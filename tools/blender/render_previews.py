@@ -258,7 +258,7 @@ def forest():
     reset()
     lib = import_lib(PROPS)
     setup_render(exposure=0.2)
-    world(horizon=(1.0, 0.70, 0.42), zenith=(0.35, 0.48, 0.70), haze=0.012, haze_col=(1.0, 0.82, 0.6))
+    world(horizon=(1.0, 0.70, 0.42), zenith=(0.35, 0.48, 0.70), haze=0.0035, haze_col=(1.0, 0.82, 0.6))
     sun(12, 160, energy=5.0, color=(1.0, 0.72, 0.45))  # low, backlit
     g = ground(colors=((0.32, 0.30, 0.14), (0.45, 0.38, 0.22)), hills=14, seed=3)
     rnd = random.Random(4)
@@ -282,8 +282,8 @@ def forest():
         inst(lib, n, (x, y, height_at(g, x, y)), rz=rnd.uniform(0, 6.28), s=rnd.uniform(0.7, 1.4))
     for i, (x, y) in enumerate(((-5, 14), (-2, 30), (4, 42))):
         inst(lib, 'Fence_Rail', (x, y, height_at(g, x, y)), rz=1.2)
-    cz = height_at(g, -6, -8)
-    camera((-6, -8, cz + 2.2), (4, 60, cz + 5), lens=28)
+    cz = height_at(g, -2, 4)
+    camera((-2, 4, cz + 2.0), (6, 60, cz + 6), lens=26)
     render('forest')
 
 
@@ -291,7 +291,7 @@ def snow():
     reset()
     lib = import_lib(PROPS)
     setup_render(exposure=0.0)
-    world(horizon=(0.80, 0.84, 0.90), zenith=(0.45, 0.52, 0.62), strength=1.4, haze=0.010, haze_col=(0.85, 0.88, 0.95))
+    world(horizon=(0.80, 0.84, 0.90), zenith=(0.45, 0.52, 0.62), strength=1.4, haze=0.006, haze_col=(0.85, 0.88, 0.95))
     sun(20, 120, energy=2.5, color=(0.95, 0.93, 0.9))
     g = ground(colors=((0.78, 0.80, 0.84), (0.55, 0.52, 0.48)), hills=18, seed=8)
     rnd = random.Random(9)
@@ -397,7 +397,21 @@ def town_street():
     town_scene('town_front', (-22, -9, 2.4), (-22, 8, 4.5), lens=24, sunp=(18, -150))
 
 
-ALL = {'lineup_big': lineup_big, 'lineup_small': lineup_small, 'forest': forest, 'snow': snow,
+def closeup():
+    reset()
+    lib = import_lib(PROPS)
+    setup_render()
+    world(haze=0.0003)
+    sun(30, -40, energy=4.5)
+    ground(colors=((0.36, 0.30, 0.18), (0.44, 0.35, 0.24)))
+    items = [('Sagebrush', 0, 0), ('Tumbleweed', 1.6, 0.2), ('CowSkull', 2.8, -0.3), ('GraveCross', 4.6, 0.3), ('Rock_A', -1.6, 0.4), ('Rock_C', -3.2, 0.8)]
+    for n, x, y in items:
+        inst(lib, n, (x, y, 0), rz=0.0)
+    camera((0.8, -5.2, 1.9), (0.8, 0.3, 0.35), lens=35)
+    render('closeup')
+
+
+ALL = {'closeup': closeup, 'lineup_big': lineup_big, 'lineup_small': lineup_small, 'forest': forest, 'snow': snow,
        'desert': desert, 'town': town, 'town_street': town_street}
 todo = argv or [k for k in ALL if not k.startswith('town') or os.path.exists(TOWN)]
 for k in todo:

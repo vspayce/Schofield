@@ -160,7 +160,10 @@ def drop_shadow(alpha, dx, dy, blur_px, opacity):
 def save_rgba(arr, name, bg_preview=(0.25, 0.2, 0.16)):
     img = Image.fromarray(to8(arr))
     p = os.path.join(UI_OUT, name)
-    img.save(p, optimize=True)
+    if name.endswith('.webp'):
+        img.save(p, quality=82, method=6)  # big grainy panels: WebP keeps them small for mobile
+    else:
+        img.save(p, optimize=True)
     # preview on a mid background + checker to judge alpha
     h, w = arr.shape[:2]
     yy, xx = np.mgrid[0:h, 0:w]

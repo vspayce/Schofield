@@ -3,7 +3,7 @@
 // MeshStandardMaterial so lighting, shadows and fog stay stock.
 import * as THREE from 'three';
 import { ROAD_HALF } from './route.js';
-import { tex } from './textures.js';
+import { tex, flatNormal } from './textures.js';
 
 const TILE = 128;
 
@@ -16,6 +16,8 @@ export function makeTerrainMaterial(route) {
     uTint1: { value: T.tint1 }, uTint2: { value: T.tint2 }, uRockTint: { value: T.rockTint },
     uSnowLine: { value: T.snowLine }, uRoadHalf: { value: ROAD_HALF },
     uRockSlope: { value: route.biome === 'canyon' ? 0.22 : 0.3 },
+    tG1N: { value: tex(T.ground1 + '_n') || flatNormal() }, tG2N: { value: tex(T.ground2 + '_n') || flatNormal() },
+    tRoadN: { value: tex(T.road + '_n') || flatNormal() }, tRockN: { value: tex(T.rock + '_n') || flatNormal() },
   };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
@@ -29,7 +31,8 @@ export function makeTerrainMaterial(route) {
         vWNorm = normalize(mat3(modelMatrix) * objectNormal);`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tG1, tG2, tRoad, tRock, tSnow, tMacro;
+        uniform sampler2D tG1, tG2, tRoad, tRock, tSnow, tMacro, tG1N, tG2N, tRoadN, tRockN;
+        vec3 gWN;
         uniform vec3 uTint1, uTint2, uRockTint;
         uniform float uSnowLine, uRoadHalf, uRockSlope;
         varying vec2 vRoad; varying vec3 vWPos; varying vec3 vWNorm;
@@ -44,14 +47,14 @@ export function makeTerrainMaterial(route) {
         vec2 wxz = vWPos.xz;
         float m1 = texture2D(tMacro, wxz / 180.0).r;
         float m2 = texture2D(tMacro, wxz / 37.0 + 0.5).r;
-        vec3 g1 = sampleAT(tG1, wxz / 7.0, m2) * uTint1;
-        vec3 g2 = sampleAT(tG2, wxz / 9.0, m2) * uTint2;
+        vec3 g1 = sampleAT(tG1, wxz / 4.0, m2) * uTint1;
+        vec3 g2 = sampleAT(tG2, wxz / 5.0, m2) * uTint2;
         vec3 ground = mix(g1, g2, smoothstep(0.42, 0.68, m1 + (m2 - 0.5) * 0.3));
         ground *= 0.82 + 0.36 * m2; // large-scale brightness variation
 
         // road: along-road UV so ruts follow the road
         float ad = abs(vRoad.x);
-        vec2 ruv = vec2(vRoad.x / 5.0, vRoad.y / 5.0);
+        vec2 ruv = vec2(vRoad.x / 4.0, vRoad.y / 4.0);
         vec3 road = texture2D(tRoad, ruv).rgb;
         float rut = smoothstep(0.55, 0.0, abs(ad - 0.82)) * 0.22 + smoothstep(0.5, 0.0, abs(ad - 1.95)) * 0.1;
         road *= 1.0 - rut;
@@ -79,9 +82,23 @@ export function makeTerrainMaterial(route) {
         col = mix(col, snow, sn);
 
         gRough = mix(mix(0.97, 0.86, rockW), 0.62, sn);
+
+        // detail normals (UDN blend on the XZ plane; tri-planar side for rock)
+        float gMix = smoothstep(0.42, 0.68, m1 + (m2 - 0.5) * 0.3);
+        vec2 ng = mix(texture2D(tG1N, wxz / 4.0).xy, texture2D(tG2N, wxz / 5.0).xy, gMix) * 2.0 - 1.0;
+        vec2 nr = texture2D(tRoadN, ruv).xy * 2.0 - 1.0;
+        // road UV runs across/along the road; rotate its tangent frame roughly into world by using the ground frame (subtle anyway)
+        vec2 nd = mix(ng * 0.7, nr, roadW);
+        vec3 wn = normalize(n + vec3(nd.x, 0.0, nd.y) * (1.0 - rockW) * (1.0 - sn * 0.6));
+        vec2 nrx = texture2D(tRockN, vWPos.zy / 9.0).xy * 2.0 - 1.0;
+        vec2 nrz = texture2D(tRockN, vWPos.xy / 9.0).xy * 2.0 - 1.0;
+        vec3 rockPert = vec3(0.0, nrx.y, nrx.x) * bw.x + vec3(nrz.x, nrz.y, 0.0) * bw.z;
+        gWN = normalize(wn + rockPert * rockW * 0.9);
         diffuseColor.rgb *= col;
       `)
-      .replace('#include <roughnessmap_fragment>', `float roughnessFactor = gRough;`);
+      .replace('#include <roughnessmap_fragment>', `float roughnessFactor = gRough;`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        normal = normalize((viewMatrix * vec4(gWN, 0.0)).xyz);`);
   };
   mat.customProgramCacheKey = () => 'terrain-' + route.def.id;
   return mat;

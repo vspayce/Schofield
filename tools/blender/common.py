@@ -737,14 +737,15 @@ def bind(ob, arm):
 # armature + posing
 # ----------------------------------------------------------------------------
 def build_armature(name, bones, roll_axis=None):
-    """bones: list of (name, head, tail, parent, connected)."""
+    """bones: list of (name, head, tail, parent, connected[, roll_z_vector])."""
     arm_data = bpy.data.armatures.new(name)
     arm = bpy.data.objects.new(name, arm_data)
     bpy.context.scene.collection.objects.link(arm)
     set_active(arm)
     bpy.ops.object.mode_set(mode="EDIT")
     eb = arm_data.edit_bones
-    for bn, head, tail, parent, conn in bones:
+    for spec in bones:
+        bn, head, tail, parent, conn = spec[:5]
         b = eb.new(bn)
         b.head = Vector(head)
         b.tail = Vector(tail)
@@ -752,7 +753,10 @@ def build_armature(name, bones, roll_axis=None):
             b.parent = eb[parent]
             b.use_connect = conn
         # consistent roll: local X toward world +X where possible
-        b.align_roll(Vector((0, 0, 1)) if abs((b.tail - b.head).normalized().z) < 0.7 else Vector((0, -1, 0)))
+        if len(spec) > 5:
+            b.align_roll(Vector(spec[5]))
+        else:
+            b.align_roll(Vector((0, 0, 1)) if abs((b.tail - b.head).normalized().z) < 0.7 else Vector((0, -1, 0)))
     bpy.ops.object.mode_set(mode="OBJECT")
     for pb in arm.pose.bones:
         pb.rotation_mode = "QUATERNION"

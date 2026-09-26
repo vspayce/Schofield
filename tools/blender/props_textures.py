@@ -81,8 +81,8 @@ def rock_granite(w, h, seed=21):
     l1m = smoothstep(0.70, 0.76, l1) * smoothstep(0.35, 0.65, fine)
     col = col * (1 - l1m[..., None] * 0.6) + np.array([0.60, 0.60, 0.44]) * (l1m[..., None] * 0.6)
     l2 = fbm(h, w, seed + 8, beta=2.8)
-    l2m = smoothstep(0.78, 0.83, l2) * (0.5 + 0.5 * fine)
-    col = col * (1 - l2m[..., None] * 0.75) + np.array([0.70, 0.42, 0.18]) * (l2m[..., None] * 0.75)
+    l2m = smoothstep(0.80, 0.84, l2) * (0.5 + 0.5 * fine)
+    col = col * (1 - l2m[..., None] * 0.5) + np.array([0.66, 0.48, 0.26]) * (l2m[..., None] * 0.5)
     streak = smoothstep(0.6, 0.85, fbm(h, w, seed + 9, beta=2.2, aniso=(1, 14)))
     col *= (1 - 0.3 * streak)[..., None]
     return np.clip(col, 0, 1)
@@ -110,15 +110,20 @@ def bark_pond(w, h, seed=31):
 
 
 def bark_fir(w, h, seed=41):
-    F1, F2, cid = worley(h, w, 90, seed, aniso=(1.0, 0.6))
-    edge = F2 - F1
-    tone = rng(seed + 1).random(90)[cid]
-    n = fbm(h, w, seed + 2, beta=1.6, aniso=(1, 4))
-    col = ramp(tone * 0.5 + n * 0.5, [(0, (0.22, 0.17, 0.13)), (0.5, (0.36, 0.29, 0.23)), (1, (0.52, 0.45, 0.38))])
-    fiss = 1 - smoothstep(0.3, 2.8, edge)
-    shade = emboss(blur_wrap(smoothstep(0, 6, edge) + n * 0.4, 0.7) * 3, 1.0)
-    col *= np.clip(shade, 0.6, 1.35)[..., None]
-    col *= (1 - 0.75 * fiss)[..., None]
+    """Grey-brown conifer bark: long shallow vertical fissures with flaky ridges."""
+    x = (np.arange(w)[None, :] + 0.5) / w * np.ones((h, 1))
+    warp = fbm(h, w, seed, beta=3.2, aniso=(1, 3))
+    ph = x * 9 + (warp - 0.5) * 2.2
+    f = ph - np.floor(ph)
+    ridge = np.exp(-((f - 0.5) / 0.24) ** 2)
+    brk = fbm(h, w, seed + 1, beta=1.6, aniso=(1, 6))
+    F1, F2, cid = worley(h, w, 120, seed + 2, aniso=(1.0, 0.3))
+    plate = smoothstep(0.0, 4.0, F2 - F1)
+    height = ridge * 0.6 + plate * 0.4 * ridge + brk * 0.4
+    tone = rng(seed + 3).random(120)[cid]
+    col = ramp(np.clip(height * 0.7 + tone * 0.3, 0, 1), [(0, (0.12, 0.09, 0.07)), (0.4, (0.30, 0.24, 0.19)), (0.75, (0.45, 0.39, 0.33)), (1, (0.56, 0.51, 0.45))])
+    shade = emboss(blur_wrap(height, 0.8) * 3, 0.7)
+    col *= np.clip(shade, 0.7, 1.3)[..., None]
     return np.clip(col, 0, 1)
 
 

@@ -11,7 +11,9 @@ DieStanding) lift the root so the FEET are at the origin -> place the rider at
 ground level for those.
 
 Meshes (toggle in code): Body, Duster, Poncho, Hat_Wide, Hat_Bowler, Bandana
-Empty:  Grip_R (child of bone hand.R) - weapon grip; -Y = barrel, +Z = up
+Weapons: hand.R bone head sits in the palm; its local frame (as three.js sees it)
+        has +Z along the hand/barrel and +Y up, so a gun added as a child of hand.R
+        with identity transform aims correctly.  Grip_R is an equivalent empty.
 Clips:  Ride, RideAim, Shoot, FallOff, StandIdle, StandShoot, DieStanding
 """
 import math
@@ -46,6 +48,24 @@ def J(s):
     }
 
 
+def palm(s):
+    """Grip point in the palm (hand.X bone head)."""
+    j = J(s)
+    w, h = np.array(j["wri"]), np.array(j["hnd"])
+    return tuple(w + (h - w) * 0.45 + np.array([0, 0, -0.012]))
+
+
+HAND_FWD = {s: (Vector(J(s)["hnd"]) - Vector(J(s)["wri"])) * Vector((1, 1, 0)) for s in (1, -1)}
+
+
+def hand_q(side, forward, up=(0, 0, 1)):
+    """World delta for hand bone so the hand points along `forward` with back-of-hand/gun-top toward `up`."""
+    f0 = HAND_FWD[side].normalized()
+    Mr = frame_mat(f0, Vector((0, 0, 1)).cross(f0))
+    Mt = frame_mat(Vector(forward).normalized(), Vector(up).cross(Vector(forward).normalized()))
+    return (Mt @ Mr.transposed()).to_quaternion()
+
+
 def bone_list():
     B = [
         ("root", (0, 0, 0), (0, 0, 0.10), None, False),
@@ -62,7 +82,8 @@ def bone_list():
             ("shoulder" + sfx, j["sho"], j["arm"], "chest", False),
             ("upperarm" + sfx, j["arm"], j["elb"], "shoulder" + sfx, True),
             ("forearm" + sfx, j["elb"], j["wri"], "upperarm" + sfx, True),
-            ("hand" + sfx, j["wri"], j["hnd"], "forearm" + sfx, True),
+            ("hand" + sfx, palm(s), tuple(np.array(palm(s)) + np.array([0, 0, 0.08])), "forearm" + sfx, False,
+             tuple((np.array(j["hnd"]) - np.array(j["wri"])) * np.array([1, 1, 0]))),
             ("thigh" + sfx, j["hip"], j["kne"], "hips", False),
             ("shin" + sfx, j["kne"], j["ank"], "thigh" + sfx, True),
             ("foot" + sfx, j["ank"], j["toe"], "shin" + sfx, True),
@@ -99,7 +120,7 @@ def body_prims():
             K(j["arm"] - np.array([0.03 * s, 0, 0.0]), j["elb"], 0.058, 0.045, "shirt", ["upperarm" + sfx, "shoulder" + sfx], k=0.03),
             K((0.07 * s, 0.035, 0.56), j["arm"], 0.07, 0.06, "shirt", ["shoulder" + sfx, "chest"], k=0.05),
             K(j["elb"], j["wri"], 0.045, 0.036, "shirt", ["forearm" + sfx], k=0.02),
-            E(j["wri"] + (j["hnd"] - j["wri"]) * 0.45, (0.035, 0.05, 0.042), "glove", ["hand" + sfx], k=0.015),
+            E(j["wri"] + (j["hnd"] - j["wri"]) * 0.5, (0.035, 0.05, 0.042), "glove", ["hand" + sfx], k=0.015),
             K(j["hip"] + np.array([0.0, 0.0, -0.01]), j["kne"], 0.088, 0.058, "pants", ["thigh" + sfx, "hips"], k=0.05),
             E(j["kne"], (0.058, 0.06, 0.06), "pants", ["thigh" + sfx, "shin" + sfx], k=0.02),
             K(j["kne"] + (j["ank"] - j["kne"]) * 0.12, j["ank"], 0.058, 0.047, "boot", ["shin" + sfx], k=0.02),
@@ -152,7 +173,7 @@ def duster_prims(bp):
             K(j["hip"] + np.array([0.02 * s, 0.02, 0.03]), j["kne"] + np.array([0.0, 0.08, 0.02]), 0.12, 0.085, "coat",
               ["thigh" + sfx, "hips"], k=0.05),
             # side skirt hanging down the horse's flank
-            C.box((0.30 * s, -0.08, -0.22), (0.014, 0.16, 0.20), 0.01, "coat", ["thigh" + sfx], k=0.05, rot=_roty(-8 * s)),
+            C.box((0.30 * s, -0.08, -0.22), (0.014, 0.16, 0.20), 0.01, "coat", ["hips"], k=0.05, rot=_roty(-8 * s)),
         ]
     # no coat below the skirt hem, keep wrists/hands out of the sleeves
     P += [C.box((0, 0, -1.0), (1, 1, 0.58), 0.0, "cut", [], sub=True, k=0.02)]
@@ -417,7 +438,7 @@ def aim_upper(rig, loc, rt, direction, turn=-22.0):
     q = aim_q(rig, "upperarm.R", direction)
     world["upperarm.R"] = q
     world["forearm.R"] = aim_q(rig, "forearm.R", direction)
-    world["hand.R"] = aim_q(rig, "hand.R", direction)
+    world["hand.R"] = hand_q(-1, direction)
     return loc, world, rt
 
 
@@ -452,8 +473,7 @@ def shoot_clip(A, n=15):
         up = Vector((0, 0, 0.35 * k))
         d = (AIM_DIR + up).normalized()
         loc2, world, rt = aim_upper(A.rig, loc, rt, d)
-        world["hand.R"] = world["hand.R"].copy()
-        world["hand.R"] = aim_q(A.rig, "hand.R", (AIM_DIR + Vector((0, 0, 0.8 * k))).normalized())
+        world["hand.R"] = hand_q(-1, (AIM_DIR + Vector((0, 0, 0.8 * k))).normalized())
         loc2["chest"] = loc2["chest"] @ E(-4 * k)
         loc2["head"] = loc2["head"] @ E(-3 * k)
         return loc2, world, rt
@@ -522,7 +542,7 @@ def stand_arms(rig, w, sway=0.0):
     for sfx, s in ((".L", 1), (".R", -1)):
         w["upperarm" + sfx] = aim_q(rig, "upperarm" + sfx, Vector((0.16 * s, 0.02 + sway, -1)))
         w["forearm" + sfx] = aim_q(rig, "forearm" + sfx, Vector((0.08 * s, -0.22 + sway, -1)))
-        w["hand" + sfx] = aim_q(rig, "hand" + sfx, Vector((0.04 * s, -0.12, -1)))
+        w["hand" + sfx] = hand_q(s, Vector((0.04 * s, -0.12, -1)), up=(0.2 * s, -1, 0))
     return w
 
 
@@ -558,7 +578,7 @@ def standshoot_clip(A, n=36):
         d = Vector((-0.10, -1, 0.02)).normalized()
         w["upperarm.R"] = aim_q(A.rig, "upperarm.R", d)
         w["forearm.R"] = aim_q(A.rig, "forearm.R", (d + Vector((0, 0, 0.25 * k))).normalized())
-        w["hand.R"] = aim_q(A.rig, "hand.R", (d + Vector((0, 0, 0.7 * k))).normalized())
+        w["hand.R"] = hand_q(-1, (d + Vector((0, 0, 0.7 * k))).normalized())
         w["coat.B"] = aim_q(A.rig, "coat.B", Vector((0, 0.12, -1)))
         return loc, w, (0, 0, A.stand_root_z - 0.02)
     return A.frames(n, pose)
@@ -611,7 +631,7 @@ def main():
     bp = body_prims()
     body = build_mesh("Body", bp, 0.0065, 4700, body_color(bp), 1024)
     dp = duster_prims(bp)
-    duster = build_mesh("Duster", dp, 0.008, 3000, cloth_color(dp, (0.50, 0.41, 0.30), duster_pattern), 512)
+    duster = build_mesh("Duster", dp, 0.008, 3000, cloth_color(dp, (0.34, 0.28, 0.22), duster_pattern), 512)
     pp = poncho_prims(bp)
     poncho = build_mesh("Poncho", pp, 0.009, 900, cloth_color(pp, (0.55, 0.45, 0.30), poncho_pattern), 256)
     bdp = bandana_prims(bp)
@@ -651,11 +671,11 @@ def main():
     g.parent_type = "BONE"
     g.parent_bone = "hand.R"
     bpy.context.view_layer.update()
-    hd = (rig.tail["hand.R"] - rig.head["hand.R"]).normalized()
-    Mg = frame_mat(hd, (1, 0, 0))  # columns side, dir, up ; want -Y = dir
-    rot = Matrix((Mg.col[0], -Mg.col[1], Mg.col[2])).transposed()
-    palm = rig.head["hand.R"] + (rig.tail["hand.R"] - rig.head["hand.R"]) * 0.45 + Vector((0, 0, -0.012))
-    g.matrix_world = Matrix.Translation(palm) @ rot.to_4x4()
+    fwd = HAND_FWD[-1].normalized()
+    side = Vector((0, 0, 1)).cross(fwd).normalized()
+    up = fwd.cross(side)
+    rot = Matrix((side, -fwd, up)).transposed()  # Blender: -Y = barrel, +Z = up  (glTF: +Z barrel, +Y up)
+    g.matrix_world = Matrix.Translation(Vector(palm(-1))) @ rot.to_4x4()
 
     A = RiderAnim(rig)
     C.write_action(arm, "Ride", ride_clip(A), loop=True)

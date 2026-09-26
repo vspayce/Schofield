@@ -210,10 +210,14 @@ export class Route {
     if (this.biome === 'canyon') {
       // canyon walls: sandy floor, then steep stepped walls up to the plateau
       const floorW = 16 + 6 * this.noise(rc.s / 120, 1.7);
-      let w = smoothstep(floorW, floorW + 28, ad + this.noise(x / 25, z / 25) * 4);
+      // buttresses and gullies break up the walls
+      const gully = fbm(this.noise2, x / 14, z / 14, 3) * 7 + Math.abs(this.noise(x / 40 + 7, z / 40)) * 6;
+      let w = smoothstep(floorW, floorW + 28, ad + this.noise(x / 25, z / 25) * 4 + gully * 0.6);
       w = w * w * (3 - 2 * w);
       const flatW = 1 - townFlat * (1 - smoothstep(30, 60, ad));
-      return lerp(rh + crown, nat, w * flatW);
+      // talus: a little rubble slope at the foot of the walls
+      const talus = smoothstep(floorW - 4, floorW + 6, ad) * (1 - w) * 3;
+      return lerp(rh + crown + talus, nat + gully * 0.4, w * flatW);
     }
     const inner = ROAD_HALF + 2 + townFlat * 40;
     const w = smoothstep(inner, inner + blendW + townFlat * 30, ad + this.noise(x / 40, z / 40) * 3);

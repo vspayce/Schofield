@@ -28,7 +28,7 @@ export class HUD {
     this.cyl.innerHTML = '';
     for (let i = 0; i < 6; i++) {
       const c = document.createElement('div'); c.className = 'ch full';
-      const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const a = (i / 6) * Math.PI * 2 - Math.PI / 2; // art: chamber centres at 76/256 of the width, first at top
       c.style.left = 37 + Math.cos(a) * 22 + 'px'; c.style.top = 37 + Math.sin(a) * 22 + 'px';
       this.cyl.appendChild(c);
     }

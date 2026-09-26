@@ -34,5 +34,27 @@ FOLIAGE = {
 }
 
 TOWN_SIZE = (1024, 1024)
-# filled in by town_textures.py / build_town.py
-TOWN = {}
+# Town atlas (JPEG). Tiling regions state the metres they represent in build_town.py.
+TOWN = {
+    'siding_grey':   (0,   0,   256, 384),   # vertical board-and-batten, 2 m x 3 m
+    'siding_red':    (256, 0,   256, 384),   # faded barn-red paint, peeling
+    'siding_ochre':  (512, 0,   256, 384),   # faded ochre/cream paint, peeling
+    'clapboard':     (768, 0,   256, 384),   # horizontal lap siding, peeling white, 2 m x 3 m
+    'shingle':       (0,   384, 256, 256),   # wood shingles, 2 m x 2 m (v = up the slope)
+    'tin':           (256, 384, 256, 256),   # corrugated rusty tin, 2 m x 2 m (ribs along v)
+    'floor':         (512, 384, 256, 256),   # deck boards along u, 2 m x 2 m
+    'brick':         (768, 384, 256, 256),   # 2 m x 2 m
+    'trim':          (0,   640, 128, 384),   # beam/post grain along v
+    'signs':         (128, 640, 512, 384),   # 6 signs, 512 x 64 each (top to bottom = TOWN_SIGNS)
+    'win_glass':     (640, 640, 96,  128),
+    'win_broken':    (736, 640, 96,  128),
+    'win_boarded':   (832, 640, 96,  128),
+    'win_open':      (928, 640, 96,  128),
+    'door_panel':    (640, 768, 96,  256),
+    'door_saloon':   (736, 768, 96,  256),
+    'door_barn':     (832, 768, 128, 256),
+    'dark':          (960, 768, 64,  128),
+    'iron':          (960, 896, 64,  64),
+    'rope':          (960, 960, 64,  64),
+}
+TOWN_SIGNS = ['SALOON', 'GENERAL STORE', 'SHERIFF', 'BANK', 'HOTEL', 'LIVERY']

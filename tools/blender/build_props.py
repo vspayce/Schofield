@@ -304,23 +304,28 @@ def pine_snow(name, seed, height=12.5):
             wdt = Lb * 0.52
             nfn = canopy_normal_fn(axis, 0.8)
             # u along the branch (stem at left edge u=0 -> trunk), v across
+            # folded "tent" card: 2 segments along the branch (tip droops more) x 2 halves
+            # hinged on the stem, so it never collapses to a razor line when seen edge-on
             fr = 'fir_snow'
-            p0 = base - tan * wdt * 0.5
-            p1 = base + dirv * Lb - tan * wdt * 0.5
-            p2 = base + dirv * Lb + tan * wdt * 0.5
-            p3 = base + tan * wdt * 0.5
-            # rotate slightly about the branch so the spray reads from the side too
-            rq = Matrix.Rotation(rnd.uniform(-0.25, 0.25), 3, dirv)
-            p0, p1, p2, p3 = [base + rq @ (p - base) for p in (p0, p1, p2, p3)]
-            uvs = [FA(fr, 0, 0), FA(fr, 1, 0), FA(fr, 1, 1), FA(fr, 0, 1)]
-            gn = (p1 - p0).cross(p3 - p0)
-            ns = [nfn(p) for p in (p0, p1, p2, p3)]
-            if gn.z < 0:
-                p0, p3 = p3, p0
-                p1, p2 = p2, p1
-                uvs = [uvs[3], uvs[2], uvs[1], uvs[0]]
-                ns = [ns[3], ns[2], ns[1], ns[0]]
-            mb.quad([p0, p1, p2, p3], uvs, FOL, smooth=True, tag='foliage', normals=ns)
+            rq = Matrix.Rotation(rnd.uniform(-0.2, 0.2), 3, dirv)
+            tn = rq @ tan
+            dir2 = (dirv * math.cos(0.22) - UP * math.sin(0.22)).normalized()
+            fold = rnd.uniform(0.28, 0.42)
+            mids = [base, base + dirv * Lb * 0.5, base + dirv * Lb * 0.5 + dir2 * Lb * 0.5]
+            rows = []
+            for m in mids:
+                rows.append([m - tn * wdt * 0.5 - UP * wdt * 0.5 * fold, m, m + tn * wdt * 0.5 - UP * wdt * 0.5 * fold])
+            for i in range(2):
+                for j in range(2):
+                    q = [rows[i][j], rows[i + 1][j], rows[i + 1][j + 1], rows[i][j + 1]]
+                    uvs = [FA(fr, i * 0.5, j * 0.5), FA(fr, (i + 1) * 0.5, j * 0.5), FA(fr, (i + 1) * 0.5, (j + 1) * 0.5), FA(fr, i * 0.5, (j + 1) * 0.5)]
+                    ns = [nfn(p) for p in q]
+                    gn = (q[1] - q[0]).cross(q[3] - q[0])
+                    if gn.z < 0:
+                        q = [q[3], q[2], q[1], q[0]]
+                        uvs = [uvs[3], uvs[2], uvs[1], uvs[0]]
+                        ns = [ns[3], ns[2], ns[1], ns[0]]
+                    mb.quad(q, uvs, FOL, smooth=True, tag='foliage', normals=ns)
             # second, steeper card (plain spray) for side silhouette
             if t < 0.92 and rnd.random() < 0.85:
                 rq2 = Matrix.Rotation(rnd.choice([-1, 1]) * rnd.uniform(0.9, 1.25), 3, dirv)
@@ -481,22 +486,27 @@ def joshua(name, seed=5):
 def sagebrush(name, seed=3):
     rnd = random.Random(seed)
     mb = C.MeshBuilder()
-    ctr = V((0, 0, 0.35))
-    nfn = lambda q: ((q - ctr) * V((1, 1, 0.7)) + UP * 0.35).normalized()
-    n = 11
+    ctr = V((0, 0, 0.3))
+    nfn = lambda q: ((q - ctr) * V((1, 1, 0.8)) + UP * 0.3).normalized()
+    # outer ring: cards leaning outward (a loose mound), inner: upright crossed cards
+    n = 7
     for i in range(n):
-        az = i * math.pi / n + rnd.uniform(-0.12, 0.12)
-        s = rnd.uniform(0.85, 1.25)
-        off = V((rnd.uniform(-0.18, 0.18), rnd.uniform(-0.18, 0.18), 0))
-        rgt = V((math.cos(az), math.sin(az), 0)) * s * 0.55
-        tilt = V((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 1)).normalized()
-        card(mb, 'sage', off - UP * 0.04, tilt * s * 0.95, rgt, nfn)
-    # a flat-ish cap card to fill the top when seen from above
-    card(mb, 'sage', V((0, -0.45, 0.62)), V((0, 0.9, 0.12)), V((0.5, 0, 0)), nfn, want_normal=UP)
+        az = i * 2 * math.pi / n + rnd.uniform(-0.2, 0.2)
+        o = V((math.cos(az), math.sin(az), 0))
+        tan = UP.cross(o)
+        s = rnd.uniform(0.8, 1.1)
+        lean = rnd.uniform(0.35, 0.6)
+        up = (UP * math.cos(lean) + o * math.sin(lean)).normalized()
+        card(mb, 'sage', o * 0.12 - UP * 0.05, up * s * 0.9, tan * s * 0.5, nfn, want_normal=(o + UP * 0.5))
+    for i in range(3):
+        az = i * math.pi / 3 + rnd.uniform(-0.2, 0.2)
+        rgt = V((math.cos(az), math.sin(az), 0))
+        s = rnd.uniform(1.05, 1.25)
+        card(mb, 'sage', -UP * 0.04, UP * s, rgt * s * 0.55, nfn)
 
     def fshade(co, n):
         h = min(1.0, max(0.0, co.z / 0.9))
-        a = 0.55 + 0.45 * h
+        a = 0.5 + 0.5 * h
         nz = noise.noise(co * 2.0)
         return (a * (1 + 0.04 * nz), a, a * (1 - 0.04 * nz))
     return finish(mb, name, foliage_fn=fshade)

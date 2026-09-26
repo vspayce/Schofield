@@ -350,7 +350,7 @@ def poster():
     out = np.concatenate([np.clip(col, 0, 1), alpha[..., None]], -1)
     sh = drop_shadow(alpha, 6, 10, 10, 0.5)
     out = compose([(np.zeros(3), sh), (out[..., :3], alpha)], w, h)
-    save_rgba(out, 'poster.png')
+    save_rgba(out, 'poster.webp')
 
 
 def paper():
@@ -368,7 +368,7 @@ def paper():
     ember = (rng.random((h, w)) > 0.985) * smoothstep(3, 0, dd) * smoothstep(-1, 0.5, dd)
     col = col + hexc('#c25a1a') * gblur(ember.astype(float), 1.0)[..., None] * 1.5
     out = compose([(np.zeros(3), drop_shadow(alpha, 5, 8, 9, 0.5)), (np.clip(col, 0, 1), alpha)], w, h)
-    save_rgba(out, 'paper.png')
+    save_rgba(out, 'paper.webp')
 
 
 # =============================================================================== weapon engravings

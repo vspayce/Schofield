@@ -52,9 +52,9 @@ def log(*a):
 # ----------------------------------------------------------------------------
 # decals (PIL, system python)
 # ----------------------------------------------------------------------------
-py = shutil.which('python3') or '/usr/bin/python3'
+PY = shutil.which('python3') or '/usr/bin/python3'
 try:
-    subprocess.run([py, os.path.join(ROOT, 'tools', 'textures', 'coach_decals.py')], check=True)
+    subprocess.run([PY, os.path.join(ROOT, 'tools', 'textures', 'coach_decals.py')], check=True)
 except Exception as e:
     if not os.path.exists(os.path.join(SRC_TEX, 'coach_side_col.png')):
         raise
@@ -738,12 +738,22 @@ for k, objs in atlases.items():
 for w in (wheel_RL, wheel_FL):
     w.location.x -= 40.0
 
-# JPEG copies for embedding (smaller GLB)
+# JPEG copies for embedding (smaller GLB) — converted with PIL (system python)
 FINAL = {}
+conv = []
 for (k, kind), img in IMGS.items():
     q = {'color': 90, 'orm': 85, 'normal': 92}[kind]
+    conv.append((os.path.join(BUILD, 'coach%s_%s.png' % (k, kind)),
+                 os.path.join(BUILD, 'coach%s_%s.jpg' % (k, kind)), q))
+subprocess.run([PY, '-c', """
+import sys
+from PIL import Image
+a = sys.argv[1:]
+for i in range(0, len(a), 3):
+    Image.open(a[i]).convert('RGB').save(a[i + 1], quality=int(a[i + 2]), optimize=True, subsampling=0 if 'normal' in a[i] else 2)
+"""] + [str(x) for c in conv for x in c], check=True)
+for (k, kind), img in IMGS.items():
     path = os.path.join(BUILD, 'coach%s_%s.jpg' % (k, kind))
-    L.save_image(img, path, quality=q)
     im2 = bpy.data.images.load(path)
     im2.name = 'Coach%s_%s' % (k, kind)
     if kind != 'color':

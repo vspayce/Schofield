@@ -72,13 +72,13 @@ html, body {
   display: flex; align-items: center; justify-content: center; gap: 24px;
 }
 #route-bar { display: flex; align-items: center; gap: 10px; font-family: var(--font-sc); font-size: 14px; text-shadow: 0 1px 3px #000; }
-#route-track { position: relative; width: min(34vw, 340px); height: 6px; background: rgba(0, 0, 0, .45); border: 1px solid rgba(243, 230, 200, .35); border-radius: 3px; }
+#route-track { position: relative; width: min(26vw, 320px); height: 6px; background: rgba(0, 0, 0, .45); border: 1px solid rgba(243, 230, 200, .35); border-radius: 3px; }
 #route-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #8a5a2b, var(--brass)); border-radius: 3px; }
 #route-coach { position: absolute; top: -14px; width: 34px; height: 34px; margin-left: -17px; left: 0; object-fit: contain; filter: drop-shadow(0 1px 2px #000); }
 #bounty { position: absolute; right: 0; font-family: var(--font-title); font-size: 20px; color: var(--brass); text-shadow: 0 2px 4px #000; }
 #bounty .lbl { font-family: var(--font-sc); font-size: 12px; color: var(--ink-dim); letter-spacing: .1em; }
 
-#hud-left { position: absolute; left: calc(12px + var(--sal)); top: calc(44px + var(--sat)); display: flex; flex-direction: column; gap: 6px; }
+#hud-left { position: absolute; left: calc(12px + var(--sal)); top: calc(48px + var(--sat)); display: flex; flex-direction: column; gap: 6px; }
 .meter { display: flex; align-items: center; gap: 6px; }
 .meter img { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 1px 2px #000); }
 .meter .bar { width: 120px; height: 7px; background: rgba(0, 0, 0, .5); border: 1px solid rgba(243, 230, 200, .3); border-radius: 4px; overflow: hidden; }
@@ -95,10 +95,10 @@ html, body {
   display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
 }
 #ammo-cyl { position: relative; width: 74px; height: 74px; transition: transform .25s cubic-bezier(.3, 1.6, .5, 1); }
-#ammo-cyl .ch { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; background-size: contain; background-repeat: no-repeat; }
+#ammo-cyl .ch { position: absolute; width: 19px; height: 19px; margin: -9.5px 0 0 -9.5px; z-index: 1; background-size: contain; background-repeat: no-repeat; }
 #ammo-cyl .ch.full { background-image: url(/assets/ui/cyl_full.png); }
 #ammo-cyl .ch.empty { background-image: url(/assets/ui/cyl_empty.png); }
-#ammo-cyl::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #4a4744 0 12%, #2c2a28 13% 60%, #1b1a19 61% 100%); box-shadow: 0 2px 6px #000, inset 0 0 6px #000; }
+#ammo-cyl::before { content: ''; position: absolute; inset: 0; background: url(/assets/ui/revolver_cylinder.png) center / contain no-repeat; }
 #ammo-shells { display: flex; gap: 6px; }
 #ammo-shells .sh { width: 20px; height: 40px; background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0 1px 2px #000); }
 #ammo-shells .sh.full { background-image: url(/assets/ui/shell_full.png); }
@@ -148,7 +148,7 @@ body.touch #touch { display: block; }
 #btn-brake { left: calc(30px + var(--sal)); bottom: calc(30px + var(--sab)); width: 56px; height: 56px; margin-left: 4px; }
 
 #btn-pause {
-  position: absolute; top: calc(8px + var(--sat)); right: calc(170px + var(--sar)); pointer-events: auto !important;
+  position: absolute; top: calc(6px + var(--sat)); left: calc(10px + var(--sal)); pointer-events: auto !important;
   width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(243, 230, 200, .4); background: rgba(0, 0, 0, .4);
   color: var(--ink); font-size: 12px; display: none;
 }
@@ -189,15 +189,15 @@ body.touch #btn-pause { display: block; }
 .m-title { font-family: var(--font-title); font-size: clamp(22px, 4vw, 38px); margin: 0 0 12px; text-shadow: 0 3px 8px #000; }
 
 .poster {
-  position: relative; width: clamp(150px, 21vw, 230px); aspect-ratio: 4 / 5; padding: 14px 12px; color: #2b1a0d; cursor: pointer;
-  background: #d9c49a url(/assets/ui/poster.png) center / 100% 100% no-repeat; text-align: center;
+  position: relative; width: clamp(150px, 21vw, 230px); aspect-ratio: 4 / 5; padding: 34% 11% 9%; color: #2b1a0d; cursor: pointer;
+  background: #d9c49a url(/assets/ui/poster.webp) center / 100% 100% no-repeat; text-align: center;
   box-shadow: 0 10px 24px rgba(0, 0, 0, .6); transition: transform .15s; display: flex; flex-direction: column; justify-content: space-between;
 }
 .poster:nth-child(odd) { transform: rotate(-1.5deg); }
 .poster:nth-child(even) { transform: rotate(1.2deg); }
 .poster:active { transform: scale(.97); }
 .poster.locked { filter: grayscale(1) brightness(.5); cursor: default; }
-.poster h3 { font-family: var(--font-title); font-size: clamp(14px, 2vw, 20px); margin: 18px 0 4px; line-height: 1.05; }
+.poster h3 { font-family: var(--font-title); font-size: clamp(13px, 1.8vw, 19px); margin: 0 0 3px; line-height: 1.05; }
 .poster .sub { font-style: italic; font-size: clamp(11px, 1.4vw, 13px); line-height: 1.15; }
 .poster .stars { font-size: 18px; color: #7a1d12; letter-spacing: 2px; }
 .poster .reward { font-family: var(--font-title); font-size: clamp(12px, 1.6vw, 16px); }
@@ -208,7 +208,7 @@ body.touch #btn-pause { display: block; }
   background: rgba(26, 17, 10, .82); border: 2px solid rgba(169, 122, 59, .5); border-radius: 6px; box-shadow: 0 10px 24px rgba(0, 0, 0, .6);
 }
 .gun-card.sel { border-color: var(--brass); box-shadow: 0 0 0 2px var(--brass), 0 10px 24px rgba(0, 0, 0, .6); }
-.gun-card img { width: 100%; height: clamp(60px, 11vw, 110px); object-fit: contain; filter: drop-shadow(0 4px 6px #000); }
+.gun-card img { width: 100%; height: clamp(60px, 11vw, 110px); object-fit: contain; filter: invert(.92) sepia(.55) saturate(1.3) drop-shadow(0 3px 4px #000); }
 .gun-card h3 { font-family: var(--font-title); margin: 6px 0 4px; font-size: clamp(16px, 2.4vw, 22px); }
 .gun-card p { margin: 0 0 8px; font-style: italic; color: var(--ink-dim); font-size: clamp(12px, 1.6vw, 14px); }
 .stat { display: flex; align-items: center; gap: 8px; font-family: var(--font-sc); font-size: 12px; margin: 3px 0; }
@@ -217,7 +217,7 @@ body.touch #btn-pause { display: block; }
 .stat .b i { display: block; height: 100%; background: var(--brass); }
 
 .paper {
-  color: #2b1a0d; background: #d8c39a url(/assets/ui/paper.png) center / 100% 100% no-repeat; padding: 22px 38px;
+  color: #2b1a0d; background: #d8c39a url(/assets/ui/paper.webp) center / 100% 100% no-repeat; padding: 22px 38px;
   box-shadow: 0 14px 30px rgba(0, 0, 0, .7); text-align: center; min-width: min(460px, 80vw); max-height: 92vh; overflow: auto;
 }
 .paper h2 { font-family: var(--font-title); font-size: clamp(22px, 4vw, 36px); margin: 4px 0; }
