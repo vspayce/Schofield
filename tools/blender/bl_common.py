@@ -301,11 +301,12 @@ def box(mb, auv, rect, center, size, rot=None, mat=0, tile=(1.0, 1.0), grain_axi
         fu, fv = min(1.0, lu / tile[0]), min(1.0, lv / tile[1])
         ou, ov = rnd.uniform(0, 1 - fu), rnd.uniform(0, 1 - fv)
         r = (faces_rect or {}).get(key, rect)
-        if isinstance(r, tuple) and len(r) == 2 and isinstance(r[1], str):
+        if isinstance(r, tuple) and len(r) == 2 and r[0] == 'full':
             # ('full', rectname): map whole rect regardless of size
             r = r[1]
             fu = fv = 1.0
             ou = ov = 0.0
+            uvp = [(0, 0), (1, 0), (1, 1), (0, 1)]  # natural orientation: u along the face's first edge
         uvs = [auv(r, ou + a * fu, ov + b * fv) for a, b in uvp]
         out.append(mb.quad(pts, uvs, mat, tag=tag))
     return out

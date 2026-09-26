@@ -396,8 +396,8 @@ def build():
     grey = lambda w, h: board_and_batten(w, h, 1)
     gens = {
         'siding_grey': grey,
-        'siding_red': lambda w, h: peel_paint(board_and_batten(w, h, 2), 12, (0.50, 0.17, 0.12), coverage=0.6, fade=0.25),
-        'siding_ochre': lambda w, h: peel_paint(board_and_batten(w, h, 3), 13, (0.80, 0.62, 0.34), coverage=0.6, fade=0.3),
+        'siding_red': lambda w, h: peel_paint(board_and_batten(w, h, 2), 12, (0.42, 0.16, 0.12), coverage=0.68, fade=0.3),
+        'siding_ochre': lambda w, h: peel_paint(board_and_batten(w, h, 3), 13, (0.72, 0.56, 0.32), coverage=0.68, fade=0.3),
         'clapboard': lambda w, h: clapboard(w, h),
         'shingle': lambda w, h: shingles(w, h),
         'tin': lambda w, h: tin(w, h),

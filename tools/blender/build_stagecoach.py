@@ -192,15 +192,15 @@ def stencil_mail(mb, st):
 
 log('materials')
 M = {}
-M['paint'] = L.surface('paint', L.srgb(84, 23, 17), var=0.10, rough=0.36, rough_var=0.1,
+M['paint'] = L.surface('paint', L.srgb(66, 17, 13), var=0.10, rough=0.4, rough_var=0.1,
                        wear_col=L.srgb(70, 46, 30), wear=0.9, wear_rough=0.75, edge_r=0.014,
-                       scratches=0.45, dust=0.6, dust_z=(0.85, 2.3), dust_up=1.0, ao=0.75,
+                       scratches=0.45, dust=0.8, dust_z=(0.85, 2.1), dust_up=1.0, ao=0.75,
                        bump=0.06, bump_scale=35, streaks=0.35, extra=body_decal, blotch=0.25)
 M['roof'] = L.surface('roof', L.srgb(66, 24, 18), var=0.12, rough=0.6, wear_col=L.srgb(84, 60, 40),
                       wear=0.8, dust=0.9, dust_up=1.4, dust_z=(1.0, 2.6), ao=0.75, grain='Y',
                       grain_amt=0.35, blotch=0.4, bump=0.2)
-M['gear'] = L.surface('gear', L.srgb(178, 118, 38), var=0.12, rough=0.55, wear_col=L.srgb(92, 64, 40),
-                      wear=0.9, wear_rough=0.8, scratches=0.4, dust=1.0, dust_z=(0.0, 1.5),
+M['gear'] = L.surface('gear', L.srgb(158, 102, 36), var=0.14, rough=0.55, wear_col=L.srgb(92, 64, 40),
+                      wear=0.9, wear_rough=0.8, scratches=0.4, dust=1.3, dust_z=(0.0, 1.7),
                       ao=0.75, streaks=0.3, blotch=0.35, bump=0.12, edge_r=0.012)
 M['iron'] = L.surface('iron', L.srgb(40, 37, 34), var=0.15, rough=0.55, metal=0.6,
                       wear_col=L.srgb(150, 146, 138), wear=0.9, wear_rough=0.3, wear_metal=0.9,
@@ -368,7 +368,7 @@ for (x, k) in ((-0.64, 0.92), (-0.61, 1.0), (0.61, 1.0), (0.64, 0.92)):
     rings_b.append([(x, FW + py * k, pz if pz in (1.60, 2.22) else pz) for (py, pz) in prof])
 L.add_loft(bm, rings_b)
 recalc(bm)
-P('front_boot', bm, M['blackleather'], 'Body', 'A', 0.8, smooth=40)
+P('front_boot', bm, M['boot'], 'Body', 'A', 0.8, smooth=40)
 
 bm = bmesh.new()
 L.add_box(bm, (1.34, 0.40, 0.09), (0, FW - 0.19, 2.265), bevel=0.03, segs=2)      # cushion
@@ -742,7 +742,7 @@ for w in (wheel_RL, wheel_FL):
 FINAL = {}
 conv = []
 for (k, kind), img in IMGS.items():
-    q = {'color': 90, 'orm': 85, 'normal': 92}[kind]
+    q = {'color': 86, 'orm': 80, 'normal': 85}[kind]
     conv.append((os.path.join(BUILD, 'coach%s_%s.png' % (k, kind)),
                  os.path.join(BUILD, 'coach%s_%s.jpg' % (k, kind)), q))
 subprocess.run([PY, '-c', """
@@ -750,7 +750,10 @@ import sys
 from PIL import Image
 a = sys.argv[1:]
 for i in range(0, len(a), 3):
-    Image.open(a[i]).convert('RGB').save(a[i + 1], quality=int(a[i + 2]), optimize=True, subsampling=0 if 'normal' in a[i] else 2)
+    im = Image.open(a[i]).convert('RGB')
+    if 'orm' in a[i]:
+        im = im.resize((im.width // 2, im.height // 2), Image.LANCZOS)
+    im.save(a[i + 1], quality=int(a[i + 2]), optimize=True, subsampling=0 if 'normal' in a[i] else 2)
 """] + [str(x) for c in conv for x in c], check=True)
 for (k, kind), img in IMGS.items():
     path = os.path.join(BUILD, 'coach%s_%s.jpg' % (k, kind))

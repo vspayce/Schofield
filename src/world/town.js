@@ -5,7 +5,9 @@ import { assets, findNode } from '../core/assets.js';
 import { mulberry32 } from '../core/noise.js';
 
 const KIT = ['Saloon', 'GeneralStore', 'Sheriff', 'Bank', 'Hotel', 'Livery', 'Shack'];
-const WIDTH = { Saloon: 13, GeneralStore: 10, Sheriff: 9, Bank: 10, Hotel: 12, Livery: 13, Shack: 7, Church: 11, WaterTower: 6, Gallows: 6 };
+// footprint width (along the street) and depth, metres — from town.glb
+const WIDTH = { Saloon: 10.5, GeneralStore: 9.7, Sheriff: 8.1, Bank: 8.5, Hotel: 12.5, Livery: 12.8, Shack: 5.2, Church: 8.8, WaterTower: 5.3, Gallows: 6.7 };
+const DEPTH = { Saloon: 16.6, GeneralStore: 15.7, Sheriff: 13.4, Bank: 13.2, Hotel: 15.6, Livery: 17.4, Shack: 5.3, Church: 16.6, WaterTower: 5.8, Gallows: 3.1 };
 
 function fallbackBuilding(name, rnd) {
   const g = new THREE.Group();
@@ -62,7 +64,7 @@ export class Towns {
 
   _place(name, s, side, rnd, ghost, extraOffset = 0) {
     const r = this.route, f = r.frame(s, {});
-    const off = 11 + extraOffset + rnd() * 1.5;
+    const off = 9.5 + extraOffset + rnd() * 1.2 + (name === 'Livery' ? 1.5 : 0);
     const x = f.x + f.rx * off * side, z = f.z + f.rz * off * side;
     const b = kitBuilding(name) || fallbackBuilding(name, rnd);
     // front (+Z local) faces the road
@@ -70,7 +72,8 @@ export class Towns {
     // sit on the lowest corner so it doesn't float on slopes
     const w = (WIDTH[name] || 9) / 2;
     let y = Infinity;
-    for (const [a, c] of [[-w, 0], [w, 0], [-w, -10], [w, -10], [0, -5]]) {
+    const dp = DEPTH[name] || 10;
+    for (const [a, c] of [[-w, 0], [w, 0], [-w, -dp], [w, -dp], [0, -dp / 2]]) {
       const lx = Math.cos(yaw) * a + Math.sin(yaw) * c, lz = -Math.sin(yaw) * a + Math.cos(yaw) * c;
       y = Math.min(y, r.height(x + lx, z + lz));
     }

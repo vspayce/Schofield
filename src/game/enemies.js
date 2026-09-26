@@ -386,7 +386,7 @@ export class Enemies {
             const watch = () => {
               if (g.over) return;
               if (g.coach.s > sp.s - 75) {
-                const e = new Gunman(g, sp.pos.clone().add(new THREE.Vector3(0, sp.roof ? 0 : -1.1, 0)), sp.face, { rifle: Math.random() < 0.3, popup: true });
+                const e = new Gunman(g, sp.pos.clone(), sp.face, { rifle: Math.random() < 0.3, popup: true }); // spawn empty = feet
                 e.s = sp.s; this.list.push(e);
               } else this._spawnQ.push({ t: 0.25, fn: watch });
             };

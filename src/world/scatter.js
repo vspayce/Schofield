@@ -74,7 +74,11 @@ function kindFromGLB(name) {
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     mats.forEach((mat) => {
       if (mat.map) mat.map.anisotropy = 4;
-      if (mat.transparent || mat.alphaTest > 0) { mat.alphaTest = Math.max(mat.alphaTest, 0.5); mat.transparent = false; mat.side = THREE.DoubleSide; }
+      if (mat.transparent || mat.alphaTest > 0) {
+        mat.alphaTest = Math.max(mat.alphaTest, 0.4); mat.transparent = false; mat.side = THREE.DoubleSide;
+        // with MSAA, alpha-to-coverage keeps distant foliage cards from thinning out
+        if (_msaa) mat.alphaToCoverage = true;
+      }
     });
     if (mats.length > 1) {
       // split multi-material geometry by group
@@ -91,6 +95,7 @@ function kindFromGLB(name) {
 }
 
 const kindCache = {};
+let _msaa = false;
 export function getKind(name) {
   if (!kindCache[name]) kindCache[name] = kindFromGLB(name) || fallbackKind(name);
   return kindCache[name];
@@ -101,6 +106,7 @@ export function resetKinds() { for (const k in kindCache) delete kindCache[k]; }
 export class Scatter {
   constructor(route, scene, quality) {
     this.route = route; this.scene = scene; this.q = quality;
+    if (_msaa !== quality.msaa > 0) { _msaa = quality.msaa > 0; resetKinds(); }
     this.rules = route.def.scatter;
     this.byTile = new Map(); // key -> { kind -> Float32Array matrices }
     this.meshes = {};        // kind -> [InstancedMesh per part]

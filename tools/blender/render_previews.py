@@ -347,7 +347,7 @@ def town_scene(name, cam, target, lens=30, sunp=(14, -120)):
     lib = import_lib(TOWN)
     plib = import_lib(PROPS)
     setup_render(exposure=0.15)
-    world(horizon=(1.0, 0.66, 0.40), zenith=(0.33, 0.43, 0.66), haze=0.006, haze_col=(1.0, 0.76, 0.55))
+    world(horizon=(1.0, 0.66, 0.40), zenith=(0.33, 0.43, 0.66), haze=0.0025, haze_col=(1.0, 0.76, 0.55))
     sun(sunp[0], sunp[1], energy=5.0, color=(1.0, 0.68, 0.42))
     ground(colors=((0.50, 0.38, 0.26), (0.58, 0.46, 0.33)))
     # street along X; north side buildings face -Y... we place: north row (y=+8) facing street (-Y, default)
@@ -394,7 +394,7 @@ def town():
 
 
 def town_street():
-    town_scene('town_front', (-22, -9, 2.4), (-22, 8, 4.5), lens=24, sunp=(18, -150))
+    town_scene('town_front', (-24, -5.5, 2.0), (-24, 8, 5.0), lens=20, sunp=(22, -150))
 
 
 def closeup():
