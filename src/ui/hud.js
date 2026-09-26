@@ -118,27 +118,40 @@ export class HUD {
     this.btnScope.classList.toggle('active', on);
   }
 
-  // a marker over every rifleman / gunman who can see you, so the ridges and
-  // rooftops aren't a guessing game; it flashes red when he's about to fire
+  // A bracket around every rifleman / gunman who can see you. On a far ridge he
+  // is only a few pixels tall, so the bracket is sized to how big he actually
+  // looks: a small box on an empty hillside tells you exactly where to aim, and
+  // it opens up as he gets closer. Flashes red when he's about to fire.
   _shooters(game) {
     const list = [];
+    const H = game.renderer.height;
+    // pixels per metre at one metre, for this camera's field of view
+    const perM = H / (2 * Math.tan(THREE.MathUtils.degToRad(game.camera.fov / 2)));
     for (const e of game.enemies.list) {
       if (!e.alive || e.type === 'rider' || !e.los) continue;
-      const dist = e.spheres[0].c.distanceTo(game.player.camPos);
+      const dist = e.spheres[1].c.distanceTo(game.player.camPos);
       if (dist > (e.rifle ? 320 : 80)) continue;
-      _p.copy(e.spheres[0].c); _p.y += 0.55;
-      _p.project(game.camera);
+      _p.copy(e.spheres[1].c).project(game.camera);
       if (_p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
-      list.push({ x: _p.x, y: _p.y, glint: e.glintT > 0, dist });
+      // a man is about 1.8 m; never smaller than a thumb-sized box
+      const px = Math.max(18, Math.min(120, (1.9 / dist) * perM));
+      list.push({ x: _p.x, y: _p.y, px, glint: e.glintT > 0, dist });
     }
-    while (this.shooterEls.length < list.length) { const d = document.createElement('div'); d.className = 'shooter'; this.shooterLayer.appendChild(d); this.shooterEls.push(d); }
+    while (this.shooterEls.length < list.length) {
+      const d = document.createElement('div');
+      d.className = 'shooter';
+      d.innerHTML = '<i></i><i></i><i></i><i></i><b></b>';
+      this.shooterLayer.appendChild(d); this.shooterEls.push(d);
+    }
     while (this.shooterEls.length > list.length) this.shooterEls.pop().remove();
     list.forEach((m, i) => {
       const el = this.shooterEls[i];
-      el.className = 'shooter' + (m.glint ? ' glint' : '');
+      el.className = 'shooter' + (m.glint ? ' glint' : '') + (m.px < 26 ? ' far' : '');
       el.style.left = (m.x * 0.5 + 0.5) * 100 + '%';
       el.style.top = (-m.y * 0.5 + 0.5) * 100 + '%';
-      el.dataset.dist = Math.round(m.dist) + 'm';
+      el.style.width = m.px + 'px';
+      el.style.height = m.px * 1.15 + 'px';
+      el.lastChild.textContent = Math.round(m.dist) + 'm';
     });
   }
 

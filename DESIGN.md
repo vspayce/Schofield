@@ -4,6 +4,10 @@ A 3rd-person western rail-shooter for the browser (mobile landscape first).
 You ride shotgun on a Concord stagecoach between frontier towns, fighting off
 riders who try to overtake the coach and riflemen on the ridgelines.
 
+Reference photos live in `reference/` and `references/` (guns). Both are
+gitignored — they stay on the artist's machine and never go to GitHub, so the
+paths below won't resolve in a fresh clone.
+
 Visual target: Red Dead Redemption 2 mood (reference/images-7/8) — warm
 golden-hour light, atmospheric haze/fog, dusty painterly palette, heavy
 silhouettes. We're a web game, so: strong lighting + fog + colour grade +

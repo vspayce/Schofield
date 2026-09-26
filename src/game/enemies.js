@@ -426,30 +426,47 @@ export class Enemies {
     }
   }
 
-  _spawnRidge(i) {
+  // A rifleman you can't see is just an unfair hit, so a spot only counts when
+  // it's a real ledge above the road AND has open sight lines to the stretch the
+  // coach is about to drive. Candidates that fail either test are thrown out
+  // rather than scored, and if nothing qualifies we try again further along.
+  _ridgeSpot(i, tries = 40) {
     const g = this.g, R = g.route, coach = g.coach;
     let best = null, bestScore = -Infinity;
-    for (let k = 0; k < 24; k++) {
-      const s = coach.s + 130 + Math.random() * 160 + i * 25;
+    for (let k = 0; k < tries; k++) {
+      // close enough that he's a readable silhouette when the bracket appears,
+      // far enough that you get a few seconds before he's in rifle range
+      const s = coach.s + 120 + Math.random() * 110 + i * 25;
       if (s > R.len - 60) continue;
       const side = Math.random() < 0.5 ? -1 : 1;
-      const d = side * (35 + Math.random() * 85);
+      const d = side * (22 + Math.random() * 48);
       const p = R.worldAt(s, d, new THREE.Vector3());
-      const rh = R.roadHeightAt(s);
+      const rise = p.y - R.roadHeightAt(s);
+      if (rise < 7 || rise > 45) continue;                       // a ledge, not a ditch or a peak
       const hx = R.height(p.x + 2, p.z) - p.y, hz = R.height(p.x, p.z + 2) - p.y;
       const slope = Math.hypot(hx, hz) / 2;
-      // a believable ledge: some height over the road, but not a needle peak
-      let score = Math.min(p.y - rh, 30) * 0.6 - slope * 40 - Math.abs(d) * 0.1;
-      // stand in the open: chest-high line of sight down to the road where the
-      // coach will pass, not hidden behind the lip of the ridge
-      const chest = _v2.copy(p).setY(p.y + 1.2);
-      const road = R.worldAt(s - 40, 0, _v3); road.y += 3;
-      const dv = road.sub(chest); const L = dv.length(); dv.divideScalar(L);
-      if (g.terrain.raycast(chest, dv, L) < L - 3) score -= 100;
+      if (slope > 0.9) continue;                                 // nowhere to stand
+      // he must see the coach from two points along its approach, chest high
+      const chest = new THREE.Vector3().copy(p).setY(p.y + 1.2);
+      let clear = true;
+      for (const ahead of [-60, -20]) {
+        const road = R.worldAt(s + ahead, 0, new THREE.Vector3()); road.y += 2.5;
+        const dv = road.sub(chest); const L = dv.length(); dv.divideScalar(L);
+        if (g.terrain.raycast(chest, dv, L) < L - 3) { clear = false; break; }
+      }
+      if (!clear) continue;
+      // prefer a good silhouette: high and close enough to read, off the road edge
+      const score = Math.min(rise, 26) * 0.8 - slope * 25 - Math.abs(Math.abs(d) - 38) * 0.25;
       if (score > bestScore) { bestScore = score; best = { p, s }; }
     }
+    return best;
+  }
+
+  _spawnRidge(i) {
+    const g = this.g;
+    const best = this._ridgeSpot(i) || this._ridgeSpot(i + 4);
     if (!best) return;
-    const face = new THREE.Vector3().subVectors(coach.pos, best.p).setY(0).normalize();
+    const face = new THREE.Vector3().subVectors(g.coach.pos, best.p).setY(0).normalize();
     const e = new Gunman(g, best.p, face, { rifle: true });
     e.los = true;
     e.s = best.s;
