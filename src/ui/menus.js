@@ -1,12 +1,15 @@
-// Title / route select / loadout / pause / results / settings screens.
+// Title / route select / loadout / gunsmith / pause / results / settings screens.
 import { ROUTES } from '../world/routes.js';
-import { WEAPONS } from '../game/player.js';
+import { WEAPONS, STARTERS, SIDEARMS, LONG_GUNS } from '../game/weapons.js';
 import { audio } from '../core/audio.js';
 import { fullscreen } from '../core/fullscreen.js';
 
 const el = document.getElementById('menu');
 const UI = import.meta.env.BASE_URL + 'assets/ui/';
 
+function persist(d) { try { localStorage.setItem('schofield.save', JSON.stringify(d)); } catch {} }
+
+// Progress kept in this browser: stars, best bounties, the purse, and guns.
 export const save = {
   data: (() => { try { return JSON.parse(localStorage.getItem('schofield.save')) || {}; } catch { return {}; } })(),
   stars(id) { return (this.data.stars || {})[id] || 0; },
@@ -16,14 +19,42 @@ export const save = {
     d.stars = d.stars || {}; d.best = d.best || {};
     d.stars[id] = Math.max(d.stars[id] || 0, stars);
     d.best[id] = Math.max(d.best[id] || 0, bounty);
-    try { localStorage.setItem('schofield.save', JSON.stringify(d)); } catch {}
+    persist(d);
   },
-  get weapon() { return this.data.weapon || 'schofield'; },
-  set weapon(v) { this.data.weapon = v; try { localStorage.setItem('schofield.save', JSON.stringify(this.data)); } catch {} },
+
+  get cash() { return this.data.cash || 0; },
+  earn(v) { this.data.cash = this.cash + Math.max(0, Math.round(v)); persist(this.data); },
+  owns(id) { return STARTERS.includes(id) || (this.data.owned || []).includes(id); },
+  buy(id) {
+    const W = WEAPONS[id];
+    if (!W || this.owns(id) || this.cash < W.price) return false;
+    this.data.cash -= W.price;
+    (this.data.owned ||= []).push(id);
+    this.equip(id);
+    return true;
+  },
+  // the gun carried in a slot ('side' | 'long')
+  equipped(slot) {
+    const id = (this.data.equip || {})[slot];
+    return WEAPONS[id]?.slot === slot && this.owns(id) ? id : slot === 'side' ? 'schofield' : 'shotgun';
+  },
+  equip(id) { (this.data.equip ||= {})[WEAPONS[id].slot] = id; persist(this.data); },
+  // which of the two is in hand when the ride starts
+  get start() { return this.data.start === 'long' ? 'long' : 'side'; },
+  set start(v) { this.data.start = v; persist(this.data); },
 };
 
 function click() { audio.play('ui_click', { volume: 0.6 }); }
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(3 - n); }
+
+// menu art exists for the revolver and the shotgun; other guns show their year
+function gunPic(W) {
+  const art = W.model === 'Schofield' ? 'schofield' : W.model === 'CoachGun' ? 'shotgun' : null;
+  return art ? `<img src="${UI}weapon_${art}.png" alt="" onerror="this.style.visibility='hidden'"/>` : `<div class="gun-yr">${W.year}</div>`;
+}
+function statBars(W) {
+  return Object.entries(W.stats).map(([k, v]) => `<div class="stat"><span>${k}</span><div class="b"><i style="width:${v * 100}%"></i></div></div>`).join('');
+}
 
 function logo() {
   return `<img class="m-logo" src="${UI}logo.png" alt="SCHOFIELD" onerror="this.outerHTML='<h1 class=&quot;logo-text&quot;>SCHOFIELD</h1>'"/>`;
@@ -32,13 +63,18 @@ function logo() {
 export class Menus {
   constructor(game) { this.g = game; }
 
-  hide() { el.classList.remove('show', 'dim', 'title-screen'); el.innerHTML = ''; }
+  hide() { el.classList.remove('show', 'dim', 'title-screen', 'tall'); el.innerHTML = ''; }
 
   _show(html, dim = true, cls = '') {
     el.innerHTML = `<div class="m-wrap">${html}</div>`;
     el.classList.add('show'); el.classList.toggle('dim', dim);
     el.classList.toggle('title-screen', cls === 'title');
-    el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => { click(); this._act(b.dataset.act, b.dataset.arg, e); }));
+    el.classList.toggle('tall', cls === 'tall'); // scrolls from the top
+    el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation(); // buttons inside clickable cards
+      if (!b.dataset.act) return;
+      click(); this._act(b.dataset.act, b.dataset.arg, e);
+    }));
   }
 
   title() {
@@ -68,16 +104,44 @@ export class Menus {
 
   loadout(i) {
     this.routeIndex = i;
-    const cur = save.weapon;
-    const card = (W) => `<div class="gun-card ${cur === W.id ? 'sel' : ''}" data-act="gun" data-arg="${W.id}">
-        <img src="${UI}weapon_${W.id}.png" alt="" onerror="this.style.visibility='hidden'"/>
-        <h3>${W.name}</h3><p>${W.blurb}</p>
-        ${Object.entries(W.stats).map(([k, v]) => `<div class="stat"><span>${k}</span><div class="b"><i style="width:${v * 100}%"></i></div></div>`).join('')}
+    const slot = (key, label, all) => {
+      const W = WEAPONS[save.equipped(key)];
+      const owned = all.filter((w) => save.owns(w.id));
+      const k = owned.indexOf(W);
+      return `<div class="gun-card ${save.start === key ? 'sel' : ''}" data-act="start" data-arg="${key}">
+        <div class="slot-lbl">${label}${save.start === key ? ' · in hand' : ''}</div>
+        ${gunPic(W)}
+        <h3>${W.name}</h3>
+        ${owned.length > 1 ? `<div class="cycle"><button class="m-btn ghost sm" data-act="cycle" data-arg="${key}:-1" aria-label="Previous gun">◀</button><span>${k + 1} of ${owned.length}</span><button class="m-btn ghost sm" data-act="cycle" data-arg="${key}:1" aria-label="Next gun">▶</button></div>` : ''}
+        ${statBars(W)}
       </div>`;
+    };
     this._show(`<h2 class="m-title">${ROUTES[i].name}</h2>
-      <div class="m-tag" style="margin:-6px 0 12px">Pick your iron. You can swap on the coach.</div>
-      <div class="m-row">${card(WEAPONS.schofield)}${card(WEAPONS.shotgun)}</div>
-      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="routes">Back</button><button class="m-btn" data-act="go">All Aboard</button></div>`);
+      <div class="m-tag" style="margin:-6px 0 12px">Tap the gun to start with in hand. Swap any time on the coach.</div>
+      <div class="m-row">${slot('side', 'Sidearm', SIDEARMS)}${slot('long', 'Long gun', LONG_GUNS)}</div>
+      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="routes">Back</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn" data-act="go">All Aboard</button></div>`, true, 'tall');
+  }
+
+  // buy guns with the purse; back = 'loadout' | 'results'
+  gunsmith(back = this.shopBack) {
+    this.shopBack = back;
+    const card = (W) => {
+      const own = save.owns(W.id), carried = save.equipped(W.slot) === W.id, afford = save.cash >= W.price;
+      const btn = carried ? '<button class="m-btn ghost sm" disabled>Carrying</button>'
+        : own ? `<button class="m-btn ghost sm" data-act="equip" data-arg="${W.id}">Carry this</button>`
+          : `<button class="m-btn sm ${afford ? '' : 'poor'}" data-act="${afford ? 'buy' : ''}" data-arg="${W.id}" ${afford ? '' : 'aria-disabled="true"'}>Buy $${W.price}</button>`;
+      return `<div class="shop-card ${carried ? 'sel' : ''}">
+        <div class="shop-head"><h3>${W.name}</h3><span class="yr">${W.year}</span></div>
+        <p>${W.blurb}</p>
+        ${statBars(W)}
+        <div class="shop-foot">${btn}</div>
+      </div>`;
+    };
+    this._show(`<h2 class="m-title">Gunsmith</h2>
+      <div class="purse">Your purse: <b>$${save.cash}</b></div>
+      <div class="shop-sec">Sidearms</div><div class="shop-grid">${SIDEARMS.map(card).join('')}</div>
+      <div class="shop-sec">Long guns</div><div class="shop-grid">${LONG_GUNS.map(card).join('')}</div>
+      <button class="m-btn" style="margin-top:14px" data-act="shop-done">Done</button>`, true, 'tall');
   }
 
   pause() {
@@ -86,7 +150,8 @@ export class Menus {
       <div><button class="m-btn ghost" data-act="settings-pause">Settings</button> <button class="m-btn ghost" data-act="restart">Restart</button> <button class="m-btn ghost" data-act="quit">Quit</button></div></div>`);
   }
 
-  results(r) {
+  results(r = this.lastResults) {
+    this.lastResults = r;
     const i = this.g.routeIndex;
     const next = i + 1 < ROUTES.length;
     this._show(`<div class="paper">
@@ -102,16 +167,19 @@ export class Menus {
       <div class="line"><span>Mail contract</span><span>$${r.reward}</span></div>
       </div>
       <div class="total">Total $${r.total}</div>
+      <div class="purse-line">Purse $${save.cash}</div>
       <div class="m-row" style="margin-top:10px">
+        <button class="m-btn ghost" data-act="shop" data-arg="results">Gunsmith</button>
         <button class="m-btn ghost" data-act="routes">Routes</button>
         <button class="m-btn ghost" data-act="restart">Ride Again</button>
         ${next ? `<button class="m-btn" data-act="next">Next Route</button>` : ''}
       </div></div>`);
   }
 
-  failed(reason) {
+  failed(reason, kept = 0) {
     this._show(`<div class="paper"><h2>Dead &amp; Buried</h2>
       <div style="font-style:italic;margin:6px 0 14px">${reason}</div>
+      ${kept ? `<div class="purse-line" style="margin:-6px 0 12px">You keep the $${kept} in bounties. Purse $${save.cash}</div>` : ''}
       <div class="m-row"><button class="m-btn" data-act="restart">Try Again</button><button class="m-btn ghost" data-act="routes">Routes</button></div></div>`);
   }
 
@@ -155,12 +223,23 @@ export class Menus {
       case 'title': this.title(); break;
       case 'routes': g.toAttract(); this.routes(); break;
       case 'pick': this.loadout(+arg); break;
-      case 'gun': save.weapon = arg; this.loadout(this.routeIndex); break;
-      case 'go': this.hide(); g.startRide(this.routeIndex, save.weapon); break;
+      case 'start': save.start = arg; this.loadout(this.routeIndex); break;
+      case 'cycle': {
+        const [slot, step] = arg.split(':');
+        const owned = (slot === 'side' ? SIDEARMS : LONG_GUNS).filter((w) => save.owns(w.id));
+        const k = owned.indexOf(WEAPONS[save.equipped(slot)]);
+        save.equip(owned[(k + +step + owned.length) % owned.length].id);
+        this.loadout(this.routeIndex); break;
+      }
+      case 'shop': this.gunsmith(arg); break;
+      case 'buy': if (save.buy(arg)) audio.play('schofield_cock', { volume: 0.8 }); this.gunsmith(); break;
+      case 'equip': save.equip(arg); this.gunsmith(); break;
+      case 'shop-done': if (this.shopBack === 'results') this.results(); else this.loadout(this.routeIndex); break;
+      case 'go': this.hide(); g.startRide(this.routeIndex); break;
       case 'resume': this.hide(); g.resume(); break;
       case 'pause': this.pause(); break;
-      case 'restart': this.hide(); g.startRide(g.routeIndex, save.weapon); break;
-      case 'next': this.hide(); g.startRide(g.routeIndex + 1, save.weapon); break;
+      case 'restart': this.hide(); g.startRide(g.routeIndex); break;
+      case 'next': this.hide(); g.startRide(g.routeIndex + 1); break;
       case 'quit': g.toAttract(); this.title(); break;
       case 'settings': this.settings('title'); break;
       case 'settings-pause': this.settings('pause'); break;

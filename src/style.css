@@ -55,6 +55,18 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #crosshair.enemy i, #crosshair.enemy b { background: #ff3b2f; }
 #crosshair.shotgun b { display: none; }
 
+/* scope: dark lens ring + fine reticle; the normal crosshair hides */
+#scope { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; background: radial-gradient(circle at 50% 50%, transparent 0, transparent min(38vh, 30vw), rgba(8, 5, 3, .96) calc(min(38vh, 30vw) + 2px)); }
+#scope.on { opacity: 1; }
+.scope-reticle { position: absolute; left: 50%; top: 50%; width: min(76vh, 60vw); height: min(76vh, 60vw); transform: translate(-50%, -50%); border-radius: 50%; box-shadow: inset 0 0 30px rgba(0, 0, 0, .8), 0 0 0 2px rgba(20, 12, 6, .9);
+  background: linear-gradient(rgba(10, 6, 3, .85), rgba(10, 6, 3, .85)) center / 1.5px 100% no-repeat, linear-gradient(rgba(10, 6, 3, .85), rgba(10, 6, 3, .85)) center / 100% 1.5px no-repeat; }
+.scope-reticle::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #e0492f; box-shadow: 0 0 3px #000; }
+#crosshair.scoped { opacity: 0; }
+/* shooters on ridges / rooftops */
+#shooters { position: absolute; inset: 0; }
+.shooter { position: absolute; width: 0; height: 0; margin: -18px 0 0 -8px; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 13px solid #ffb347; filter: drop-shadow(0 0 3px #000); }
+.shooter::after { content: attr(data-dist); position: absolute; left: -20px; top: -30px; width: 40px; text-align: center; font: 11px var(--font-sc); color: #ffd79a; text-shadow: 0 1px 2px #000; }
+.shooter.glint { border-top-color: #ff3b2f; animation: chev .2s infinite alternate; }
 #hitmarker {
   position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; opacity: 0;
   background:
@@ -119,6 +131,9 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #ammo-shells .sh { width: 20px; height: 40px; background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0 1px 2px #000); }
 #ammo-shells .sh.full { background-image: url(/assets/ui/shell_full.png); }
 #ammo-shells .sh.empty { background-image: url(/assets/ui/shell_empty.png); opacity: .6; }
+#ammo-count { font-family: var(--font-title); font-size: 30px; line-height: 1; color: var(--ink); text-shadow: 0 2px 4px #000; }
+#ammo-count small { font-size: 15px; color: var(--ink-dim); margin-left: 2px; }
+#ammo-count.low b { color: #ff6a4a; }
 #ammo-name { font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; letter-spacing: .08em; }
 #ammo.reloading #ammo-name::after { content: ' — reloading'; color: var(--brass); }
 
@@ -163,6 +178,8 @@ body.touch #touch { display: block; }
 #btn-swap { right: calc(48px + var(--sar)); bottom: calc(160px + var(--sab)); width: 52px; height: 52px; opacity: .72; }
 /* left thumb: Dead Eye (most important), whip, rein */
 #btn-deadeye { left: calc(28px + var(--sal)); bottom: calc(118px + var(--sab)); width: 74px; height: 74px; }
+#btn-scope { left: calc(118px + var(--sal)); bottom: calc(128px + var(--sab)); width: 54px; height: 54px; }
+.tbtn svg { width: 100%; height: 100%; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .7)); }
 #btn-whip { left: calc(118px + var(--sal)); bottom: calc(34px + var(--sab)); width: 52px; height: 52px; opacity: .72; }
 #btn-brake { left: calc(38px + var(--sal)); bottom: calc(30px + var(--sab)); width: 52px; height: 52px; opacity: .72; }
 
@@ -257,6 +274,27 @@ body.touch #btn-pause { display: block; }
 .opts select, .opts input { font-family: var(--font-body); font-size: 15px; }
 
 /* short landscape phones */
+/* loadout slots + gunsmith */
+#menu.tall .m-wrap { justify-content: flex-start; }
+.m-btn.sm { min-width: 0; padding: 5px 14px; font-size: 15px; margin: 0; }
+.m-btn.poor { opacity: .45; cursor: default; }
+.m-btn[disabled] { opacity: .6; cursor: default; }
+.slot-lbl { font-family: var(--font-sc); font-size: 13px; letter-spacing: .12em; color: var(--brass); }
+.gun-yr { height: clamp(60px, 11vw, 110px); display: flex; align-items: center; justify-content: center; font-family: var(--font-title); font-size: clamp(28px, 5vw, 48px); color: rgba(243, 230, 200, .35); }
+.cycle { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 2px 0 8px; font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); }
+.purse { font-family: var(--font-sc); font-size: 17px; margin: -4px 0 8px; text-shadow: 0 1px 3px #000; }
+.purse b, .purse-line { font-family: var(--font-title); color: #ffcf6e; }
+.paper .purse-line { color: #6b3a0e; font-size: clamp(14px, 2vw, 18px); margin-top: 2px; }
+.shop-sec { align-self: stretch; max-width: 1100px; margin: 10px auto 6px; width: 100%; font-family: var(--font-sc); letter-spacing: .14em; color: var(--brass); border-bottom: 1px solid rgba(169, 122, 59, .4); padding-bottom: 3px; }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; width: 100%; max-width: 1100px; }
+.shop-card { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: rgba(26, 17, 10, .86); border: 2px solid rgba(169, 122, 59, .4); border-radius: 6px; }
+.shop-card.sel { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass); }
+.shop-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.shop-head h3 { font-family: var(--font-title); font-size: 17px; margin: 0; font-weight: normal; }
+.shop-head .yr { font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); }
+.shop-card p { margin: 0 0 4px; font-style: italic; font-size: 13px; line-height: 1.3; color: var(--ink-dim); flex: 1; }
+.shop-foot { display: flex; justify-content: flex-end; margin-top: 4px; }
+
 @media (max-height: 480px) {
   .m-title { font-size: 20px; margin-bottom: 6px; }
   .m-tag { margin: 0 0 8px; font-size: 13px; }
@@ -275,7 +313,8 @@ body.touch #btn-pause { display: block; }
   .paper .total { font-size: 17px; margin-top: 3px; }
   .results-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; }
   .gun-card { padding: 8px; }
-  .gun-card img { height: 44px; }
+  .gun-card img, .gun-yr { height: 44px; }
+  .gun-yr { font-size: 28px; }
   .gun-card p { display: none; }
   .gun-card h3 { margin: 2px 0; }
   .stat { margin: 1px 0; }

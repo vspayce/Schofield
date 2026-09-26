@@ -224,24 +224,57 @@ function fallbackRider(variant, tint) {
 }
 
 // ----------------------------------------------------------------- weapons
-export function createWeapon(name) {
+// finish: RGB multiplier over the gun (weapons.glb is one texture atlas), so
+// one revolver model can pass for blued, nickel or brass-framed guns.
+export function createWeapon(name, { finish = null } = {}) {
+  if (name === 'Gatling') return gatling();
   const g = assets.models.weapons;
   if (g) {
     const src = findNode(g.scene, name);
     if (src) {
       const c = src.clone(true);
       c.position.set(0, 0, 0);
-      c.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      c.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        if (finish) {
+          o.material = o.material.clone(); o.material.color.multiply(new THREE.Color(...finish));
+        }
+      });
       const muzzle = findNode(c, 'Muzzle_' + name) || c;
       return { root: c, muzzle };
     }
   }
   const root = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0x2a2b2e, metalness: 0.8, roughness: 0.35 });
+  if (finish) metal.color.multiply(new THREE.Color(...finish));
   const wood = new THREE.MeshStandardMaterial({ color: 0x5a3219, roughness: 0.6 });
   const len = name === 'Schofield' ? 0.3 : 0.9;
   const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, len), metal); barrel.position.set(0, 0.06, len / 2); root.add(barrel);
   const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, name === 'Schofield' ? 0.05 : 0.35), wood); grip.position.set(0, 0, name === 'Schofield' ? 0 : -0.1); root.add(grip);
   const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.06, len); root.add(muzzle);
   return { root, muzzle };
+}
+
+// Six-barrel Gatling, held at the grip like the other guns (+Z = muzzle).
+// `spin` turns the barrel cluster; the player calls it while firing.
+function gatling() {
+  const root = new THREE.Group();
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb08a3e, metalness: 0.85, roughness: 0.35 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x2b2c30, metalness: 0.8, roughness: 0.4 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x5a3219, roughness: 0.7 });
+  const cyl = (r, h, m, seg = 12) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg).rotateX(Math.PI / 2), m);
+  const housing = cyl(0.09, 0.3, brass); housing.position.set(0, 0.08, 0.1); root.add(housing);
+  const barrels = new THREE.Group(); barrels.position.set(0, 0.08, 0.25); root.add(barrels);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const b = cyl(0.014, 0.75, steel, 6); b.position.set(Math.cos(a) * 0.05, Math.sin(a) * 0.05, 0.37); barrels.add(b);
+  }
+  for (const z of [0.2, 0.5, 0.72]) { const band = cyl(0.07, 0.03, brass); band.position.z = z; barrels.add(band); }
+  const hopper = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.08), brass); hopper.position.set(0, 0.2, 0.08); root.add(hopper);
+  const crank = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.12), steel); crank.position.set(0.11, 0.08, 0.02); root.add(crank);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.06), wood); grip.position.set(0, 0, -0.02); root.add(grip);
+  root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.08, 1.0); root.add(muzzle);
+  return { root, muzzle, spin: (a) => { barrels.rotation.z += a; } };
 }

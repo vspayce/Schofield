@@ -226,7 +226,7 @@ class Rider extends Enemy {
     this.hp -= amount;
     if (this.hp <= 0) {
       this.state = 'riderless';
-      const push = dir.clone().multiplyScalar(g.player.weapon.id === 'shotgun' ? 7 : 3);
+      const push = dir.clone().multiplyScalar(g.player.weapon.knock ? 7 : 3);
       this._throw(this._fwdVec().multiplyScalar(this.speed * 0.8).add(push).add(new THREE.Vector3(0, 2.5, 0)));
       return true;
     }
@@ -293,7 +293,8 @@ class Gunman extends Enemy {
       this.losT = (this.losT || 0) - dt;
       if (this.losT <= 0 && dist < range) {
         this.losT = 0.25;
-        const from = this.spheres[0].c, to = _v2.copy(g.player.headPos);
+        // from the chest: if he can shoot you, his body is exposed to shoot back
+        const from = this.spheres[1].c, to = _v2.copy(g.player.headPos);
         const dv = _v3.subVectors(to, from); const L = dv.length(); dv.divideScalar(L);
         let clear = g.terrain.raycast(from, dv, L - 2) >= L - 2.5;
         if (clear) {
@@ -438,7 +439,13 @@ export class Enemies {
       const hx = R.height(p.x + 2, p.z) - p.y, hz = R.height(p.x, p.z + 2) - p.y;
       const slope = Math.hypot(hx, hz) / 2;
       // a believable ledge: some height over the road, but not a needle peak
-      const score = Math.min(p.y - rh, 30) * 0.6 - slope * 40 - Math.abs(d) * 0.1;
+      let score = Math.min(p.y - rh, 30) * 0.6 - slope * 40 - Math.abs(d) * 0.1;
+      // stand in the open: chest-high line of sight down to the road where the
+      // coach will pass, not hidden behind the lip of the ridge
+      const chest = _v2.copy(p).setY(p.y + 1.2);
+      const road = R.worldAt(s - 40, 0, _v3); road.y += 3;
+      const dv = road.sub(chest); const L = dv.length(); dv.divideScalar(L);
+      if (g.terrain.raycast(chest, dv, L) < L - 3) score -= 100;
       if (score > bestScore) { bestScore = score; best = { p, s }; }
     }
     if (!best) return;
