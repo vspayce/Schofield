@@ -15,34 +15,24 @@ export const assets = {
   audio: {},    // name -> ArrayBuffer (decoded later by audio module)
 };
 
-async function exists(url) {
-  try {
-    const r = await fetch(url, { method: 'HEAD' });
-    const ct = r.headers.get('content-type') || '';
-    // Vite dev server answers unknown paths with index.html
-    return r.ok && !ct.includes('text/html');
-  } catch { return false; }
-}
+// One retry covers a dropped request on a flaky mobile connection. A missing
+// file (or Vite's index.html fallback) fails to parse and resolves to null.
+function retry(fn) { return fn().catch(() => new Promise((r) => setTimeout(r, 400)).then(fn)); }
 
 function loadModel(name) {
   const url = `${BASE}models/${name}.glb`;
-  return exists(url).then((ok) => ok
-    ? gltfLoader.loadAsync(url).then((g) => (assets.models[name] = g)).catch((e) => { console.warn('model failed', name, e); return null; })
-    : null);
+  return retry(() => gltfLoader.loadAsync(url)).then((g) => (assets.models[name] = g)).catch((e) => { console.warn('model failed', name, e); return null; });
 }
 
 function loadTexture(name, { srgb = true, repeat = true, ext = 'jpg' } = {}) {
   const url = `${BASE}textures/${name}.${ext}`;
-  return exists(url).then((ok) => {
-    if (!ok) return null;
-    return texLoader.loadAsync(url).then((t) => {
-      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-      if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.anisotropy = 4;
-      assets.textures[name] = t;
-      return t;
-    }).catch(() => null);
-  });
+  return retry(() => texLoader.loadAsync(url)).then((t) => {
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 4;
+    assets.textures[name] = t;
+    return t;
+  }).catch(() => null);
 }
 
 function loadAudio(name) {
