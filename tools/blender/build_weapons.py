@@ -24,9 +24,12 @@ import sch_lib as L  # noqa: E402
 
 ARGS = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 QUICK = '--quick' in ARGS
+GEOM = '--geom' in ARGS         # build shapes, skip the bake (fast iteration)
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(ROOT, 'public', 'assets', 'models', 'weapons.glb')
-BUILD = os.path.join(HERE, 'build', 'weapons')
+if '--out' in ARGS:             # private export path, so parallel builds don't collide
+    OUT = os.path.abspath(ARGS[ARGS.index('--out') + 1])
+BUILD = os.path.join(HERE, "build", os.path.splitext(os.path.basename(OUT))[0])
 TEX = 256 if QUICK else 1024
 PY = shutil.which('python3') or '/usr/bin/python3'
 T0 = time.time()
@@ -325,9 +328,24 @@ P('win_butt', bm, M['brass'], W, smooth=40, prio=0.4)
 WIN_MUZZLE = (0, -0.762, WZ)
 
 # ----------------------------------------------------------------------------
+# the gunsmith's long guns, one module each (see weapon_mods.py)
+# ----------------------------------------------------------------------------
+import weapon_mods  # noqa: E402
+
+_ctx = weapon_mods.WeaponCtx(L=L, M=M, P=lambda name, bm, mat, **kw: P(name, bm, mat, _ctx.weapon, **kw),
+                             extrude=extrude, tube_y=tube_y, sweep_round=sweep_round,
+                             sweep_rect=sweep_rect, bmesh=bmesh, math=math, Matrix=Matrix,
+                             Vector=Vector, log=log)
+EXTRA = weapon_mods.load(_ctx, strict=not GEOM)
+for _n, (_mz, _len) in EXTRA.items():
+    log('module %-12s muzzle %s' % (_n, ['%.3f' % v for v in _mz]))
+
+# ----------------------------------------------------------------------------
 # bake (weapons laid apart so AO doesn't cross-contaminate)
 # ----------------------------------------------------------------------------
 OFFS = {S: 0.0, C: 0.6, W: 1.2}
+for _i, _n in enumerate(EXTRA):
+    OFFS[_n] = 1.8 + _i * 0.6
 for o in PARTS:
     o.location.x = OFFS[o['weapon']]
 tot = {}
@@ -335,6 +353,22 @@ for o in PARTS:
     tot[o['weapon']] = tot.get(o['weapon'], 0) + L.tri_count(o)
     log('  %-14s %5d' % (o.name, L.tri_count(o)))
 log('tris per weapon', tot)
+
+# --geom: shape only, no bake or export. Prints each weapon's size so a new
+# module can be checked against the real gun in seconds instead of minutes.
+if GEOM:
+    for wname in sorted({o['weapon'] for o in PARTS}):
+        objs = [o for o in PARTS if o['weapon'] == wname]
+        pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
+        dx = max(p.x for p in pts) - min(p.x for p in pts)
+        dy = max(p.y for p in pts) - min(p.y for p in pts)
+        dz = max(p.z for p in pts) - min(p.z for p in pts)
+        log('%-12s tris %5d  L %.3f m  W %.3f  H %.3f  (y %.3f..%.3f, z %.3f..%.3f)'
+            % (wname, sum(L.tri_count(o) for o in objs), dy, dx, dz,
+               min(p.y for p in pts) - OFFS.get(wname, 0) * 0, max(p.y for p in pts),
+               min(p.z for p in pts), max(p.z for p in pts)))
+    log('geometry only — stopping before bake')
+    sys.exit(0)
 
 L.uv_atlas(PARTS, margin=0.006 if TEX >= 1024 else 0.012)
 IMGS = {}
@@ -375,7 +409,7 @@ roots = {}
 GROUPS = {}
 for o in PARTS:
     GROUPS.setdefault(o['weapon'], []).append(o)
-for wname, muzzle in ((S, SCH_MUZZLE), (C, CG_MUZZLE), (W, WIN_MUZZLE)):
+for wname, muzzle in [(S, SCH_MUZZLE), (C, CG_MUZZLE), (W, WIN_MUZZLE)] + [(n, m) for n, (m, _) in EXTRA.items()]:
     objs = GROUPS[wname]
     ob = L.join(objs, wname)
     for key in list(ob.keys()):
