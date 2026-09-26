@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1a120c" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Schofield</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="gl"></canvas>
+
+    <!-- In-ride HUD -->
+    <div id="hud" class="hidden">
+      <div id="vignette-hit"></div>
+      <div id="deadeye-overlay"></div>
+      <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+      <div id="hitmarker"></div>
+      <div id="dmg-dirs"></div>
+
+      <div id="hud-top">
+        <div id="route-bar">
+          <span class="town" id="town-from"></span>
+          <div id="route-track"><div id="route-fill"></div><img id="route-coach" src="assets/ui/coach_icon.png" alt="" /></div>
+          <span class="town" id="town-to"></span>
+        </div>
+        <div id="bounty"><span class="lbl">BOUNTY</span> <span id="bounty-val">$0</span></div>
+      </div>
+
+      <div id="hud-left">
+        <div class="meter" id="hp-meter"><img src="assets/ui/health_heart.png" alt="" /><div class="bar"><div class="fill"></div></div></div>
+        <div class="meter" id="coach-meter"><img src="assets/ui/coach_icon.png" alt="" /><div class="bar"><div class="fill"></div></div></div>
+        <div class="meter" id="de-meter"><img src="assets/ui/deadeye_icon.png" alt="" /><div class="bar"><div class="fill"></div></div></div>
+      </div>
+
+      <div id="ammo">
+        <div id="ammo-cyl"></div>
+        <div id="ammo-shells"></div>
+        <div id="ammo-name"></div>
+      </div>
+
+      <div id="feed"></div>
+      <div id="banner"></div>
+
+      <!-- touch controls -->
+      <div id="touch">
+        <div id="aim-zone"></div>
+        <button class="tbtn" id="btn-whip"><img src="assets/ui/btn_whip.png" alt="" /><span>WHIP</span></button>
+        <button class="tbtn" id="btn-brake"><img src="assets/ui/btn_brake.png" alt="" /><span>REIN</span></button>
+        <button class="tbtn big" id="btn-fire"><img src="assets/ui/btn_fire.png" alt="" /><span>FIRE</span></button>
+        <button class="tbtn" id="btn-reload"><img src="assets/ui/btn_reload.png" alt="" /><span>RELOAD</span></button>
+        <button class="tbtn" id="btn-swap"><img src="assets/ui/btn_swap.png" alt="" /><span>SWAP</span></button>
+        <button class="tbtn" id="btn-deadeye"><img src="assets/ui/btn_deadeye.png" alt="" /><span>DEAD EYE</span></button>
+      </div>
+      <button id="btn-pause" aria-label="Pause">❚❚</button>
+      <div id="desk-hint">Mouse aim · Click fire · R reload · Q swap · E Dead Eye · W whip · S rein · Esc pause</div>
+    </div>
+
+    <!-- Menus -->
+    <div id="menu" class="screen"></div>
+
+    <div id="loading" class="screen show">
+      <div class="load-inner">
+        <img id="load-logo" src="assets/ui/logo.png" alt="Schofield" onerror="this.replaceWith(Object.assign(document.createElement('h1'),{className:'logo-text',textContent:'SCHOFIELD'}))" />
+        <div id="load-bar"><div id="load-fill"></div></div>
+        <div id="load-msg">Loading the coach…</div>
+      </div>
+    </div>
+
+    <div id="rotate" class="screen">
+      <div class="rot-inner">
+        <div class="phone"></div>
+        <p>Turn your device sideways, partner.</p>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

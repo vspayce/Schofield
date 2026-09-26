@@ -1,0 +1,138 @@
+# SCHOFIELD — design & asset contracts
+
+A 3rd-person western rail-shooter for the browser (mobile landscape first).
+You ride shotgun on a Concord stagecoach between frontier towns, fighting off
+riders who try to overtake the coach and riflemen on the ridgelines.
+
+Visual target: Red Dead Redemption 2 mood (reference/images-7/8) — warm
+golden-hour light, atmospheric haze/fog, dusty painterly palette, heavy
+silhouettes. We're a web game, so: strong lighting + fog + colour grade +
+good silhouettes do the heavy lifting, not polygon counts.
+
+## Stack
+- Vite + Three.js (vanilla ES modules), DOM/CSS HUD. `npm run dev`, `npm run deploy` (gh-pages).
+- Assets are built by scripts checked into `tools/` so they're reproducible:
+  - `tools/blender/*.py`  — run with `/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python tools/blender/<x>.py`
+  - `tools/textures/*.py` — Python 3 + numpy/PIL/scipy
+  - `tools/audio/*.py`    — Python 3 + numpy/scipy, encoded with ffmpeg
+- Output goes to `public/assets/{models,textures,audio,ui}/`.
+
+## Gameplay
+- The coach runs on a spline route automatically (driver NPC holds the reins).
+  Player can **whip** (speed burst, limited stamina) or **brake**.
+- Player = shotgun messenger on the coach roof, camera over the right shoulder.
+  Aim anywhere 360° (drag on mobile / mouse on desktop). Soft aim-assist on touch.
+- Weapons (pick before each run, swap any time):
+  - **Schofield** revolver: 6 rounds, accurate, fast, headshots x2. Top-break reload
+    ejects all 6 then reloads (~1.6 s).
+  - **Coach gun** (double-barrel): 2 shells, 9 pellets, wide cone, brutal up close,
+    knocks riders off horses. Reload ~1.8 s.
+- **Dead Eye**: meter fills with kills; activate for ~5 s of slow motion.
+- Enemies:
+  - **Riders**: approach from behind / flanks, ride alongside and shoot, try to reach the
+    team horses. Shoot the rider (drops, horse runs off) or the horse (tumble).
+  - **Ridge riflemen**: on hilltops / rocks / rooftops; telegraph with a lens glint
+    before firing. Higher damage.
+  - **Town gunmen**: in ghost-town windows/rooftops/behind barrels.
+- Coach has HP (damage from hits on the coach); player has HP. Either at 0 = run failed.
+- Reach town = results: bounty earned, accuracy, headshots, time; star rating.
+
+## Routes (levels)
+1. **Dry Creek Plains** — Mercy Springs → Dry Creek. Golden hour, open grassland, riders.
+2. **Widow's Pass** — Dry Creek → Silver Notch. Winding mountain road, pines, snow on top,
+   drop-offs, ridge riflemen. Overcast/cool.
+3. **Perdition** — through a ghost town at dusk: gunmen in windows and rooftops, riders in
+   the main street.
+4. **Devil's Gulch** — red canyon at sunset, everything at once.
+
+## World conventions (ALL assets must follow)
+- Units: **metres**. Y-up in three.js. glTF 2.0 binary (`.glb`).
+- In Blender: model faces **-Y** (Blender's "Front" view), Z up. The glTF exporter
+  (`export_yup=True`) turns that into **+Z forward, +Y up** in three.js. Origin at ground
+  level, centred on the footprint, unless stated otherwise.
+- Apply all transforms before export. No cameras/lights in the GLB.
+- Materials: Principled BSDF only (base colour texture/vertex colour, roughness, metallic,
+  normal map optional). Keep textures embedded, ≤1024², JPEG-able when opaque.
+  Alpha-cut foliage uses PNG + alphaMode MASK.
+- Budget (mobile!): hero assets (coach, horse, human) ≤ 12k tris each; props ≤ 2k;
+  buildings ≤ 6k. Each GLB ≤ ~1.5 MB.
+- Skinned characters: ≤ 40 bones, ≤ 4 influences/vertex, animations as named glTF
+  actions (NLA/actions exported with `export_animation_mode='ACTIONS'`).
+
+## Asset list & node-name contracts (code looks these up by name)
+
+### models/stagecoach.glb (Concord coach, ~5.2 m long incl. pole, body ~1.6 m wide)
+- Nodes: `Body` (everything that bounces on the thoroughbraces), `Chassis`,
+  `Wheel_FL`, `Wheel_FR`, `Wheel_RL`, `Wheel_RR` — each wheel a separate object with its
+  origin at the hub and the axle along local X so code spins it about X.
+  Front wheels ~1.0 m diameter, rear ~1.45 m.
+- Empties: `Seat_Driver` (driver's bench, left), `Seat_Guard` (player sits on roof at the
+  rear-right luggage rail, facing forward), `Hitch` (front end of the pole, where the team
+  attaches), `Lamp_L`, `Lamp_R`.
+- Look: dark oxblood/red-brown painted body with gold pinstripe, yellow-ochre running gear,
+  leather boot at rear (reference/Pasted*.png, images-8), luggage on roof, leather curtains.
+
+### models/horse.glb (skinned, ~2.4 m nose-to-tail, ~1.6 m at withers)
+- Animations: `Gallop` (loop, ~0.5 s cycle), `Canter` (loop), `Idle`, `Fall` (one-shot,
+  crumple sideways/forward), `Rear` (optional).
+- Root motion NOT baked (in place). Saddle as a separate mesh `Saddle` (hideable),
+  harness as `Harness` (hideable). Empty `Mount` at the saddle seat.
+- Coat colours handled in code by tinting; bake a neutral light-brown coat with dark
+  mane/tail/lower legs in the texture or vertex colours.
+
+### models/rider.glb (skinned human, ~1.8 m, seated riding pose basis)
+- Animations: `Ride` (seated bounce loop matching Gallop), `RideAim` (upper body aiming
+  a pistol forward-right, loop), `Shoot` (short recoil, additive-friendly), `FallOff`
+  (one-shot, thrown backwards), `StandIdle`, `StandShoot`, `DieStanding` (one-shot).
+- Bones must include `spine`, `chest`, `neck`, `head`, `upperarm.R`, `forearm.R`, `hand.R`
+  (code aims these procedurally). Empty/bone for `hand.R` holds weapons.
+- Variants via separate meshes toggled in code: `Hat_Wide`, `Hat_Bowler`, `Bandana`,
+  `Duster` (long coat), `Poncho`. Body mesh `Body`.
+- Also used for the driver and the player (different mesh toggles/tints).
+
+### models/weapons.glb
+- `Schofield` (nickel/blued S&W revolver, ~0.32 m, grip origin), `CoachGun` (double
+  barrel, ~0.95 m, grip origin), `Winchester` (enemy rifle). Muzzle empties
+  `Muzzle_Schofield`, `Muzzle_CoachGun`, `Muzzle_Winchester`.
+
+### models/props.glb (one file, many named root objects, each origin at base)
+`Pine_A`, `Pine_B`, `Pine_Snow`, `DeadTree`, `Saguaro`, `Joshua`, `Sagebrush`,
+`Rock_A`, `Rock_B`, `Rock_C`, `Boulder_Big`, `CliffChunk`, `Fence_Rail` (3 m section),
+`TelegraphPole`, `Barrel`, `Crate`, `Wagon_Wreck`, `CowSkull`, `GraveCross`,
+`Tumbleweed`, `Signpost`, `WaterTrough`, `Windmill`.
+(Code instances these, so keep materials few and shared — atlas where possible.)
+
+### models/town.glb (ghost-town kit, each root object origin at front-centre ground)
+`Saloon` (2-storey, balcony), `GeneralStore`, `Sheriff`, `Bank`, `Church` (with steeple),
+`Hotel`, `Livery` (barn), `WaterTower`, `Gallows`, `Boardwalk` (6 m section), `Shack`.
+Street-facing side = -Y in Blender (+Z in three.js). Weathered, sun-bleached, broken
+boards, faded painted signs. Add empties named `Spawn_*` at windows/roof edges where a
+gunman can appear (e.g. `Spawn_Window_1`, `Spawn_Roof_1`), facing the street.
+
+### textures/ (tiling, 1024², JPG; `_n` normal maps optional)
+`dirt_road`, `dry_grass`, `green_grass`, `sand`, `rock`, `red_rock`, `snow`, `gravel`
++ `grass_blade.png` (alpha, for grass cards), `cloud_noise.png`, `mountain_silhouette.png`
+(for far horizon layers), `wood_planks`, `lens_dirt.png`.
+
+### ui/ (PNG, alpha)
+Western HUD: revolver cylinder pieces (`cyl_full.png`, `cyl_empty.png`), shotgun shell icons,
+`deadeye_icon.png`, `health_heart.png`, `coach_icon.png`, wanted-poster panel
+`poster.png`, parchment `paper.png`, crosshair, touch button bases (`btn_fire.png`, etc.).
+Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index.html.
+
+### audio/ (OGG + M4A? → just `.mp3`, 44.1 kHz)
+`schofield_shot`, `schofield_shot2`, `schofield_cock`, `schofield_reload`,
+`shotgun_shot`, `shotgun_reload`, `rifle_shot_far`, `bullet_whiz_1..3`, `ricochet_1..3`,
+`hit_flesh_1..2`, `hit_wood_1..2`, `horse_neigh`, `horse_gallop_loop`, `coach_rumble_loop`,
+`wind_loop`, `whip_crack`, `deadeye_in`, `deadeye_out`, `heartbeat_loop`, `bell_town`,
+`music_ride_loop`, `music_menu`, `sting_victory`, `sting_death`, `ui_click`.
+
+## Code layout
+```
+src/
+  main.js            boot, loader, state machine (menu → loadout → ride → results)
+  core/              renderer, post, quality tiers, input, audio, assets
+  world/             route spline, terrain chunks + splat shader, scatter, sky, route defs
+  game/              coach, player/weapons, enemies, combat, deadeye, fx
+  ui/                hud, menus
+```
