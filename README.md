@@ -8,8 +8,11 @@ off riders and ridge riflemen with a Schofield revolver or a coach gun.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run deploy     # build + publish to GitHub Pages (gh-pages branch)
+npm run build      # production build in dist/
 ```
+
+Pushing to `main` publishes the game to https://vspayce.github.io/Schofield/ via
+`.github/workflows/deploy.yml` (Settings → Pages → Source must be "GitHub Actions").
 
 Debug: `?route=0..3&unlock&weapon=shotgun` jumps straight into a ride.
 
