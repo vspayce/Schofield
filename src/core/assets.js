@@ -2,10 +2,11 @@
 // game still runs (placeholder geometry / generated textures take over).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const BASE = import.meta.env.BASE_URL + 'assets/';
 
-const gltfLoader = new GLTFLoader();
+const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const texLoader = new THREE.TextureLoader();
 
 export const assets = {
