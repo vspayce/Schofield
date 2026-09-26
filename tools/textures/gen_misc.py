@@ -14,76 +14,74 @@ from texlib import *
 
 # ---------------------------------------------------------------------------- grass card
 def grass_blade():
+    """Dense dry-grass clump (~30-40 % alpha coverage) with oat-like seed heads.
+    RGB of every transparent texel is dilated from the nearest opaque texel so mips
+    never pull in dark fringes."""
+    from scipy import ndimage
     rng = np.random.default_rng(5)
     S = 1024  # 4x supersample of 256
     img = Image.new('RGBA', (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     base_x = S / 2
-    nblades = 12
     blades = []
-    for i in range(nblades):
-        # spread the roots a little, lean outward with random curvature
-        rx = base_x + rng.normal(0, S * 0.045)
-        lean = (rx - base_x) / (S * 0.045) * 0.18 + rng.normal(0, 0.22)
-        L = S * rng.uniform(0.55, 0.95)
-        curve = rng.normal(0, 0.35) + np.sign(lean) * 0.25
-        w0 = S * rng.uniform(0.012, 0.022)
+    for i in range(46):
+        rx = base_x + rng.normal(0, S * 0.11)
+        rx = float(np.clip(rx, S * 0.12, S * 0.88))
+        lean = (rx - base_x) / (S * 0.11) * 0.16 + rng.normal(0, 0.2)
+        L = S * rng.uniform(0.45, 0.97)
+        curve = rng.normal(0, 0.35) + np.sign(lean) * 0.2
+        w0 = S * rng.uniform(0.014, 0.026)
         blades.append((L, rx, lean, curve, w0, rng.random()))
     blades.sort(key=lambda b: -b[0])  # tall ones behind
-    for L, rx, lean, curve, w0, tone in blades:
+    tips = []
+    for bi, (L, rx, lean, curve, w0, tone) in enumerate(blades):
         segs = 24
-        left, right, cols = [], [], []
+        left, right = [], []
         x, y = rx, S - 2
         a = -np.pi / 2 + lean
         for k in range(segs + 1):
             f = k / segs
-            w = w0 * (1 - f) ** 0.9 + 1.2
-            nx, ny = -np.sin(a), np.cos(a)
-            left.append((x + nx * w, y + ny * w * 0.0 - 0))
+            w = w0 * (1 - f) ** 0.85 + 1.5
+            nx = -np.sin(a)
+            left.append((x + nx * w, y))
             right.append((x - nx * w, y))
             a += curve * (f * 2.2) / segs
             x += np.cos(a) * L / segs
             y += np.sin(a) * L / segs
-        # draw as strips of quads with gradient colour (dark root -> pale tip) and a midrib
-        c_root = np.array([0.36, 0.28, 0.14])
-        c_mid = np.array([0.72, 0.58, 0.32]) * (0.85 + 0.3 * tone)
-        c_tip = np.array([0.93, 0.84, 0.6]) * (0.9 + 0.1 * tone)
+        x = min(max(x, 8), S - 8)
+        y = max(y, 40)
+        tips.append((x, y, a, L))
+        c_root = np.array([0.34, 0.27, 0.14])
+        c_mid = np.array([0.70, 0.57, 0.32]) * (0.82 + 0.3 * tone)
+        c_tip = np.array([0.92, 0.83, 0.60]) * (0.88 + 0.12 * tone)
         for k in range(segs):
             f = k / segs
             c = c_root + (c_mid - c_root) * smoothstep(0, 0.45, f) if f < 0.45 else c_mid + (c_tip - c_mid) * smoothstep(0.45, 1.0, f)
             q = [left[k], left[k + 1], right[k + 1], right[k]]
             d.polygon(q, fill=tuple(int(v * 255) for v in np.clip(c, 0, 1)) + (255,))
-            # lit edge on one side
-            e = [left[k], left[k + 1]]
-            d.line(e, fill=tuple(int(v * 255) for v in np.clip(c * 1.18, 0, 1)) + (255,), width=3)
-    # a few seed heads (little oat-like spikelets) on the tallest stems
-    for L, rx, lean, curve, w0, tone in blades[:3]:
-        a = -np.pi / 2 + lean
-        x, y = rx, S - 2
-        for k in range(24):
-            a += curve * ((k / 24) * 2.2) / 24
-            x += np.cos(a) * L / 24
-            y += np.sin(a) * L / 24
-        # drooping spikelets hanging off short pedicels near the tip
-        for s in range(6):
-            t = s / 6
-            px = x - np.cos(a) * t * S * 0.1
-            py = y - np.sin(a) * t * S * 0.1
-            side = 1 if s % 2 else -1
-            ex = px + side * S * 0.022
-            ey = py + S * 0.018
-            d.line([(px, py), (ex, ey - 8)], fill=(190, 160, 100, 255), width=3)
-            d.polygon([(ex, ey - 12), (ex + 6, ey + 4), (ex, ey + 16), (ex - 6, ey + 4)], fill=(222, 198, 140, 255))
-    small = img.resize((256, 256), Image.LANCZOS)
+            d.line([left[k], left[k + 1]], fill=tuple(int(v * 255) for v in np.clip(c * 1.18, 0, 1)) + (255,), width=3)
+    # seed heads on ~8 of the taller stems: thin stalk extension + drooping spikelets
+    for (x, y, a, L) in tips[:14:2] + tips[1:4]:
+        for s_ in range(7):
+            t = s_ / 7
+            px = x - np.cos(a) * t * S * 0.11
+            py = y - np.sin(a) * t * S * 0.11
+            side = 1 if s_ % 2 else -1
+            ex = px + side * S * 0.024
+            ey = py + S * 0.02
+            d.line([(px, py), (ex, ey - 8)], fill=(190, 160, 100, 255), width=4)
+            d.polygon([(ex, ey - 14), (ex + 8, ey + 4), (ex, ey + 20), (ex - 8, ey + 4)], fill=(224, 200, 142, 255))
+    small = img.convert('RGBa').resize((256, 256), Image.LANCZOS).convert('RGBA')
     a = np.asarray(small).astype(np.float64)
-    # keep alpha crisp-ish for alphaTest but with AA; premultiply-safe: bleed colour into transparent area
     rgb = a[..., :3]
-    al = a[..., 3:] / 255
-    bled = blur(rgb * al, 3) / np.maximum(blur(al, 3), 1e-4)
-    rgb = np.where(al > 0.02, rgb, bled)
-    out = np.concatenate([np.clip(rgb, 0, 255), a[..., 3:]], -1).astype(np.uint8)
+    al = a[..., 3]
+    opaque = al > 128
+    idx = ndimage.distance_transform_edt(~opaque, return_distances=False, return_indices=True)
+    near = rgb[idx[0], idx[1]]
+    rgb = np.where((al > 200)[..., None], rgb, near)
+    out = np.concatenate([np.clip(rgb, 0, 255), al[..., None]], -1).astype(np.uint8)
     Image.fromarray(out).save(os.path.join(TEX_OUT, 'grass_blade.png'), optimize=True)
-    # preview on a sky-ish background
+    print('grass coverage (alpha>127): %.1f%%' % (100 * (al > 127).mean()))
     bg = Image.new('RGBA', (256, 256), (140, 170, 200, 255))
     bg.alpha_composite(Image.fromarray(out))
     bg.resize((512, 512), Image.NEAREST).save(os.path.join(PREVIEW, 'grass_blade_prev.png'))

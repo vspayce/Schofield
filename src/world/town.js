@@ -97,20 +97,54 @@ export class Towns {
   }
 
   _street(s0, s1, rnd, fill, ghost) {
+    const placed = { '-1': [], '1': [] };
     for (const side of [-1, 1]) {
-      let s = s0 + rnd() * 6;
+      let s = s0 + rnd() * 6, last = '';
       while (s < s1) {
         if (rnd() > fill) { s += 8 + rnd() * 10; continue; }
-        const name = KIT[Math.floor(rnd() * KIT.length)];
+        let name;
+        // never the same facade twice in a row, or directly opposite its twin
+        for (let k = 0; k < 8; k++) {
+          name = KIT[Math.floor(rnd() * KIT.length)];
+          const opp = placed[-side].find((b) => Math.abs(b.s - s) < 12);
+          if (name !== last && (!opp || opp.name !== name)) break;
+        }
         const w = WIDTH[name] || 9;
         this._place(name, s + w / 2, side, rnd, ghost);
+        placed[side].push({ s, name }); last = name;
+        // street clutter in front of the boardwalk
+        if (ghost || rnd() < 0.5) this._clutter(s + w * (0.2 + rnd() * 0.6), side, rnd);
         s += w + 1.5 + rnd() * 4;
       }
+      // a ragged back row so the town doesn't end at one wall
+      if (ghost) for (let t = s0 + 10; t < s1 - 10; t += 16 + rnd() * 14) this._place('Shack', t, side, rnd, false, 24 + rnd() * 10);
     }
     // landmarks
     const mid = (s0 + s1) / 2;
     this._place(ghost ? 'Church' : 'WaterTower', mid + 30, rnd() < 0.5 ? -1 : 1, rnd, ghost, 14);
     if (ghost) this._place('Gallows', s0 + 40, -1, rnd, ghost, 2);
+  }
+
+  _clutter(s, side, rnd) {
+    const props = assets.models.props;
+    if (!props) return;
+    const pick = ['Barrel', 'Crate', 'WaterTrough', 'Barrel', 'Crate', 'Wagon_Wreck'][Math.floor(rnd() * (rnd() < 0.85 ? 5 : 6))];
+    const src = findNode(props.scene, pick);
+    if (!src) return;
+    const r = this.route, f = r.frame(s, {});
+    const off = (pick === 'Wagon_Wreck' ? 7 : 6.8) + rnd() * 0.8;
+    const n = pick === 'Barrel' || pick === 'Crate' ? 1 + Math.floor(rnd() * 3) : 1;
+    for (let i = 0; i < n; i++) {
+      const o = src.clone(true);
+      const x = f.x + f.rx * off * side + f.tx * i * 0.9, z = f.z + f.rz * off * side + f.tz * i * 0.9;
+      o.position.set(x, r.height(x, z), z);
+      o.rotation.set(0, rnd() * Math.PI * 2, 0);
+      if (pick === 'Wagon_Wreck') o.rotation.y = Math.atan2(f.tx, f.tz) + (rnd() - 0.5) * 0.6;
+      o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      this.group.add(o);
+      o.updateMatrixWorld(true);
+      this.solids.push(new THREE.Box3().setFromObject(o));
+    }
   }
 
   dispose() { this.scene.remove(this.group); }

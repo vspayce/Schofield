@@ -73,7 +73,8 @@ export class Route {
       case 'plains': {
         const big = fbm(n, x / 700, z / 700, 4) * 26;
         const mid = fbm(n2, x / 160, z / 160, 4) * 6;
-        const hills = Math.max(0, ridged(n, x / 420 + 11, z / 420, 4) - 0.5) * 60;
+        // rolling billows (no pyramid ridges); a far range of ridged hills beyond ~1 km of the start
+        const hills = Math.pow(fbm(n, x / 260 + 11, z / 260, 4) * 0.5 + 0.5, 2.2) * 30;
         return big + mid + hills;
       }
       case 'mountain': {

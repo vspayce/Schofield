@@ -6,7 +6,7 @@ import { assets, findNode } from '../core/assets.js';
 import { mulberry32, smoothstep } from '../core/noise.js';
 import { ROAD_HALF } from './route.js';
 import { TILE } from './terrain.js';
-import { grassTex } from './textures.js';
+import { grassTex, tex } from './textures.js';
 
 // ---------------------------------------------------------------- catalogue
 function stdMat(color, rough = 0.9, extra = {}) { return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0, ...extra }); }
@@ -95,9 +95,53 @@ function kindFromGLB(name) {
 }
 
 const kindCache = {};
+const IMPOSTOR = new Set(['Pine_A', 'Pine_B', 'Pine_Snow', 'DeadTree', 'Saguaro', 'Joshua']);
+let _renderer = null;
+export function setImpostorRenderer(r) { _renderer = r; }
+
+// Bake a kind into a two-card impostor (front + side views) for distant tiles.
+function buildImpostor(name) {
+  const K = getKind(name);
+  if (!_renderer) return K;
+  const scene = new THREE.Scene();
+  const box = new THREE.Box3();
+  for (const p of K.parts) {
+    const m = new THREE.Mesh(p.geo, p.mat); m.matrixAutoUpdate = false; m.matrix.copy(p.m); scene.add(m);
+    p.geo.computeBoundingBox(); box.union(p.geo.boundingBox.clone().applyMatrix4(p.m));
+  }
+  scene.add(new THREE.AmbientLight(0xffffff, 1.4), new THREE.HemisphereLight(0xffffff, 0x888888, 1.2));
+  const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const W = Math.max(size.x, size.z) * 1.02, H = size.y * 1.02;
+  const rt = new THREE.WebGLRenderTarget(512, 512, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+  const cam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, 0.1, 200);
+  const r = _renderer, prevT = r.getRenderTarget(), prevC = r.getClearColor(new THREE.Color()), prevA = r.getClearAlpha();
+  r.setRenderTarget(rt); r.setClearColor(0x000000, 0); r.clear();
+  const views = [new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)];
+  views.forEach((v, i) => {
+    cam.position.copy(c).addScaledVector(v, 100); cam.lookAt(c); cam.updateMatrixWorld();
+    r.setViewport(i * 256, 0, 256, 512); r.setScissor(i * 256, 0, 256, 512); r.setScissorTest(true);
+    r.render(scene, cam);
+  });
+  r.setScissorTest(false); r.setViewport(0, 0, r.domElement.width, r.domElement.height);
+  r.setRenderTarget(prevT); r.setClearColor(prevC, prevA);
+  const mat = new THREE.MeshStandardMaterial({ map: rt.texture, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95 });
+  if (_msaa) mat.alphaToCoverage = true;
+  const mk = (u0, rotY) => {
+    const g = new THREE.PlaneGeometry(W, H).translate(0, c.y, 0);
+    const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, u0 + uv.getX(i) * 0.5);
+    g.rotateY(rotY); g.translate(c.x * 0, 0, 0);
+    const nrm = g.attributes.normal; for (let i = 0; i < nrm.count; i++) nrm.setXYZ(i, 0, 1, 0);
+    return g;
+  };
+  const parts = [{ geo: mergeSimple([mk(0, 0), mk(0.5, Math.PI / 2)]), mat, m: new THREE.Matrix4() }];
+  return { parts, radius: K.radius };
+}
 let _msaa = false;
 export function getKind(name) {
-  if (!kindCache[name]) kindCache[name] = kindFromGLB(name) || fallbackKind(name);
+  if (!kindCache[name]) {
+    if (name.endsWith('#imp')) kindCache[name] = buildImpostor(name.slice(0, -4));
+    else kindCache[name] = kindFromGLB(name) || fallbackKind(name);
+  }
   return kindCache[name];
 }
 export function resetKinds() { for (const k in kindCache) delete kindCache[k]; }
@@ -170,7 +214,8 @@ export class Scatter {
         }
         r.roadCoords(x, z, rc);
         if (rc.s >= 0 && Math.abs(rc.d) < (rule.minRoad ?? 6)) continue;
-        if (rc.s >= 0 && (r.inTown(rc.s) || rc.s < 120 || rc.s > r.len - 140) && Math.abs(rc.d) < 40 && !rule.far) continue;
+        const town = r.inTown(rc.s) || (r.townRange && rc.s > r.townRange.s0 - 30 && rc.s < r.townRange.s1 + 30) || rc.s < 130 || rc.s > r.len - 150;
+        if (rc.s >= 0 && town && Math.abs(rc.d) < (rule.far ? 32 : 40)) continue;
         const h = r.height(x, z);
         if (rule.minH !== undefined && h < rule.minH) continue;
         if (rule.maxH !== undefined && h > rule.maxH) continue;
@@ -212,6 +257,13 @@ export class Scatter {
       im.frustumCulled = false; im.count = 0;
       im.userData.local = p.m;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      const tint = /^(Rock|Boulder|Cliff)/.test(kind) && this.route.def.terrain.propRock;
+      if (tint) {
+        const arr = new Float32Array(cap * 3);
+        for (let i = 0; i < cap; i++) { arr[i * 3] = tint.r; arr[i * 3 + 1] = tint.g; arr[i * 3 + 2] = tint.b; }
+        im.instanceColor = new THREE.InstancedBufferAttribute(arr, 3);
+      }
+      if (kind.endsWith('#imp')) im.castShadow = false;
       this.group.add(im);
       return im;
     });
@@ -229,7 +281,7 @@ export class Scatter {
       this._box.max.set(t.x0 + TILE + 12, 600, t.z0 + TILE + 12);
       if (!this._frustum.intersectsBox(this._box)) continue;
       const d = Math.hypot(t.x0 + TILE / 2 - focus.x, t.z0 + TILE / 2 - focus.z);
-      vis.push([key, d > 300 ? 1 : 0, d]);
+      vis.push([key, d > 300 ? 2 : d > 170 ? 1 : 0, d]);
     }
     const sig = vis.map((v) => v[0] + v[1]).join('|');
     if (sig !== this._sig || this._dirty) {
@@ -242,11 +294,13 @@ export class Scatter {
   _rebuild(vis) {
     const farOnly = new Set(this.rules.filter((r) => r.far || r.poles).map((r) => r.kind));
     const lists = {};
-    for (const [key, far] of vis) {
+    for (const [key, band] of vis) {
       const e = this.byTile.get(key);
       for (const kind in e.kinds) {
-        if (far && !farOnly.has(kind)) continue;
-        (lists[kind] ||= []).push(e.kinds[kind]);
+        if (band === 2 && !farOnly.has(kind)) continue;
+        // mid/far trees become impostor cards
+        const k = band >= 1 && IMPOSTOR.has(kind) && _renderer ? kind + '#imp' : kind;
+        (lists[k] ||= []).push(e.kinds[kind]);
       }
     }
     const tmp = new THREE.Matrix4(), base = new THREE.Matrix4();
@@ -285,24 +339,34 @@ export class Scatter {
     // normals straight up for soft, uniform lighting
     const nrm = geo.attributes.normal;
     for (let i = 0; i < nrm.count; i++) nrm.setXYZ(i, 0, 1, 0);
-    const mat = new THREE.MeshStandardMaterial({ map: grassTex(), alphaTest: 0.45, side: THREE.DoubleSide, color: G.color, roughness: 1 });
-    this.grassU = { uTime: { value: 0 }, uWind: { value: this.route.def.wind }, uFocus: { value: new THREE.Vector3() } };
+    const mat = new THREE.MeshStandardMaterial({ map: grassTex(), alphaTest: 0.25, side: THREE.DoubleSide, color: G.color, roughness: 1 });
+    mat.alphaToCoverage = this.q.msaa > 0;
+    const T = this.route.def.terrain;
+    this.grassU = {
+      uTime: { value: 0 }, uWind: { value: this.route.def.wind }, uFocus: { value: new THREE.Vector3() },
+      tMacro: { value: tex('cloud_noise') }, uGT1: { value: T.tint1 }, uGT2: { value: T.tint2 },
+      uGMix: { value: new THREE.Vector2(...(T.greenMix || [0.42, 0.68])) },
+    };
     mat.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, this.grassU);
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-        uniform float uTime, uWind; uniform vec3 uFocus; varying float vGH;`)
+        uniform float uTime, uWind; uniform vec3 uFocus; varying float vGH; varying vec2 vGXZ;`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
           float dist = length(ip.xz - uFocus.xz);
-          float fade = 1.0 - smoothstep(40.0, 62.0, dist);
+          float fade = 1.0 - smoothstep(30.0, 60.0, dist);
+          vGXZ = ip.xz;
           transformed *= fade;
           float sway = sin(uTime * 1.7 + ip.x * 0.21 + ip.z * 0.17) * 0.5 + sin(uTime * 3.1 + ip.x * 0.7) * 0.2;
           transformed.x += sway * uWind * 0.18 * position.y;
           transformed.z += cos(uTime * 1.3 + ip.z * 0.2) * uWind * 0.1 * position.y;
           vGH = position.y;`);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-        varying float vGH;`).replace('#include <map_fragment>', `#include <map_fragment>
-          diffuseColor.rgb *= mix(0.45, 1.15, clamp(vGH, 0.0, 1.0));`);
+        uniform sampler2D tMacro; uniform vec3 uGT1, uGT2; uniform vec2 uGMix;
+        varying float vGH; varying vec2 vGXZ;`).replace('#include <map_fragment>', `#include <map_fragment>
+          // match the ground layer underneath (same macro noise as the terrain)
+          float gm = smoothstep(uGMix.x, uGMix.y, texture2D(tMacro, vGXZ / 180.0).r);
+          diffuseColor.rgb *= mix(uGT1, uGT2, gm) * mix(0.78, 1.12, clamp(vGH, 0.0, 1.0));`);
     };
     const cap = Math.floor(26000 * this.q.grass);
     this.grass = new THREE.InstancedMesh(geo, mat, cap);

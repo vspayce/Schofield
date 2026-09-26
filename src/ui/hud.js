@@ -127,7 +127,8 @@ export class HUD {
     const list = [];
     for (const e of game.enemies.list) {
       if (!e.alive) continue;
-      const threat = e.type === 'rider' ? e.aggro > 0.2 || (e.s - game.coach.s) > -70 : e.los !== false;
+      const dist = e.spheres[1].c.distanceTo(game.player.camPos);
+      const threat = e.type === 'rider' ? e.state === 'ride' && dist < 70 : e.los === true && dist < (e.rifle ? 200 : 70);
       if (!threat) continue;
       _p.copy(e.spheres[1].c).project(game.camera);
       const behind = _p.z > 1;
@@ -136,7 +137,11 @@ export class HUD {
       let x = behind ? -_p.x : _p.x, y = behind ? -_p.y : _p.y;
       if (behind && Math.abs(y) < 0.3) y = -0.9; // straight behind: show at the bottom
       const a = Math.atan2(y * innerHeight, x * innerWidth);
-      list.push({ a, cls: e.glintT > 0 ? 'glint' : e.type === 'rider' ? '' : 'rifle' });
+      const cls = e.glintT > 0 ? 'glint' : e.type === 'rider' ? '' : 'rifle';
+      // merge threats in nearly the same direction (keep the most urgent)
+      const near = list.find((c) => Math.abs(Math.atan2(Math.sin(c.a - a), Math.cos(c.a - a))) < 0.25);
+      if (near) { if (cls === 'glint' || (cls === 'rifle' && near.cls === '')) near.cls = cls; continue; }
+      list.push({ a, cls });
     }
     while (this.chevs.length < list.length) { const d = document.createElement('div'); d.className = 'chev'; this.chevLayer.appendChild(d); this.chevs.push(d); }
     while (this.chevs.length > list.length) this.chevs.pop().remove();

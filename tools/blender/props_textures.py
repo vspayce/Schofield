@@ -21,91 +21,107 @@ FONTS = '/System/Library/Fonts/Supplemental/'
 
 
 # ----------------------------------------------------------------------------- opaque
+def _to_mean(col, target=0.63):
+    """Scale so mean luminance ~= target (game tints rocks per biome via instanceColor)."""
+    lum = (col * np.array([0.3, 0.59, 0.11])).sum(-1).mean()
+    return np.clip(col * (target / max(lum, 1e-3)), 0, 1)
+
+
+def _rock_fbm3(h, w, seed):
+    """3 octaves of fbm at distinct scales (large masses, mid lumps, fine grain)."""
+    o1 = fbm(h, w, seed, beta=3.6)
+    o2 = fbm(h, w, seed + 1, beta=2.4, lowcut=4)
+    o3 = fbm(h, w, seed + 2, beta=1.2, lowcut=16)
+    return o1, o2, o3
+
+
 def rock_sand(w, h, seed=11):
+    """Neutral-warm layered sandstone: warped strata, 3-octave fbm, soft (low-contrast)
+    fractures, weathering streaks. Mean luminance ~0.63 so biome tint does the colour."""
     t = np.arange(h)[:, None] / h * np.ones((1, w))
-    warp = fbm(h, w, seed + 1, beta=3.2)
+    warp = fbm(h, w, seed + 1, beta=3.4)
     warp2 = fbm(h, w, seed + 2, beta=2.4, aniso=(6, 1))
-    tt = t + (warp - 0.5) * 0.22 + (warp2 - 0.5) * 0.05
+    tt = t + (warp - 0.5) * 0.18 + (warp2 - 0.5) * 0.04
     r = rng(seed)
-    strat = (0.5 + 0.22 * np.sin(2 * np.pi * 3 * tt + r.random() * 6)
-             + 0.16 * np.sin(2 * np.pi * 9 * tt + r.random() * 6)
-             + 0.08 * np.sin(2 * np.pi * 23 * tt + r.random() * 6))
-    layers = fbm(h, w, seed + 3, beta=2.0, aniso=(10, 1))
-    big = fbm(h, w, seed + 4, beta=3.5)
-    v = np.clip(strat * 0.65 + layers * 0.35, 0, 1)
-    col = ramp(v, [(0.0, (0.48, 0.32, 0.23)), (0.3, (0.63, 0.45, 0.32)), (0.55, (0.76, 0.61, 0.46)),
-                   (0.78, (0.84, 0.72, 0.57)), (1.0, (0.69, 0.52, 0.38))])
-    col *= (0.82 + 0.3 * big)[..., None]
-    # cracks (worley cell edges, broken up)
-    F1, F2, cid = worley(h, w, 14, seed + 5, aniso=(0.6, 1.3))
+    strat = (0.5 + 0.18 * np.sin(2 * np.pi * 4 * tt + r.random() * 6)
+             + 0.14 * np.sin(2 * np.pi * 11 * tt + r.random() * 6)
+             + 0.10 * np.sin(2 * np.pi * 27 * tt + r.random() * 6)
+             + 0.05 * np.sin(2 * np.pi * 53 * tt + r.random() * 6))
+    layers = fbm(h, w, seed + 3, beta=1.8, aniso=(12, 1))
+    o1, o2, o3 = _rock_fbm3(h, w, seed + 20)
+    v = np.clip(strat * 0.5 + layers * 0.2 + o1 * 0.15 + o2 * 0.1 + o3 * 0.05, 0, 1)
+    col = ramp(v, [(0.0, (0.52, 0.46, 0.40)), (0.35, (0.64, 0.58, 0.50)), (0.6, (0.74, 0.68, 0.59)),
+                   (0.85, (0.82, 0.77, 0.68)), (1.0, (0.70, 0.64, 0.56))])
+    col *= (0.86 + 0.2 * o1 + 0.08 * o2)[..., None]
+    # soft fractures: low-contrast, masked, mostly subvertical joints
+    F1, F2, cid = worley(h, w, 9, seed + 5, aniso=(0.5, 1.6))
     edge = F2 - F1
-    crack = (1 - smoothstep(0.0, 2.2, edge)) * smoothstep(0.55, 0.75, fbm(h, w, seed + 6, beta=2.5))
-    # bedding cracks along strata
-    bed = (1 - smoothstep(0.0, 0.035, np.abs(np.sin(2 * np.pi * 9 * tt)))) * smoothstep(0.45, 0.7, fbm(h, w, seed + 7, beta=2.2, aniso=(4, 1)))
-    cells = rng(seed + 8).random(14)[cid]
-    col *= (0.93 + 0.12 * cells)[..., None]
-    fine = fbm(h, w, seed + 9, beta=0.9)
-    height = v * 0.9 + big * 2.2 + fine * 0.35 - crack * 0.8 - bed * 0.6
-    shade = emboss(blur_wrap(height, 1.0) * 6, 1.0, light=(-0.4, -0.9))
-    col *= np.clip(shade, 0.6, 1.4)[..., None]
-    col *= (1 - 0.55 * crack - 0.35 * bed)[..., None]
-    # desert varnish streaks running down
-    streak = smoothstep(0.55, 0.85, fbm(h, w, seed + 10, beta=3.0, aniso=(1, 6)))
-    col = col * (1 - 0.45 * streak[..., None]) + np.array([0.26, 0.17, 0.13]) * 0.45 * streak[..., None]
-    col += (fine[..., None] - 0.5) * 0.08
-    return np.clip(col, 0, 1)
+    crack = (1 - smoothstep(0.0, 1.6, edge)) * smoothstep(0.6, 0.8, fbm(h, w, seed + 6, beta=2.5))
+    bed = (1 - smoothstep(0.0, 0.03, np.abs(np.sin(2 * np.pi * 11 * tt)))) * smoothstep(0.4, 0.7, fbm(h, w, seed + 7, beta=2.2, aniso=(4, 1)))
+    height = v * 1.0 + o1 * 2.0 + o2 * 0.8 + o3 * 0.3 - crack * 0.4 - bed * 0.4
+    shade = emboss(blur_wrap(height, 1.0) * 6, 0.8, light=(-0.4, -0.9))
+    col *= np.clip(shade, 0.7, 1.3)[..., None]
+    col *= (1 - 0.18 * crack - 0.2 * bed)[..., None]
+    # weathering: dark varnish streaks down + pale dusty wash
+    streak = smoothstep(0.5, 0.85, fbm(h, w, seed + 10, beta=2.8, aniso=(1, 8)))
+    col *= (1 - 0.22 * streak)[..., None]
+    wash = smoothstep(0.55, 0.8, fbm(h, w, seed + 11, beta=2.6, aniso=(1, 4)))
+    col = col * (1 - 0.18 * wash[..., None]) + 0.85 * 0.18 * wash[..., None]
+    col += (o3[..., None] - 0.5) * 0.06
+    return _to_mean(col, 0.63)
 
 
 def rock_granite(w, h, seed=21):
-    big = fbm(h, w, seed, beta=3.4)
-    mid = fbm(h, w, seed + 1, beta=2.2)
-    fine = fbm(h, w, seed + 2, beta=0.6)
-    v = big * 0.5 + mid * 0.35 + fine * 0.15
-    col = ramp(v, [(0.0, (0.30, 0.29, 0.28)), (0.4, (0.47, 0.45, 0.42)), (0.7, (0.60, 0.58, 0.54)), (1.0, (0.72, 0.70, 0.66))])
-    r = rng(seed + 3)
+    o1, o2, o3 = _rock_fbm3(h, w, seed)
+    fine = fbm(h, w, seed + 3, beta=0.6)
+    v = o1 * 0.45 + o2 * 0.3 + o3 * 0.15 + fine * 0.1
+    col = ramp(v, [(0.0, (0.48, 0.47, 0.45)), (0.4, (0.62, 0.61, 0.58)), (0.7, (0.72, 0.71, 0.68)), (1.0, (0.82, 0.81, 0.78))])
+    r = rng(seed + 4)
     spec = r.random((h, w))
-    col[spec > 0.93] *= 0.45
-    col[spec < 0.05] = col[spec < 0.05] * 0.5 + 0.42
+    col[spec > 0.94] *= 0.6
+    col[spec < 0.04] = col[spec < 0.04] * 0.6 + 0.36
     col = blur_wrap(col, 0.55)
-    F1, F2, cid = worley(h, w, 10, seed + 4, aniso=(1.0, 1.0))
-    edge = F2 - F1
-    crack = (1 - smoothstep(0.0, 2.2, edge)) * smoothstep(0.55, 0.75, fbm(h, w, seed + 5, beta=2.5))
-    cells = rng(seed + 6).random(10)[cid]
-    col *= (0.93 + 0.12 * cells)[..., None]
-    height = big * 2.6 + mid * 1.0 + fine * 0.25 - crack * 0.8
-    shade = emboss(blur_wrap(height, 1.0) * 6, 1.0, light=(-0.4, -0.9))
-    col *= np.clip(shade, 0.6, 1.4)[..., None]
-    col *= (1 - 0.6 * crack)[..., None]
-    # lichen: yellow-green and rust-orange crusts
-    l1 = fbm(h, w, seed + 7, beta=2.6)
-    l1m = smoothstep(0.70, 0.76, l1) * smoothstep(0.35, 0.65, fine)
-    col = col * (1 - l1m[..., None] * 0.6) + np.array([0.60, 0.60, 0.44]) * (l1m[..., None] * 0.6)
-    l2 = fbm(h, w, seed + 8, beta=2.8)
-    l2m = smoothstep(0.80, 0.84, l2) * (0.5 + 0.5 * fine)
-    col = col * (1 - l2m[..., None] * 0.5) + np.array([0.66, 0.48, 0.26]) * (l2m[..., None] * 0.5)
-    streak = smoothstep(0.6, 0.85, fbm(h, w, seed + 9, beta=2.2, aniso=(1, 14)))
-    col *= (1 - 0.3 * streak)[..., None]
-    return np.clip(col, 0, 1)
+    # sheeting joints (roughly horizontal) + a few soft fractures
+    tt = np.arange(h)[:, None] / h + (fbm(h, w, seed + 5, beta=3.2) - 0.5) * 0.25
+    sheet = (1 - smoothstep(0.0, 0.04, np.abs(np.sin(2 * np.pi * 3 * tt)))) * smoothstep(0.5, 0.75, fbm(h, w, seed + 6, beta=2.4, aniso=(5, 1)))
+    F1, F2, cid = worley(h, w, 8, seed + 7)
+    crack = (1 - smoothstep(0.0, 1.6, F2 - F1)) * smoothstep(0.6, 0.8, fbm(h, w, seed + 8, beta=2.5))
+    height = o1 * 2.4 + o2 * 1.0 + o3 * 0.35 - crack * 0.4 - sheet * 0.5
+    shade = emboss(blur_wrap(height, 1.0) * 6, 0.8, light=(-0.4, -0.9))
+    col *= np.clip(shade, 0.7, 1.3)[..., None]
+    col *= (1 - 0.18 * crack - 0.22 * sheet)[..., None]
+    # sparse lichen, subtle
+    l1 = fbm(h, w, seed + 9, beta=2.6)
+    l1m = smoothstep(0.74, 0.8, l1) * smoothstep(0.35, 0.65, fine)
+    col = col * (1 - l1m[..., None] * 0.4) + np.array([0.66, 0.66, 0.52]) * (l1m[..., None] * 0.4)
+    streak = smoothstep(0.5, 0.85, fbm(h, w, seed + 10, beta=2.6, aniso=(1, 10)))
+    col *= (1 - 0.2 * streak)[..., None]
+    return _to_mean(col, 0.64)
 
 
 def bark_pond(w, h, seed=31):
-    n = 64
-    F1, F2, cid = worley(h, w, n, seed, aniso=(1.0, 0.42))
-    edge = F2 - F1
-    r = rng(seed + 1)
-    tone = r.random(n)[cid]
-    flake = fbm(h, w, seed + 2, beta=1.4, aniso=(1, 3))
-    plate = ramp(np.clip(tone * 0.6 + flake * 0.4, 0, 1), [
-        (0.0, (0.36, 0.23, 0.16)), (0.35, (0.52, 0.33, 0.21)), (0.65, (0.64, 0.44, 0.30)), (1.0, (0.66, 0.56, 0.47))])
-    fiss = 1 - smoothstep(0.6, 3.5, edge)
-    height = smoothstep(0.0, 7.0, edge) * 0.7 + flake * 0.6
-    shade = emboss(blur_wrap(height, 0.8) * 3, 0.7, light=(-0.7, -0.7))
-    col = plate * np.clip(shade, 0.6, 1.35)[..., None]
-    dark = np.array([0.10, 0.07, 0.06])
+    """Ponderosa: long flat cinnamon plates (~4:1 tall) separated by deep dark vertical
+    furrows, with occasional cross-breaks; flaky puzzle texture inside plates."""
+    x = (np.arange(w)[None, :] + 0.5) / w * np.ones((h, 1))
+    warp = fbm(h, w, seed, beta=3.2, aniso=(1, 4))
+    ph = x * 7 + (warp - 0.5) * 2.4
+    f = ph - np.floor(ph)
+    furrow = np.exp(-((f - 0.5) / 0.1) ** 2)                 # vertical furrows
+    n = 150
+    F1, F2, cid = worley(h, w, n, seed + 1, aniso=(1.0, 0.25))  # plates 4:1
+    brk = (1 - smoothstep(0.2, 1.4, F2 - F1)) * smoothstep(0.45, 0.6, fbm(h, w, seed + 2, beta=2.0))
+    fiss = np.clip(np.maximum(furrow, brk * 0.85), 0, 1)
+    tone = rng(seed + 3).random(n)[cid]
+    flake = fbm(h, w, seed + 4, beta=1.2, aniso=(1, 3))
+    plate = ramp(np.clip(tone * 0.45 + flake * 0.55, 0, 1), [
+        (0.0, (0.40, 0.26, 0.18)), (0.35, (0.54, 0.35, 0.23)), (0.65, (0.64, 0.45, 0.31)), (1.0, (0.68, 0.58, 0.49))])
+    height = flake * 0.5 - fiss * 0.8
+    shade = emboss(blur_wrap(height, 0.8) * 3, 0.5, light=(-0.7, -0.7))
+    col = plate * np.clip(shade, 0.75, 1.25)[..., None]
+    dark = np.array([0.09, 0.06, 0.05])
     col = col * (1 - fiss[..., None]) + dark * fiss[..., None]
-    # scale lines inside plates (puzzle flakes)
-    sub = fbm(h, w, seed + 3, beta=1.2, aniso=(1, 2.5))
-    col *= (0.85 + 0.3 * sub)[..., None]
+    sub = fbm(h, w, seed + 5, beta=1.0, aniso=(1, 2.5))
+    col *= (0.88 + 0.24 * sub)[..., None]
     return np.clip(col, 0, 1)
 
 
@@ -117,10 +133,10 @@ def bark_fir(w, h, seed=41):
     f = ph - np.floor(ph)
     ridge = np.exp(-((f - 0.5) / 0.24) ** 2)
     brk = fbm(h, w, seed + 1, beta=1.6, aniso=(1, 6))
-    F1, F2, cid = worley(h, w, 120, seed + 2, aniso=(1.0, 0.3))
+    F1, F2, cid = worley(h, w, 360, seed + 2, aniso=(1.0, 0.25))
     plate = smoothstep(0.0, 4.0, F2 - F1)
     height = ridge * 0.6 + plate * 0.4 * ridge + brk * 0.4
-    tone = rng(seed + 3).random(120)[cid]
+    tone = rng(seed + 3).random(360)[cid]
     col = ramp(np.clip(height * 0.7 + tone * 0.3, 0, 1), [(0, (0.12, 0.09, 0.07)), (0.4, (0.30, 0.24, 0.19)), (0.75, (0.45, 0.39, 0.33)), (1, (0.56, 0.51, 0.45))])
     shade = emboss(blur_wrap(height, 0.8) * 3, 0.7)
     col *= np.clip(shade, 0.7, 1.3)[..., None]
@@ -492,7 +508,7 @@ def sage_card(w, h, seed=201):
                     px = x + r.normal(0, 7 * s)
                     py = y + r.normal(0, 6 * s)
                     ex, ey = (px - W * 0.5) / (W * 0.47), (py - Hh * 0.6) / (Hh * 0.42)
-                    if py > Hh * 0.93 or ex * ex + ey * ey > 1.0 + r.uniform(-0.25, 0.1):
+                    if py > Hh * 0.93 or ex * ex + ey * ey > 1.0 + r.uniform(-0.4, 0.3):
                         continue
                     rr = r.uniform(0.6, 1.0) * rad * s * 0.5
                     up = np.clip(1 - py / Hh, 0, 1)
@@ -533,27 +549,45 @@ def joshua_card(w, h, seed=211):
 
 
 def tumble_card(w, h, seed=221):
+    """Tangled Russian-thistle: many short, kinked, branching twigs at random angles,
+    dense core and a ragged (noise-modulated) outline - no concentric arcs."""
     ss = 3
     W, Hh = w * ss, h * ss
 
     def fn(d, img, s):
         r = rng(seed)
-        cx, cy, R = W / 2, Hh / 2, W * 0.46
-        for i in range(520):
-            # arcs biased toward the rim
-            rad = R * r.uniform(0.05, 1.0) ** 0.45
+        cx, cy = W / 2, Hh / 2
+        R0 = W * 0.44
+        ph = r.uniform(0, 6, 5)
+
+        def Rmax(a):
+            return R0 * (0.82 + 0.1 * np.sin(3 * a + ph[0]) + 0.06 * np.sin(7 * a + ph[1]) + 0.04 * np.sin(13 * a + ph[2]))
+        for i in range(700):
             a0 = r.uniform(0, 2 * np.pi)
-            pts = []
-            steps = 6
-            da = r.uniform(0.2, 0.7) * r.choice([-1, 1])
-            rr = rad
-            for k in range(steps):
-                a = a0 + da * k / steps
-                rr = np.clip(rr + r.normal(0, R * 0.05), R * 0.1, R)
-                pts.append((cx + np.cos(a) * rr, cy + np.sin(a) * rr))
+            rad = Rmax(a0) * r.random() ** 0.6
+            x, y = cx + np.cos(a0) * rad, cy + np.sin(a0) * rad
+            ang = r.uniform(0, 2 * np.pi)
+            pts = [(x, y)]
+            n = r.integers(2, 5)
+            seg = r.uniform(6, 16) * s
+            for k in range(n):
+                ang += r.normal(0, 0.7)
+                x += np.cos(ang) * seg
+                y += np.sin(ang) * seg
+                aa = np.arctan2(y - cy, x - cx)
+                rr = np.hypot(x - cx, y - cy)
+                if rr > Rmax(aa):
+                    break
+                pts.append((x, y))
+            if len(pts) < 2:
+                continue
             t = r.random()
-            c = lerpc((0.40, 0.30, 0.20), (0.80, 0.68, 0.48), t)
-            d.line(pts, fill=c + (255,), width=int(r.uniform(1.2, 2.2) * s), joint='curve')
+            c = lerpc((0.36, 0.27, 0.18), (0.80, 0.68, 0.48), t)
+            d.line(pts, fill=c + (255,), width=max(1, int(r.uniform(1.0, 2.0) * s)), joint='curve')
+            if r.random() < 0.4:  # tiny spur
+                px, py = pts[-1]
+                sa = ang + r.choice([-1, 1]) * r.uniform(0.6, 1.2)
+                d.line([(px, py), (px + np.cos(sa) * seg * 0.5, py + np.sin(sa) * seg * 0.5)], fill=c + (255,), width=max(1, int(1.2 * s)))
     return draw_supersampled(w, h, ss, fn)
 
 

@@ -484,31 +484,34 @@ def joshua(name, seed=5):
 
 
 def sagebrush(name, seed=3):
+    """Mound of small crossed-card sub-clumps (many small overlapping cards hide the planes)."""
     rnd = random.Random(seed)
     mb = C.MeshBuilder()
-    ctr = V((0, 0, 0.3))
-    nfn = lambda q: ((q - ctr) * V((1, 1, 0.8)) + UP * 0.3).normalized()
-    # outer ring: cards leaning outward (a loose mound), inner: upright crossed cards
-    n = 7
-    for i in range(n):
-        az = i * 2 * math.pi / n + rnd.uniform(-0.2, 0.2)
-        o = V((math.cos(az), math.sin(az), 0))
-        tan = UP.cross(o)
-        s = rnd.uniform(0.8, 1.1)
-        lean = rnd.uniform(0.35, 0.6)
-        up = (UP * math.cos(lean) + o * math.sin(lean)).normalized()
-        card(mb, 'sage', o * 0.12 - UP * 0.05, up * s * 0.9, tan * s * 0.5, nfn, want_normal=(o + UP * 0.5))
-    for i in range(3):
-        az = i * math.pi / 3 + rnd.uniform(-0.2, 0.2)
-        rgt = V((math.cos(az), math.sin(az), 0))
-        s = rnd.uniform(1.05, 1.25)
-        card(mb, 'sage', -UP * 0.04, UP * s, rgt * s * 0.55, nfn)
+    ctr = V((0, 0, 0.25))
+    nfn = lambda q: ((q - ctr) * V((1, 1, 0.8)) + UP * 0.35).normalized()
+    subs = [(V((0, 0, 0)), 0.95)]
+    for i in range(5):
+        az = i * 2 * math.pi / 5 + rnd.uniform(-0.3, 0.3)
+        r = rnd.uniform(0.28, 0.42)
+        subs.append((V((math.cos(az) * r, math.sin(az) * r, 0)), rnd.uniform(0.55, 0.75)))
+    for (c, s) in subs:
+        base_az = rnd.uniform(0, math.pi)
+        o = V((c.x, c.y, 0))
+        lean_dir = o.normalized() if o.length > 1e-3 else V((0, 0, 0))
+        for k in range(3):
+            az = base_az + k * math.pi / 3 + rnd.uniform(-0.15, 0.15)
+            rgt = V((math.cos(az), math.sin(az), 0)) * s * 0.55
+            up = (UP + lean_dir * 0.35).normalized()
+            # random tilt about the card's horizontal axis and a roll, so no card is ever a
+            # clean vertical plane (edge-on slivers read as 'cards')
+            tq = Matrix.Rotation(rnd.uniform(-0.45, 0.45), 3, rgt.normalized()) @ Matrix.Rotation(rnd.uniform(-0.3, 0.3), 3, up)
+            card(mb, 'sage', c - UP * 0.06, (tq @ up) * s * 0.95, tq @ rgt, nfn)
 
     def fshade(co, n):
         h = min(1.0, max(0.0, co.z / 0.9))
         a = 0.5 + 0.5 * h
         nz = noise.noise(co * 2.0)
-        return (a * (1 + 0.04 * nz), a, a * (1 - 0.04 * nz))
+        return (a * (1 + 0.05 * nz), a, a * (1 - 0.05 * nz))
     return finish(mb, name, foliage_fn=fshade)
 
 
@@ -877,18 +880,27 @@ def join_objects(name, obs):
 
 
 def tumbleweed(name, seed=71):
+    """Ball of 12 randomly oriented tangled-twig cards (slightly squashed), centre at z~0.4."""
     rnd = random.Random(seed)
     mb = C.MeshBuilder()
     R = 0.42
-    ctr = V((0, 0, R * 0.95))
+    ctr = V((0, 0, R * 1.1))
     nfn = lambda q: (q - ctr).normalized()
-    dirs = [V((1, 0, 0)), V((0, 1, 0)), V((0, 0, 1)), V((1, 1, 0)), V((1, -1, 0)), V((1, 0, 1)), V((0, 1, 1)), V((-1, 0, 1)), V((0, -1, 1))]
-    for d in dirs:
-        d = (d.normalized() + V((rnd.uniform(-0.1, 0.1),) * 3)).normalized()
+    n = 12
+    for i in range(n):
+        # fibonacci sphere directions + jitter so no plane lines up
+        zz = 1 - 2 * (i + 0.5) / n
+        rr = math.sqrt(max(0.0, 1 - zz * zz))
+        th = i * 2.399963 + rnd.uniform(-0.2, 0.2)
+        d = V((rr * math.cos(th), rr * math.sin(th), zz)).normalized()
         a, b, _ = C.frame_from_dir(d)
-        s = R * rnd.uniform(0.9, 1.1)
-        card(mb, 'tumble', ctr - b * s, b * 2 * s, a * s, nfn, want_normal=d)
-    fshade = lambda co, n: (0.75 + 0.25 * max(0.0, n.z),) * 3
+        rot = Matrix.Rotation(rnd.uniform(0, 6.28), 3, d)
+        a, b = rot @ a, rot @ b
+        s = R * rnd.uniform(0.85, 1.05)
+        off = d * rnd.uniform(-0.06, 0.06)
+        card(mb, 'tumble', ctr + off - b * s, b * 2 * s, a * s, nfn, want_normal=d)
+    mb.verts = [V((v.x, v.y, ctr.z + (v.z - ctr.z) * 0.88)) for v in mb.verts]
+    fshade = lambda co, n: (0.72 + 0.28 * max(0.0, n.z),) * 3
     return finish(mb, name, foliage_fn=fshade)
 
 

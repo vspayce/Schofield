@@ -97,7 +97,7 @@ export class Player {
     this.aimDir.set(Math.sin(yawW) * Math.cos(pitchW), Math.sin(pitchW), Math.cos(yawW) * Math.cos(pitchW));
     const head = this.headPos;
     const right = _v.set(-Math.cos(yawW), 0, Math.sin(yawW));
-    const back = 3.3, side = (g.input.touch ? 1.4 : 1.2) * this.shoulder, up = g.input.touch ? 0.7 : 0.55;
+    const back = 4.1, side = (g.input.touch ? 1.45 : 1.3) * this.shoulder, up = g.input.touch ? 0.95 : 0.8;
     const target = new THREE.Vector3().copy(head)
       .addScaledVector(this.aimDir, -back)
       .addScaledVector(right, side)

@@ -8,7 +8,7 @@ import { damp } from './core/noise.js';
 import { ROUTES } from './world/routes.js';
 import { Route } from './world/route.js';
 import { Terrain } from './world/terrain.js';
-import { Scatter } from './world/scatter.js';
+import { Scatter, setImpostorRenderer } from './world/scatter.js';
 import { Sky } from './world/sky.js';
 import { Towns } from './world/town.js';
 import { Coach } from './game/coach.js';
@@ -34,6 +34,7 @@ class Game {
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 5000);
     this.scene = new THREE.Scene();
     this.renderer.setup(this.scene, this.camera);
+    setImpostorRenderer(this.renderer.r);
     this.input = new Input(this.canvas);
     this.hud = new HUD();
     this.menus = new Menus(this);
@@ -315,7 +316,8 @@ class Game {
     const right = c.right, fwd = c.fwd;
     const target = new THREE.Vector3();
     const look = new THREE.Vector3().copy(c.pos).add(new THREE.Vector3(0, 1.8, 0));
-    if (shot === 0) target.copy(c.pos).addScaledVector(right, 7).addScaledVector(fwd, 6 - t * 12).add(new THREE.Vector3(0, 1.4, 0));
+    // coach framed in the right third, clear of the menu on the left
+    if (shot === 0) { target.copy(c.pos).addScaledVector(right, 7).addScaledVector(fwd, 6 - t * 12).add(new THREE.Vector3(0, 1.4, 0)); look.addScaledVector(right, 2.6); }
     else if (shot === 1) { target.copy(c.pos).addScaledVector(fwd, -9 - t * 3).addScaledVector(right, -3).add(new THREE.Vector3(0, 4 + t * 2, 0)); look.addScaledVector(fwd, 6); }
     else { target.copy(c.pos).addScaledVector(fwd, 14 - t * 2).addScaledVector(right, -4 + t * 3).add(new THREE.Vector3(0, 1.2, 0)); look.addScaledVector(fwd, 3); }
     const gh = this.route.height(target.x, target.z) + 0.8;

@@ -64,9 +64,11 @@ def board_and_batten(w, h, seed, nboards=11, base=BLEACHED):
 
 def peel_paint(base, seed, paint, coverage=0.55, fade=0.35):
     h, w = base.shape[:2]
-    m = fbm(h, w, seed, beta=3.2)
+    # multi-scale peel: mid-size flakes broken up by fine noise (no big recognisable decal shapes)
+    m = fbm(h, w, seed, beta=2.6, lowcut=3)
     m2 = fbm(h, w, seed + 1, beta=1.4)
-    mask = smoothstep(1 - coverage - 0.03, 1 - coverage + 0.03, m * 0.85 + m2 * 0.15)
+    streak = fbm(h, w, seed + 3, beta=2.0, aniso=(1, 6))
+    mask = smoothstep(1 - coverage - 0.04, 1 - coverage + 0.04, m * 0.6 + m2 * 0.2 + streak * 0.2)
     # paint keeps the board structure (gaps/grain) but flattens tone
     lum = base.mean(-1, keepdims=True)
     pc = np.array(paint)[None, None, :] * (0.55 + 0.6 * lum / max(lum.mean(), 1e-3) * 0.75)

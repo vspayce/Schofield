@@ -15,7 +15,9 @@ export function makeTerrainMaterial(route) {
     tRock: { value: tex(T.rock) }, tSnow: { value: tex(T.snow || T.ground1) }, tMacro: { value: tex('cloud_noise') },
     uTint1: { value: T.tint1 }, uTint2: { value: T.tint2 }, uRockTint: { value: T.rockTint },
     uSnowLine: { value: T.snowLine }, uRoadHalf: { value: ROAD_HALF },
-    uRockSlope: { value: route.biome === 'canyon' ? 0.22 : 0.3 },
+    uRockSlope: { value: T.rockSlope ?? (route.biome === 'canyon' ? 0.22 : 0.3) },
+    uRoadTint: { value: T.roadTint || new THREE.Color(1, 1, 1) },
+    uGreenMix: { value: new THREE.Vector2(...(T.greenMix || [0.42, 0.68])) },
     tG1N: { value: tex(T.ground1 + '_n') || flatNormal() }, tG2N: { value: tex(T.ground2 + '_n') || flatNormal() },
     tRoadN: { value: tex(T.road + '_n') || flatNormal() }, tRockN: { value: tex(T.rock + '_n') || flatNormal() },
   };
@@ -23,10 +25,10 @@ export function makeTerrainMaterial(route) {
     Object.assign(sh.uniforms, uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
-        attribute vec2 aRoad;
-        varying vec2 vRoad; varying vec3 vWPos; varying vec3 vWNorm;`)
+        attribute vec2 aRoad; attribute float aSunVis;
+        varying vec2 vRoad; varying vec3 vWPos; varying vec3 vWNorm; varying float vSunVis;`)
       .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-        vRoad = aRoad;
+        vRoad = aRoad; vSunVis = aSunVis;
         vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
         vWNorm = normalize(mat3(modelMatrix) * objectNormal);`);
     sh.fragmentShader = sh.fragmentShader
@@ -35,7 +37,8 @@ export function makeTerrainMaterial(route) {
         vec3 gWN;
         uniform vec3 uTint1, uTint2, uRockTint;
         uniform float uSnowLine, uRoadHalf, uRockSlope;
-        varying vec2 vRoad; varying vec3 vWPos; varying vec3 vWNorm;
+        uniform vec3 uRoadTint; uniform vec2 uGreenMix;
+        varying vec2 vRoad; varying vec3 vWPos; varying vec3 vWNorm; varying float vSunVis;
         float gRough;
         vec3 sampleAT(sampler2D t, vec2 uv, float m) {
           // two scales, rotated, blended by macro noise -> kills visible tiling
@@ -49,13 +52,14 @@ export function makeTerrainMaterial(route) {
         float m2 = texture2D(tMacro, wxz / 37.0 + 0.5).r;
         vec3 g1 = sampleAT(tG1, wxz / 4.0, m2) * uTint1;
         vec3 g2 = sampleAT(tG2, wxz / 5.0, m2) * uTint2;
-        vec3 ground = mix(g1, g2, smoothstep(0.42, 0.68, m1 + (m2 - 0.5) * 0.3));
+        vec3 ground = mix(g1, g2, smoothstep(uGreenMix.x, uGreenMix.y, m1 + (m2 - 0.5) * 0.3));
         ground *= 0.82 + 0.36 * m2; // large-scale brightness variation
 
         // road: along-road UV so ruts follow the road
         float ad = abs(vRoad.x);
         vec2 ruv = vec2(vRoad.x / 4.0, vRoad.y / 4.0);
-        vec3 road = texture2D(tRoad, ruv).rgb;
+        vec3 road = texture2D(tRoad, ruv).rgb * uRoadTint;
+        road *= 0.9 + 0.2 * m2; // large-scale wear variation
         float rut = smoothstep(0.55, 0.0, abs(ad - 0.82)) * 0.22 + smoothstep(0.5, 0.0, abs(ad - 1.95)) * 0.1;
         road *= 1.0 - rut;
         float edgeN = (m2 - 0.5) * 1.6;
@@ -71,20 +75,21 @@ export function makeTerrainMaterial(route) {
         vec3 ry = texture2D(tRock, vWPos.xz / 9.0).rgb;
         vec3 rz = texture2D(tRock, vWPos.xy / 9.0).rgb;
         vec3 rock = (rx * bw.x + ry * bw.y + rz * bw.z) * uRockTint;
-        float rockW = smoothstep(uRockSlope, uRockSlope + 0.14, slope + (m2 - 0.5) * 0.18);
+        float rockW = smoothstep(uRockSlope, uRockSlope + 0.14, slope + (m2 - 0.5) * 0.18 + (m1 - 0.5) * 0.25);
 
         vec3 col = mix(ground, rock, rockW);
         col = mix(col, road, roadW * (1.0 - rockW * 0.8));
 
         // snow above the snow line, favouring flat ground
         float sn = smoothstep(uSnowLine - 6.0, uSnowLine + 8.0, vWPos.y + (m1 - 0.5) * 20.0) * smoothstep(0.55, 0.25, slope);
+        sn *= 1.0 - roadW; // the road is kept clear
         vec3 snow = texture2D(tSnow, wxz / 6.0).rgb;
         col = mix(col, snow, sn);
 
         gRough = mix(mix(0.97, 0.86, rockW), 0.62, sn);
 
         // detail normals (UDN blend on the XZ plane; tri-planar side for rock)
-        float gMix = smoothstep(0.42, 0.68, m1 + (m2 - 0.5) * 0.3);
+        float gMix = smoothstep(uGreenMix.x, uGreenMix.y, m1 + (m2 - 0.5) * 0.3);
         vec2 ng = mix(texture2D(tG1N, wxz / 4.0).xy, texture2D(tG2N, wxz / 5.0).xy, gMix) * 2.0 - 1.0;
         vec2 nr = texture2D(tRoadN, ruv).xy * 2.0 - 1.0;
         // road UV runs across/along the road; rotate its tangent frame roughly into world by using the ground frame (subtle anyway)
@@ -98,7 +103,11 @@ export function makeTerrainMaterial(route) {
       `)
       .replace('#include <roughnessmap_fragment>', `float roughnessFactor = gRough;`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        normal = normalize((viewMatrix * vec4(gWN, 0.0)).xyz);`);
+        normal = normalize((viewMatrix * vec4(gWN, 0.0)).xyz);`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        // baked terrain self-shadow (ridges / canyon walls beyond the shadow map)
+        reflectedLight.directDiffuse *= vSunVis;
+        reflectedLight.directSpecular *= vSunVis;`);
   };
   mat.customProgramCacheKey = () => 'terrain-' + route.def.id;
   return mat;
@@ -108,6 +117,8 @@ export class Terrain {
   constructor(route, scene, quality) {
     this.route = route; this.scene = scene; this.q = quality;
     this.mat = makeTerrainMaterial(route);
+    const L = route.def.light;
+    this.sunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - L.sunElev), THREE.MathUtils.degToRad(L.sunAzim));
     this.tiles = new Map();
     this.queue = [];
     this.radius = quality.drawDist;
@@ -172,7 +183,30 @@ export class Terrain {
       let nx = hl - hr, ny = 2 * step, nz = hd - hu;
       const l = Math.hypot(nx, ny, nz); nor[p * 3] = nx / l; nor[p * 3 + 1] = ny / l; nor[p * 3 + 2] = nz / l;
       route.roadCoords(x, z, rc);
-      road[p * 2] = rc.s < 0 ? 99 : rc.d; road[p * 2 + 1] = Math.max(0, rc.s);
+      road[p * 2] = rc.s < 0 ? 99 : Math.abs(rc.d); road[p * 2 + 1] = Math.max(0, rc.s);
+    }
+    // sun visibility: march toward the sun on a coarse 17x17 grid, interpolate to vertices
+    const sunVis = new Float32Array(vcount);
+    const SG = 16, sg = TILE / SG, vis = new Float32Array((SG + 1) * (SG + 1));
+    const sd = this.sunDir;
+    for (let b = 0; b <= SG; b++) for (let a = 0; a <= SG; a++) {
+      const x = x0 + a * sg, z = z0 + b * sg;
+      const h0 = route.height(x, z) + 0.5;
+      let v = 1, t = 3;
+      while (t < 520) {
+        const hx = x + sd.x * t, hz = z + sd.z * t, hy = h0 + sd.y * t;
+        const d = route.height(hx, hz) - hy;
+        if (d > 0) { v = Math.max(0, v - Math.min(1, d / 6)); if (v <= 0) break; }
+        t *= 1.18;
+      }
+      vis[b * (SG + 1) + a] = v;
+    }
+    const kk = n / SG;
+    for (let b = 0; b < V; b++) for (let a = 0; a < V; a++) {
+      const fa = a / kk, fb = b / kk, ia = Math.min(SG - 1, fa | 0), ib = Math.min(SG - 1, fb | 0), ta = fa - ia, tb = fb - ib;
+      const r0 = vis[ib * (SG + 1) + ia] * (1 - ta) + vis[ib * (SG + 1) + ia + 1] * ta;
+      const r1 = vis[(ib + 1) * (SG + 1) + ia] * (1 - ta) + vis[(ib + 1) * (SG + 1) + ia + 1] * ta;
+      sunVis[b * V + a] = 0.12 + 0.88 * (r0 * (1 - tb) + r1 * tb);
     }
     const idx = [];
     for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) {
@@ -191,6 +225,7 @@ export class Terrain {
       pos[q * 3] = pos[src * 3]; pos[q * 3 + 1] = pos[src * 3 + 1] - 6; pos[q * 3 + 2] = pos[src * 3 + 2];
       nor[q * 3] = nor[src * 3]; nor[q * 3 + 1] = nor[src * 3 + 1]; nor[q * 3 + 2] = nor[src * 3 + 2];
       road[q * 2] = road[src * 2]; road[q * 2 + 1] = road[src * 2 + 1];
+      sunVis[q] = sunVis[src];
     });
     for (let r = 0; r < ring.length; r++) {
       const a0 = ring[r], a1 = ring[(r + 1) % ring.length], s0 = skirt0 + r, s1 = skirt0 + ((r + 1) % ring.length);
@@ -200,6 +235,7 @@ export class Terrain {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     g.setAttribute('aRoad', new THREE.BufferAttribute(road, 2));
+    g.setAttribute('aSunVis', new THREE.BufferAttribute(sunVis, 1));
     g.setIndex(idx);
     g.computeBoundingSphere();
     const mesh = new THREE.Mesh(g, this.mat);

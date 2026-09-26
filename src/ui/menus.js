@@ -33,11 +33,12 @@ function logo() {
 export class Menus {
   constructor(game) { this.g = game; }
 
-  hide() { el.classList.remove('show', 'dim'); el.innerHTML = ''; }
+  hide() { el.classList.remove('show', 'dim', 'title-screen'); el.innerHTML = ''; }
 
-  _show(html, dim = true) {
+  _show(html, dim = true, cls = '') {
     el.innerHTML = `<div class="m-wrap">${html}</div>`;
     el.classList.add('show'); el.classList.toggle('dim', dim);
+    el.classList.toggle('title-screen', cls === 'title');
     el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => { click(); this._act(b.dataset.act, b.dataset.arg, e); }));
   }
 
@@ -49,7 +50,7 @@ export class Menus {
       <div class="m-row" style="margin-top:6px">
         <button class="m-btn ghost" data-act="settings">Settings</button>
         <button class="m-btn ghost" data-act="how">How to Play</button>
-      </div>`, false);
+      </div>`, false, 'title');
   }
 
   routes() {

@@ -119,7 +119,7 @@ export class FX {
     this.scene = scene;
     this.smoke = new Pool(scene, 900, smokePuff(), false);
     this.add = new Pool(scene, 300, flashTex(), true);
-    this.light = new THREE.PointLight(0xffb060, 0, 14, 2);
+    this.light = new THREE.PointLight(0xffb060, 0, 6, 2);
     scene.add(this.light);
     this.lightT = 0;
     const L = route.def.light;
@@ -136,7 +136,7 @@ export class FX {
       const v = dir.clone().multiplyScalar(2 + Math.random() * (big ? 7 : 4)).add(new THREE.Vector3((Math.random() - 0.5) * 1.5, Math.random() * 0.8, (Math.random() - 0.5) * 1.5));
       this.smoke.spawn({ pos, vel: v, life: 1.4 + Math.random(), size: 0.25, size1: big ? 2.2 : 1.4, color: this.smokeCol, alpha: 0.5, drag: 2.4, grav: -0.25 });
     }
-    if (light) { this.light.position.copy(pos); this.light.intensity = big ? 90 : 55; this.lightT = 0.05; }
+    if (light) { this.light.position.copy(pos); this.light.intensity = big ? 18 : 10; this.lightT = 0.05; }
   }
 
   tracer(from, to) {
@@ -193,9 +193,9 @@ export class FX {
     let k = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
     while (k--) {
       this.smoke.spawn({
-        pos: _v.set(pos.x + (Math.random() - 0.5) * 1.2, pos.y + 0.2, pos.z + (Math.random() - 0.5) * 1.2),
-        vel: new THREE.Vector3((Math.random() - 0.5) * 1.2, 0.4 + Math.random() * 0.8, (Math.random() - 0.5) * 1.2),
-        life: 2.2 + Math.random() * 1.5, size, size1: size * 5, color: this.dustCol, alpha: 0.28, drag: 1.2, grav: -0.05, fadeIn: 0.2,
+        pos: _v.set(pos.x + (Math.random() - 0.5) * 5, pos.y + size * 0.6, pos.z + (Math.random() - 0.5) * 5),
+        vel: new THREE.Vector3((Math.random() - 0.5) * 1.5, 0.2 + Math.random() * 0.4, (Math.random() - 0.5) * 1.5),
+        life: 3 + Math.random() * 2, size, size1: size * 8, color: this.dustCol, alpha: 0.18, drag: 1.2, grav: -0.03, fadeIn: 0.25,
       });
     }
   }

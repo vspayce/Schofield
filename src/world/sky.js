@@ -22,7 +22,8 @@ const skyFrag = /* glsl */`
     vec3 d = normalize(vDir);
     float h = d.y;
     float sd = max(dot(d, uSunDir), 0.0);
-    vec3 col = mix(uHorizon, uZenith, pow(smoothstep(-0.02, 0.6, h), 0.7));
+    vec3 col = mix(uHorizon, uZenith, pow(smoothstep(-0.02, 0.6, h), 0.5));
+    col += uSunGlow * 0.15 * (1.0 - clamp(h, 0.0, 1.0)); // warm mid band, no grey
     col = mix(col, uGround, smoothstep(0.0, -0.08, h));
     // sun glow in the haze
     col += uSunGlow * (pow(sd, 6.0) * 0.55 + pow(sd, 40.0) * 0.6) * (1.0 - smoothstep(0.1, 0.8, h) * 0.5);
@@ -33,8 +34,8 @@ const skyFrag = /* glsl */`
       float c2 = texture2D(tCloud, cp * 0.45 + vec2(uTime * 0.003, 0.2)).r;
       float c = smoothstep(1.0 - uClouds, 1.15 - uClouds * 0.55, c1 * 0.7 + c2 * 0.35);
       c *= smoothstep(0.0, 0.18, h);
-      vec3 lit = mix(uHorizon * 1.05, vec3(1.0, 0.97, 0.92), 0.5) + uSunGlow * pow(sd, 4.0) * 0.9;
-      vec3 shade = mix(uZenith, uHorizon, 0.6) * 0.72;
+      vec3 lit = mix(uHorizon, uSunColor, 0.3) * mix(0.75, 1.1, smoothstep(0.0, 0.35, h)) + uSunGlow * pow(sd, 4.0) * 0.9;
+      vec3 shade = mix(uZenith, uHorizon, 0.45) * 0.6;
       vec3 cc = mix(shade, lit, smoothstep(0.2, 1.0, c2 + sd * 0.4));
       col = mix(col, cc, c * 0.9);
     }
@@ -110,7 +111,8 @@ export class Sky {
     const q = renderer.tier;
     this.sun.shadow.mapSize.set(q.shadowSize, q.shadowSize);
     const sc = this.sun.shadow.camera;
-    sc.left = -45; sc.right = 45; sc.top = 45; sc.bottom = -45; sc.near = 1; sc.far = 400;
+    this.shadowHalf = q.shadowSize >= 2048 ? 60 : 45;
+    sc.left = -this.shadowHalf; sc.right = this.shadowHalf; sc.top = this.shadowHalf; sc.bottom = -this.shadowHalf; sc.near = 1; sc.far = 400;
     this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.04;
     this.sun.shadow.radius = 2;
     scene.add(this.sun, this.sun.target);
@@ -130,7 +132,7 @@ export class Sky {
     gnd.position.y = -5; envScene.add(gnd);
     this.env = pm.fromScene(envScene, 0.04).texture;
     scene.environment = this.env;
-    scene.environmentIntensity = 0.55;
+    scene.environmentIntensity = L.env ?? 0.55;
     pm.dispose();
 
     // grade
@@ -138,17 +140,23 @@ export class Sky {
     fu.uSat.value = g.sat; fu.uContrast.value = g.contrast;
     fu.uGain.value.set(...g.gain); fu.uLift.value.set(...g.lift);
     fu.uExposure.value = L.exposure;
+    fu.uTintShadow.value.set(...(L.tintShadow || [0.9, 0.95, 1.05]));
   }
 
   update(camera, focus, t) {
     this.uniforms.uTime.value = t;
     this.dome.position.copy(camera.position);
     for (const r of this.rings) r.position.set(camera.position.x, camera.position.y - 30, camera.position.z);
-    // shadow box follows focus, snapped to texels to avoid shimmer
-    const texel = 90 / this.sun.shadow.mapSize.x;
-    const fx = Math.round(focus.x / texel) * texel, fz = Math.round(focus.z / texel) * texel;
-    this.sun.target.position.set(fx, focus.y, fz);
-    this.sun.position.set(fx + this.sunDir.x * 200, focus.y + this.sunDir.y * 200, fz + this.sunDir.z * 200);
+    // shadow box follows focus, snapped to whole shadow texels in LIGHT space (no shimmer)
+    const texel = (this.shadowHalf * 2) / this.sun.shadow.mapSize.x;
+    const m = this._lm || (this._lm = new THREE.Matrix4().lookAt(new THREE.Vector3(), this.sunDir.clone().negate(), new THREE.Vector3(0, 1, 0)));
+    const inv = this._lmi || (this._lmi = m.clone().invert());
+    const p = this._fp || (this._fp = new THREE.Vector3());
+    p.copy(focus).applyMatrix4(inv);
+    p.x = Math.round(p.x / texel) * texel; p.y = Math.round(p.y / texel) * texel;
+    p.applyMatrix4(m);
+    this.sun.target.position.copy(p);
+    this.sun.position.copy(p).addScaledVector(this.sunDir, 200);
     this.sun.target.updateMatrixWorld();
   }
 

@@ -86,9 +86,9 @@ const FinalShader = {
 };
 
 export const QUALITY = {
-  low: { pixelRatio: 1.0, shadowSize: 1024, shadows: true, bloom: false, msaa: 0, grass: 0, drawDist: 420, scatter: 0.55 },
+  low: { pixelRatio: 1.0, shadowSize: 1024, shadows: true, bloom: false, msaa: 0, grass: 0.3, drawDist: 420, scatter: 0.55 },
   medium: { pixelRatio: 1.5, shadowSize: 2048, shadows: true, bloom: false, msaa: 4, grass: 0.6, drawDist: 560, scatter: 0.8 },
-  high: { pixelRatio: 2.0, shadowSize: 2048, shadows: true, bloom: true, msaa: 4, grass: 1, drawDist: 700, scatter: 1 },
+  high: { pixelRatio: 1.75, shadowSize: 2048, shadows: true, bloom: true, msaa: 4, grass: 1, drawDist: 700, scatter: 1 },
 };
 
 export class Renderer {

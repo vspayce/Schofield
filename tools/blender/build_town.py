@@ -14,7 +14,7 @@ Empty origin = the gunman's FEET; identity rotation = facing the street (-Y Blen
 +Z three.js). Window spawns stand ~0.55 m inside an open/shot-out window whose interior
 is a dark box (so the window never looks see-through-empty).
 """
-import bpy, math, random, os, sys, subprocess
+import bpy, math, random, os, sys, subprocess, zlib
 from mathutils import Vector, Matrix, noise
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +56,12 @@ def quad_facing(mb, pts, uvs, want, tag=None):
     return mb.quad(pts, uvs, 0, tag=tag)
 
 
+# regions whose tiles get a random (board-aligned) u/v shift per tile column/row so
+# peeling-paint patches never repeat identically along a wall
+SHIFT = {'siding_grey': (11, 20), 'siding_red': (11, 20), 'siding_ochre': (11, 20), 'clapboard': (11, 20),
+         'floor': (8, 13), 'tin': (24, 8)}
+
+
 def panel(mb, o, ux, uy, w, h, rect, holes=(), top_fn=None, uoff=0.0, voff=0.0, tile=None):
     """Planar wall/roof grid. o = bottom-left seen from the front; normal = ux × uy.
     Cut at texture-tile boundaries and hole edges; cells inside holes are skipped.
@@ -78,6 +84,22 @@ def panel(mb, o, ux, uy, w, h, rect, holes=(), top_fn=None, uoff=0.0, voff=0.0, 
         zs.update([hz, hz + hh])
     if top_fn is not None and hasattr(top_fn, 'kinks'):
         xs.update([x for x in top_fn.kinks if 0 < x < w])
+    # per-column / per-row random shifts (quantised to board / lap spacing)
+    shu, shv = {}, {}
+    if rect in SHIFT:
+        qu, qv = SHIFT[rect]
+        hs = zlib.crc32(repr((round(o.x, 2), round(o.y, 2), round(o.z, 2), rect)).encode())
+        rr = random.Random(hs)
+        for ku in range(-1, int(w / tu) + 3):
+            shu[ku] = rr.randrange(qu) / qu
+            xw = ku * tu - uoff + (1 - shu[ku]) * tu   # where the shifted u wraps
+            if shu[ku] > 0 and 1e-4 < xw < w - 1e-4:
+                xs.add(xw)
+        for kv in range(-1, int(h / tv) + 3):
+            shv[kv] = rr.randrange(qv) / qv
+            zw = kv * tv - voff + (1 - shv[kv]) * tv
+            if shv[kv] > 0 and 1e-4 < zw < h - 1e-4:
+                zs.add(zw)
     xs = sorted(x for x in xs if -1e-6 <= x <= w + 1e-6)
     zs = sorted(z for z in zs if -1e-6 <= z <= h + 1e-6)
     cache = {}
@@ -101,7 +123,11 @@ def panel(mb, o, ux, uy, w, h, rect, holes=(), top_fn=None, uoff=0.0, voff=0.0, 
                     continue
                 corners = [(x, min(z, top_fn(x))) for (x, z) in corners]
             ids = [P(x, z) for (x, z) in corners]
-            uvs = [T(rect, min(1, max(0, (x + uoff) / tu - ku)), min(1, max(0, (z + voff) / tv - kv))) for (x, z) in corners]
+            su, sv = shu.get(ku, 0.0), shv.get(kv, 0.0)
+            cu = (cx + uoff) / tu - ku + su
+            cv = (cz + voff) / tv - kv + sv
+            wu, wv = math.floor(cu), math.floor(cv)
+            uvs = [T(rect, min(1, max(0, (x + uoff) / tu - ku + su - wu)), min(1, max(0, (z + voff) / tv - kv + sv - wv))) for (x, z) in corners]
             # drop degenerate tops
             if top_fn is not None and abs(corners[3][1] - corners[0][1]) < 1e-4 and abs(corners[2][1] - corners[1][1]) < 1e-4:
                 continue

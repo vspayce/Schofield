@@ -411,7 +411,11 @@ def closeup():
     render('closeup')
 
 
-ALL = {'closeup': closeup, 'lineup_big': lineup_big, 'lineup_small': lineup_small, 'forest': forest, 'snow': snow,
+def hotel_side():
+    town_scene('hotel_side', (4, -3.5, 2.2), (18, 12, 5.5), lens=26, sunp=(25, -60))
+
+
+ALL = {'hotel_side': hotel_side, 'closeup': closeup, 'lineup_big': lineup_big, 'lineup_small': lineup_small, 'forest': forest, 'snow': snow,
        'desert': desert, 'town': town, 'town_street': town_street}
 todo = argv or [k for k in ALL if not k.startswith('town') or os.path.exists(TOWN)]
 for k in todo:
