@@ -1,4 +1,4 @@
-// The shotgun messenger: over-the-shoulder camera that orbits the roof seat,
+// The shotgun messenger: chase camera centred behind the coach that orbits with the aim,
 // Schofield revolver / coach gun, hit-scan shooting with aim assist, recoil,
 // reloads, health regen and Dead Eye target painting.
 import * as THREE from 'three';
@@ -23,7 +23,7 @@ export const WEAPONS = {
   },
 };
 
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
 export class Player {
   constructor(game, weaponId) {
@@ -57,7 +57,6 @@ export class Player {
     this.camPos = new THREE.Vector3();
     this.aimDir = new THREE.Vector3(0, 0, 1);
     this.fov = 60;
-    this.shoulder = 1; // 1 = right shoulder
     this.hover = null;
   }
 
@@ -95,13 +94,14 @@ export class Player {
     const yawW = heading + this.yaw;
     const pitchW = this.pitch + this.recoil;
     this.aimDir.set(Math.sin(yawW) * Math.cos(pitchW), Math.sin(pitchW), Math.cos(yawW) * Math.cos(pitchW));
-    const head = this.headPos;
-    const right = _v.set(-Math.cos(yawW), 0, Math.sin(yawW));
-    const back = 4.1, side = (g.input.touch ? 1.45 : 1.3) * this.shoulder, up = g.input.touch ? 0.95 : 0.8;
-    const target = new THREE.Vector3().copy(head)
+    // chase camera: sits dead behind the coach on its centreline and orbits
+    // with the aim, so at rest you look straight down the road over the roof
+    const pivot = _v3.copy(this.headPos);
+    pivot.addScaledVector(coach.right, -_v.subVectors(pivot, coach.pos).dot(coach.right));
+    const back = 9, up = 1.0;
+    const target = new THREE.Vector3().copy(pivot)
       .addScaledVector(this.aimDir, -back)
-      .addScaledVector(right, side)
-      .add(new THREE.Vector3(0, up + Math.max(0, -this.pitch) * 0.8, 0));
+      .add(new THREE.Vector3(0, up + Math.max(0, -this.pitch) * 1.2, 0));
     // shake
     const sh = coach.shake + g.shake;
     target.x += (Math.random() - 0.5) * sh; target.y += (Math.random() - 0.5) * sh;
