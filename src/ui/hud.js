@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
+const _p = new THREE.Vector3();
 
 export class HUD {
   constructor() {
@@ -19,6 +20,10 @@ export class HUD {
     this.deOverlay = $('deadeye-overlay');
     this.btnDE = $('btn-deadeye');
     this.btnWhip = $('btn-whip');
+    this.chevLayer = $('chevrons');
+    this.chevs = [];
+    this.coachPct = this.coach.querySelector('.pct');
+    this.ring = this.cross.querySelector('u');
     this._last = {};
     this.marks = [];
     this.markLayer = document.createElement('div');
@@ -73,7 +78,18 @@ export class HUD {
     this._meter(this.de, p.deadeye, 'de');
     const ready = p.deadeye >= 0.2;
     if (this._last.deReady !== ready) { this._last.deReady = ready; this.de.classList.toggle('ready', ready); this.btnDE.classList.toggle('disabled', !ready); }
-    if (this._last.deOn !== p.deadeyeOn) { this._last.deOn = p.deadeyeOn; this.deOverlay.classList.toggle('on', p.deadeyeOn); }
+    if (this._last.deOn !== p.deadeyeOn) { this._last.deOn = p.deadeyeOn; this.deOverlay.classList.toggle('on', p.deadeyeOn); this.btnDE.classList.toggle('active', p.deadeyeOn); if (p.deadeyeOn) this.btnDE.classList.remove('disabled'); }
+    const cp = Math.max(0, Math.round(c.hp));
+    if (this._last.cp !== cp) {
+      if (this._last.cp !== undefined && cp < this._last.cp) { this.coach.classList.remove('flash'); void this.coach.offsetWidth; this.coach.classList.add('flash'); clearTimeout(this._cf); this._cf = setTimeout(() => this.coach.classList.remove('flash'), 400); }
+      this._last.cp = cp; this.coachPct.textContent = cp + '%';
+    }
+    // coach-gun pattern ring sized to the real pellet cone
+    if (p.weapon.id === 'shotgun') {
+      const r = Math.round(p.weapon.spread * (innerHeight / 2) / Math.tan(THREE.MathUtils.degToRad(game.camera.fov / 2)));
+      if (this._last.ring !== r) { this._last.ring = r; Object.assign(this.ring.style, { width: r * 2 + 'px', height: r * 2 + 'px', left: -r + 'px', top: -r + 'px' }); }
+    }
+    this._chevrons(game);
     const stam = Math.round(c.stamina * 10);
     if (this._last.stam !== stam) { this._last.stam = stam; this.btnWhip.style.opacity = 0.4 + c.stamina * 0.5; }
     const prog = Math.min(1, c.s / game.route.len);
@@ -106,14 +122,43 @@ export class HUD {
     });
   }
 
+  // edge arrows for threats you can't see (behind you, off-screen, or tiny and far)
+  _chevrons(game) {
+    const list = [];
+    for (const e of game.enemies.list) {
+      if (!e.alive) continue;
+      const threat = e.type === 'rider' ? e.aggro > 0.2 || (e.s - game.coach.s) > -70 : e.los !== false;
+      if (!threat) continue;
+      _p.copy(e.spheres[1].c).project(game.camera);
+      const behind = _p.z > 1;
+      const on = !behind && Math.abs(_p.x) < 0.92 && Math.abs(_p.y) < 0.88;
+      if (on) continue;
+      let x = behind ? -_p.x : _p.x, y = behind ? -_p.y : _p.y;
+      if (behind && Math.abs(y) < 0.3) y = -0.9; // straight behind: show at the bottom
+      const a = Math.atan2(y * innerHeight, x * innerWidth);
+      list.push({ a, cls: e.glintT > 0 ? 'glint' : e.type === 'rider' ? '' : 'rifle' });
+    }
+    while (this.chevs.length < list.length) { const d = document.createElement('div'); d.className = 'chev'; this.chevLayer.appendChild(d); this.chevs.push(d); }
+    while (this.chevs.length > list.length) this.chevs.pop().remove();
+    const rx = innerWidth / 2 - 46, ry = innerHeight / 2 - 40;
+    list.forEach((c, i) => {
+      const el = this.chevs[i];
+      const x = innerWidth / 2 + Math.cos(c.a) * rx, y = innerHeight / 2 - Math.sin(c.a) * ry;
+      el.className = 'chev ' + c.cls;
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+      el.style.transform = `rotate(${Math.PI / 2 - c.a}rad)`;
+    });
+  }
+
   crosshairEnemy(on) { if (this._last.ce !== on) { this._last.ce = on; this.cross.classList.toggle('enemy', on); } }
 
-  hitmarker(hit, kill) {
+  hitmarker(hit, kill, head) {
     if (!hit) return;
-    this.hm.classList.remove('show', 'kill');
+    this.hm.classList.remove('show', 'kill', 'head');
     void this.hm.offsetWidth;
     this.hm.classList.add('show');
     if (kill) this.hm.classList.add('kill');
+    if (head) this.hm.classList.add('head');
   }
 
   setBounty(v) { this.bounty.textContent = '$' + v; }
@@ -127,7 +172,7 @@ export class HUD {
     while (this.feed.children.length > 4) this.feed.firstChild.remove();
   }
 
-  banner(title, sub = '', secs = 2.2) {
+  banner(title, sub = '', secs = 1.4) {
     this.bannerEl.innerHTML = title + (sub ? `<small>${sub}</small>` : '');
     this.bannerEl.classList.add('show');
     clearTimeout(this._bt);

@@ -40,7 +40,8 @@ class Game {
     this.mode = 'boot';
     this.time = 0; this.timeScale = 1; this.targetScale = 1;
     this.shake = 0; this.bountyTotal = 0;
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
+    this.hitStopT = 0;
     this._loadSettings();
     window.__game = this; // debug handle
   }
@@ -78,6 +79,12 @@ class Game {
     else this.menus.title();
     const unlock = () => { audio.resume(); if (this.mode === 'attract') audio.loop('music_menu', { bus: 'music', volume: 1 }); };
     addEventListener('pointerdown', unlock, { once: false });
+    // pause when backgrounded or turned to portrait
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.pause(); });
+    const portrait = matchMedia('(orientation: portrait)');
+    portrait.addEventListener?.('change', () => { if (portrait.matches && this.input.touch) this.pause(); });
+    // music is big: decode it after the title is up
+    audio.loadDeferred();
     this._loop();
   }
 
@@ -130,6 +137,8 @@ class Game {
   }
 
   toAttract() {
+    this._cancelLater();
+    this.paused = false; audio.ctx?.resume();
     if (this.mode === 'attract') return;
     this.input.setEnabled(false);
     this.hud.show(false);
@@ -140,6 +149,8 @@ class Game {
   }
 
   async startRide(i, weapon) {
+    this._cancelLater();
+    this.paused = false; audio.ctx?.resume();
     audio.stopAll(0.3);
     // show a loading card while the territory is built (can take a couple of seconds on phones)
     const ld = document.getElementById('loading');
@@ -165,6 +176,11 @@ class Game {
     audio.loop('music_ride_loop', { bus: 'music', volume: 0.8 });
     this._inTownMusic = false;
   }
+
+  hitStop(t) { this.hitStopT = Math.max(this.hitStopT, t); }
+
+  _later(ms, fn) { const id = setTimeout(fn, ms); (this._pending ||= []).push(id); }
+  _cancelLater() { (this._pending || []).forEach(clearTimeout); this._pending = []; }
 
   setTimeScale(s) { this.targetScale = s; audio.setRate(s < 1 ? 0.6 : 1); this.renderer.final.uniforms.uDeadeye.value = s < 1 ? 1 : 0; }
 
@@ -202,7 +218,7 @@ class Game {
     audio.stopLoop('music_town_loop', 0.5);
     audio.play('sting_death', { bus: 'music', volume: 1 });
     this.coach.stopping = true;
-    setTimeout(() => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason); }, 2200);
+    this._later(2200, () => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason); });
   }
 
   arrive() {
@@ -227,17 +243,19 @@ class Game {
     const reward = Math.round(ROUTES[this.routeIndex].reward * (0.5 + coachPct / 200));
     const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars };
     save.record(this.routeIndex, ROUTES[this.routeIndex].id, stars, r.total);
-    setTimeout(() => { this.hud.show(false); this.menus.results(r); }, 3500);
+    this._later(3500, () => { this.hud.show(false); this.menus.results(r); });
   }
 
   // ------------------------------------------------------------- loop
   _loop() {
     const tick = () => {
       requestAnimationFrame(tick);
-      const rdt = Math.min(0.05, this.clock.getDelta());
+      this.timer.update();
+      const rdt = Math.min(0.05, this.timer.getDelta());
       if (this.paused) { this.renderer.render(this.time); return; }
       this.timeScale = damp(this.timeScale, this.targetScale, 8, rdt);
-      const dt = rdt * this.timeScale;
+      let dt = rdt * this.timeScale;
+      if (this.hitStopT > 0) { this.hitStopT -= rdt; dt *= 0.12; }
       this.time += dt;
       this.update(dt, rdt);
       this.renderer.render(this.time);

@@ -68,11 +68,15 @@ export const AUDIO_LIST = [
   'music_menu', 'music_town_loop', 'music_results', 'sting_victory', 'sting_death', 'ui_click',
 ];
 
+// big music files load after the title is showing (except the menu theme)
+export const DEFERRED_AUDIO = ['music_ride_loop', 'music_town_loop', 'music_results'];
+export function loadDeferredAudio() { return Promise.all(DEFERRED_AUDIO.map((n) => loadAudio(n))); }
+
 export async function loadAll(onProgress) {
   const jobs = [
     ...MODEL_LIST.map((n) => loadModel(n)),
     ...TEX_LIST.map(([n, o]) => loadTexture(n, o)),
-    ...AUDIO_LIST.map((n) => loadAudio(n)),
+    ...AUDIO_LIST.filter((n) => !DEFERRED_AUDIO.includes(n)).map((n) => loadAudio(n)),
   ];
   let done = 0;
   jobs.forEach((j) => j.finally(() => onProgress?.(++done / jobs.length)));

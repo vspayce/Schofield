@@ -7,7 +7,7 @@ import { createHorse, createRider, createWeapon, rotateBoneWorld, aimBone } from
 import { ROAD_HALF } from '../world/route.js';
 import { clamp, damp, lerp } from '../core/noise.js';
 
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _ray = new THREE.Ray();
 const COATS = [new THREE.Color(1, 1, 1), new THREE.Color(0.5, 0.38, 0.3), new THREE.Color(0.3, 0.25, 0.22), new THREE.Color(1.3, 1.2, 1.1), new THREE.Color(0.95, 0.7, 0.5)];
 const VARIANTS = ['bandit', 'bandit2', 'bandit3'];
 const CLOTH = [new THREE.Color(1, 1, 1), new THREE.Color(0.8, 0.7, 0.6), new THREE.Color(0.6, 0.65, 0.75), new THREE.Color(1.1, 0.9, 0.7)];
@@ -182,11 +182,14 @@ class Rider extends Enemy {
       g.combat.enemyShot(this, muzzle, { dist, acc: g.diff.riderAcc, dmgPlayer: 7 + Math.random() * 4, dmgCoach: 4 + Math.random() * 3 });
     }
     // reaching the team
-    if (ds > 4 && Math.abs(this.d) < 5) {
+    if (ds > 4 && ds < 12 && Math.abs(this.d) < 5) {
       this.atTeam += dt;
       if (this.atTeam > 1 && !this._warned) { this._warned = true; g.hud.banner("They're going for the team!", '', 1.5); }
       if (this.atTeam > 5) { this.atTeam = 0; this._warned = false; coach.hp -= 12; g.onCoachDamage(); this.targetDs = -6; }
     } else this.atTeam = Math.max(0, this.atTeam - dt);
+    // riders who've been in the fight a long time peel away
+    this.life = (this.life || 0) + dt;
+    if (this.life > 45 && this.aggro > 0.5 && Math.random() < dt * 0.1) { this.state = 'fleeing'; this.side = Math.sign(this.d) || 1; }
     // neigh
     this.neighT -= dt;
     if (this.neighT < 0) { this.neighT = 12 + Math.random() * 15; audio.play('horse_neigh', { position: this.pos, volume: 0.5 }); }
@@ -286,10 +289,24 @@ class Gunman extends Enemy {
       }
       const dist = dir.length();
       const range = this.rifle ? 190 : 70;
-      if (dist < range) {
+      // line of sight to the coach (throttled)
+      this.losT = (this.losT || 0) - dt;
+      if (this.losT <= 0 && dist < range) {
+        this.losT = 0.25;
+        const from = this.spheres[0].c, to = _v2.copy(g.player.headPos);
+        const dv = _v3.subVectors(to, from); const L = dv.length(); dv.divideScalar(L);
+        let clear = g.terrain.raycast(from, dv, L - 2) >= L - 2.5;
+        if (clear) {
+          _ray.set(from, dv);
+          for (const b of g.towns.solids) { if (b.containsPoint(from)) continue; const p = _ray.intersectBox(b, _v); if (p && p.distanceTo(from) < L - 2) { clear = false; break; } }
+        }
+        this.los = clear;
+      }
+      if (dist < range && this.los) {
         this.fireT -= dt;
-        // telegraph: lens glint for riflemen, a visible cock for pistols
+        // telegraph: lens glint for riflemen, a brief glint + hammer cock for pistols
         if (this.fireT < 1.1 && this.fireT + dt >= 1.1 && this.rifle) this.glintT = 1.1;
+        if (!this.rifle && this.fireT < 0.6 && this.fireT + dt >= 0.6) { this.glintT = 0.6; audio.play('schofield_cock', { position: this.root.position, volume: 0.9 }); }
         if (this.glintT > 0) {
           this.glintT -= dt;
           const hp = this.spheres[0].c;
@@ -346,10 +363,21 @@ export class Enemies {
       if (!w.done && prog >= w.at) { w.done = true; this._spawnWave(w); }
     }
     // staggered spawns
+    const riders = this.list.filter((e) => e.alive && e.type === 'rider' && e.state === 'ride').length;
     for (let i = this._spawnQ.length - 1; i >= 0; i--) {
       const q = this._spawnQ[i]; q.t -= dt;
-      if (q.t <= 0) { this._spawnQ.splice(i, 1); q.fn(); }
+      if (q.t <= 0) {
+        if (q.rider && riders >= 5) { q.t = 1; continue; } // cap live riders
+        this._spawnQ.splice(i, 1); q.fn();
+      }
     }
+    // patch the coach up a little whenever a fight is cleared
+    const busy = this.aliveCount > 0 || this._spawnQ.length > 0;
+    if (this._engaged && !busy && !g.over) {
+      g.coach.hp = Math.min(100, g.coach.hp + 10);
+      g.hud.feedMsg('Coach patched up +10', false);
+    }
+    this._engaged = busy;
     for (const e of this.list) e.update(dt);
     for (let i = this.list.length - 1; i >= 0; i--) {
       const e = this.list[i];
@@ -361,17 +389,17 @@ export class Enemies {
     const g = this.g;
     const n = Math.round(w.count * g.diff.countMult);
     if (w.type === 'riders') {
-      g.hud.banner(w.from === 'ahead' ? 'Riders up ahead!' : w.from === 'flank' ? 'Riders on the flank!' : 'Riders behind!', '', 2);
+      g.hud.banner(w.from === 'ahead' ? 'Riders up ahead!' : w.from === 'flank' ? 'Riders on the flank!' : 'Riders behind!', '', 1.3);
       const used = new Set(this.list.filter((e) => e.type === 'rider' && e.alive).map((e) => e.slot));
       let slot = 0;
       for (let i = 0; i < n; i++) {
         while (used.has(slot)) slot++;
         const sl = slot++;
         const side = i % 2 === 0 ? 1 : -1;
-        this._spawnQ.push({ t: i * 0.9, fn: () => this.list.push(new Rider(g, { from: w.from, slot: sl, side })) });
+        this._spawnQ.push({ t: i * 0.9, rider: true, fn: () => this.list.push(new Rider(g, { from: w.from, slot: sl, side })) });
       }
     } else if (w.type === 'ridge') {
-      g.hud.banner('Riflemen on the ridge!', 'Watch for the glint', 2);
+      g.hud.banner('Riflemen on the ridge!', 'Watch for the glint', 1.5);
       for (let i = 0; i < n; i++) this._spawnQ.push({ t: i * 1.2, fn: () => this._spawnRidge(i) });
     } else if (w.type === 'town') {
       g.hud.banner('Perdition', 'Nobody lives here anymore', 3);
@@ -409,22 +437,25 @@ export class Enemies {
       const rh = R.roadHeightAt(s);
       const hx = R.height(p.x + 2, p.z) - p.y, hz = R.height(p.x, p.z + 2) - p.y;
       const slope = Math.hypot(hx, hz) / 2;
-      const score = (p.y - rh) - slope * 25 - Math.abs(d) * 0.1;
+      // a believable ledge: some height over the road, but not a needle peak
+      const score = Math.min(p.y - rh, 30) * 0.6 - slope * 40 - Math.abs(d) * 0.1;
       if (score > bestScore) { bestScore = score; best = { p, s }; }
     }
     if (!best) return;
     const face = new THREE.Vector3().subVectors(coach.pos, best.p).setY(0).normalize();
     const e = new Gunman(g, best.p, face, { rifle: true });
+    e.los = true;
     e.s = best.s;
     this.list.push(e);
   }
 
   // closest enemy part to the aim ray within an angular tolerance (radians)
-  pick(origin, dir, tol) {
+  pick(origin, dir, tol, noHead = false) {
     let best = null, bestA = tol;
     for (const e of this.list) {
       if (!e.alive) continue;
       for (const sp of e.spheres) {
+        if (noHead && sp.part === 'head') continue;
         const to = _v.subVectors(sp.c, origin);
         const dist = to.length();
         if (dist > 260) continue;
@@ -437,12 +468,21 @@ export class Enemies {
   }
 
   // exact ray hit, or (with tol) the assisted aim point
-  raycast(origin, dir, range, tol = 0) {
+  raycast(origin, dir, range, tol = 0, maxMiss = 1) {
     const hit = this.rayHit(origin, dir, range);
     if (hit) return hit;
     if (tol > 0) {
-      const p = this.pick(origin, dir, tol);
-      if (p && p.dist < range) return { point: p.aimPoint.clone(), enemy: p.enemy, part: p.part, t: p.dist };
+      const p = this.pick(origin, dir, tol, true);
+      if (p && p.dist < range) {
+        // snap to the sphere's surface nearest the ray, and only for small linear misses
+        const sp = p.enemy.spheres.find((q) => q.c === p.aimPoint);
+        const t = _v.subVectors(sp.c, origin).dot(dir);
+        const onRay = _v2.copy(origin).addScaledVector(dir, t);
+        const miss = onRay.distanceTo(sp.c) - sp.r;
+        if (miss > maxMiss) return null;
+        const pt = sp.c.clone().add(_v3.subVectors(onRay, sp.c).setLength(sp.r * 0.7));
+        return { point: pt, enemy: p.enemy, part: p.part, t: p.dist };
+      }
     }
     return null;
   }

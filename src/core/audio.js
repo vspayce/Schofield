@@ -3,7 +3,7 @@
 // attenuated relative to the listener (camera) manually — cheaper than PannerNodes
 // on mobile and good enough for a rail shooter.
 import * as THREE from 'three';
-import { assets } from './assets.js';
+import { assets, loadDeferredAudio } from './assets.js';
 
 // authored loop lengths at 44.1 kHz (see tools/audio)
 const LOOP_SAMPLES = {
@@ -42,6 +42,14 @@ class AudioSys {
     await Promise.all(entries.map(async ([k, ab]) => {
       try { this.buffers[k] = await this.ctx.decodeAudioData(ab.slice(0)); } catch (e) { console.warn('decode', k); }
     }));
+  }
+
+  async loadDeferred() {
+    await loadDeferredAudio();
+    for (const [k, ab] of Object.entries(assets.audio)) {
+      if (this.buffers[k] || !this.ctx) continue;
+      try { this.buffers[k] = await this.ctx.decodeAudioData(ab.slice(0)); } catch { console.warn('decode', k); }
+    }
   }
 
   resume() { if (this.ctx && this.ctx.state !== 'running') this.ctx.resume(); }

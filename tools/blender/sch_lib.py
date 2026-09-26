@@ -594,6 +594,7 @@ def save_image(img, path, quality=90):
 def final_material(name, col, orm, nrm, normal_strength=1.0):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
+    mat.use_backface_culling = True     # -> glTF doubleSided: false
     nt = mat.node_tree
     nt.nodes.clear()
     p = nt.nodes.new('ShaderNodeBsdfPrincipled')

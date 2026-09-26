@@ -126,9 +126,14 @@ export class Input {
 
   lock() {
     if (this.touch || this._noLock) return;
+    if (!this.canvas.requestPointerLock) { this._noLock = true; return; }
     try {
-      const p = this.canvas.requestPointerLock?.();
-      p?.catch?.(() => { this._noLock = true; });
-    } catch { this._noLock = true; }
+      const p = this.canvas.requestPointerLock();
+      p?.catch?.((e) => {
+        // embedded/iframe contexts can never lock: fall back to drag-to-aim.
+        // Anything else (e.g. re-lock too soon after Esc) just retries on the next click.
+        if (e?.name === 'WrongDocumentError' || e?.name === 'NotSupportedError') this._noLock = true;
+      });
+    } catch { /* retry on next click */ }
   }
 }

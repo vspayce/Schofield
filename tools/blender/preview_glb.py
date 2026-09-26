@@ -101,12 +101,12 @@ else:
     y = 0.0
     for o in roots:
         o.location = (0, 0, y)
-        y += 0.35
+        y += 0.3
     sun.rotation_euler = (math.radians(50), 0, math.radians(150))
     bg.inputs[1].default_value = 0.6
     cam_d.type = 'ORTHO'
-    cam_d.ortho_scale = 1.35
-    cam.location = (3.0, -0.3, y / 2 - 0.17)
+    cam_d.ortho_scale = 1.6
+    cam.location = (3.0, -0.2, 0.3)
     cam.rotation_euler = (math.radians(90), 0, math.radians(90))
     sc.render.filepath = PREFIX + '_side.png'
     bpy.ops.render.render(write_still=True)

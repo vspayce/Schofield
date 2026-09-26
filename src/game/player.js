@@ -9,16 +9,16 @@ import { clamp, damp } from '../core/noise.js';
 export const WEAPONS = {
   schofield: {
     id: 'schofield', name: 'Schofield Revolver', model: 'Schofield', mag: 6, interval: 0.26, reload: 1.6,
-    pellets: 1, spread: 0.0045, damage: 60, headMult: 3, range: 220, falloff: [60, 220], kick: 0.028,
+    pellets: 1, spread: 0.0045, damage: 60, headMult: 3, range: 260, falloff: [90, 260], floor: 0.5, kick: 0.028,
     snd: ['schofield_shot', 'schofield_shot2'], reloadSnd: 'schofield_reload',
-    stats: { power: 0.55, range: 0.85, rate: 0.8, spread: 0.9 },
+    stats: { power: 0.55, range: 0.85, rate: 0.8, accuracy: 0.9 },
     blurb: 'Smith & Wesson top-break .45. Six quick, true shots and a fast reload.',
   },
   shotgun: {
     id: 'shotgun', name: 'Coach Gun', model: 'CoachGun', mag: 2, interval: 0.32, reload: 1.8,
-    pellets: 9, spread: 0.055, damage: 26, headMult: 1.6, range: 70, falloff: [14, 55], kick: 0.075,
+    pellets: 9, spread: 0.06, damage: 20, headMult: 1.5, range: 70, falloff: [14, 55], floor: 0.15, kick: 0.075,
     snd: ['shotgun_shot'], reloadSnd: 'shotgun_reload',
-    stats: { power: 1, range: 0.35, rate: 0.45, spread: 0.3 },
+    stats: { power: 1, range: 0.35, rate: 0.45, accuracy: 0.3 },
     blurb: 'Double-barrel 10 gauge. Knocks a man clean out of the saddle up close.',
   },
 };
@@ -37,7 +37,9 @@ export class Player {
     this.ammo = {};
     for (const k in WEAPONS) this.ammo[k] = WEAPONS[k].mag;
     this.weapon = WEAPONS[weaponId] || WEAPONS.schofield;
-    this.cool = 0; this.reloading = 0; this.swapT = 0;
+    this.cool = 0; this.reloading = 0; this.swapT = 0; this.holsterT = 0;
+    this.settle = 0; // seconds the aim has been steady (tightens the Schofield)
+    this.timers = []; // game-time callbacks (respect pause)
     this.stats = { shots: 0, hits: 0, kills: 0, headshots: 0 };
 
     this.model = createRider({ variant: 'player' });
@@ -77,6 +79,7 @@ export class Player {
     // touch aim assist: slow down over targets + gentle pull
     if (g.input.touch && this.hover) { dx *= 0.55; dy *= 0.55; }
     this.yaw -= dx; this.pitch = clamp(this.pitch - dy, -1.05, 0.5);
+    this.settle = Math.abs(inp.dx) + Math.abs(inp.dy) < 0.0025 ? this.settle + rdt : 0;
     if (g.input.touch && this.hover && (Math.abs(inp.dx) + Math.abs(inp.dy)) > 0) {
       const want = this._anglesTo(this.hover.aimPoint);
       this.yaw += angDiff(want.yaw, this.yaw) * Math.min(1, rdt * 3.5);
@@ -94,7 +97,7 @@ export class Player {
     this.aimDir.set(Math.sin(yawW) * Math.cos(pitchW), Math.sin(pitchW), Math.cos(yawW) * Math.cos(pitchW));
     const head = this.headPos;
     const right = _v.set(-Math.cos(yawW), 0, Math.sin(yawW));
-    const back = 3.3, side = 1.2 * this.shoulder, up = 0.55;
+    const back = 3.3, side = (g.input.touch ? 1.4 : 1.2) * this.shoulder, up = g.input.touch ? 0.7 : 0.55;
     const target = new THREE.Vector3().copy(head)
       .addScaledVector(this.aimDir, -back)
       .addScaledVector(right, side)
@@ -138,6 +141,14 @@ export class Player {
     // ------------------------------------------------------------ weapons
     const W = this.weapon;
     this.cool -= dt; this.swapT -= dt;
+    for (let i = this.timers.length - 1; i >= 0; i--) {
+      const t = this.timers[i]; t.t -= rdt;
+      if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); }
+    }
+    // the holstered gun gets reloaded while you use the other one
+    const other = W.id === 'schofield' ? WEAPONS.shotgun : WEAPONS.schofield;
+    if (this.ammo[other.id] < other.mag) { this.holsterT += dt; if (this.holsterT > 2.5) { this.ammo[other.id] = other.mag; this.holsterT = 0; } }
+    else this.holsterT = 0;
     if (this.reloading > 0) {
       this.reloading -= dt;
       if (this.reloading <= 0) { this.ammo[W.id] = W.mag; g.hud.setAmmo(W, this.ammo[W.id], false); }
@@ -157,7 +168,7 @@ export class Player {
     }
     if (this.deadeyeOn) {
       this.deadeye -= rdt * 0.2;
-      if (this.hover && this.marks.length < this.ammo[W.id] + (W.id === 'schofield' ? 0 : 0)) {
+      if (this.hover && this.marks.length < this.ammo[W.id]) {
         const already = this.marks.find((m) => m.enemy === this.hover.enemy);
         if (!already && this.hover.part !== 'horse') {
           this.marks.push({ enemy: this.hover.enemy, part: this.hover.part });
@@ -168,7 +179,8 @@ export class Player {
     }
 
     if (!this.executing) {
-      const wantsFire = W.id === 'schofield' ? inp.firePressed || (inp.fire && g.input.touch) : inp.firePressed;
+      // holding fire repeats the Schofield on every platform
+      const wantsFire = W.id === 'schofield' ? inp.firePressed || inp.fire : inp.firePressed;
       if (wantsFire && this.cool <= 0 && this.reloading <= 0) {
         if (this.deadeyeOn && this.marks.length) this._endDeadeye();
         else if (this.ammo[W.id] > 0) this._fire();
@@ -202,30 +214,38 @@ export class Player {
     const g = this.g, W = this.weapon;
     this.ammo[W.id]--;
     this.cool = W.interval;
-    this.stats.shots++;
+    this.stats.shots += W.pellets;
     const muzzle = this.muzzleWorld(new THREE.Vector3());
     // gun fires from the muzzle; direction toward what's under the crosshair
     let aimPoint;
     if (forced) aimPoint = forced;
     else {
-      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, g.input.touch ? 0.035 : 0.012);
+      // assist only nudges near-misses onto the body/horse surface; headshots must be earned
+      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, g.input.touch ? 0.035 : 0.01, g.input.touch ? 1.1 : 0.4);
       aimPoint = hit ? hit.point : _v2.copy(this.camPos).addScaledVector(this.aimDir, 120).clone();
     }
     const baseDir = new THREE.Vector3().subVectors(aimPoint, this.camPos).normalize();
-    let anyHit = false, killed = false;
+    let anyHit = false, killed = false, head = false, pelletHits = 0;
+    const steady = W.id === 'schofield' && this.settle > 0.3 ? 0.3 : 1;
     for (let p = 0; p < W.pellets; p++) {
       const dir = baseDir.clone();
       if (!forced) {
-        const s = W.spread * (p === 0 && W.pellets === 1 ? 1 : 1);
+        const s = W.spread * steady;
         dir.x += (Math.random() - 0.5) * 2 * s; dir.y += (Math.random() - 0.5) * 2 * s; dir.z += (Math.random() - 0.5) * 2 * s;
         dir.normalize();
       }
       const res = g.combat.playerShot(this.camPos, dir, W, muzzle, !!forced);
-      if (res.hit) anyHit = true;
+      if (res.hit) { anyHit = true; pelletHits++; }
       if (res.killed) killed = true;
+      if (res.head) head = true;
     }
-    if (anyHit) this.stats.hits++;
-    g.hud.hitmarker(anyHit, killed);
+    this.stats.hits += pelletHits;
+    g.hud.hitmarker(anyHit, killed, head);
+    if (anyHit) {
+      audio.play('ui_click', { volume: head ? 0.9 : 0.6, pitch: head ? 2.2 : 0.8, rand: 0 });
+      if (killed) g.hitStop(0.06);
+    }
+    if (g.input.touch) navigator.vibrate?.(killed ? [12, 30, 12] : 12);
     // feedback
     const dirOut = baseDir;
     g.fx.muzzle(muzzle, dirOut, { big: W.id === 'shotgun', light: true });
@@ -235,7 +255,7 @@ export class Player {
     g.shake += W.id === 'shotgun' ? 0.05 : 0.02;
     this.model.kick?.();
     g.hud.setAmmo(W, this.ammo[W.id], false);
-    if (this.ammo[W.id] <= 0) setTimeout(() => { if (this.ammo[W.id] <= 0 && this.reloading <= 0 && !this.g.over) this._reload(); }, 350);
+    if (this.ammo[W.id] <= 0) this.timers.push({ t: 0.35, fn: () => { if (this.ammo[W.id] <= 0 && this.reloading <= 0 && !this.g.over) this._reload(); } });
   }
 
   _startDeadeye() {
@@ -264,7 +284,7 @@ export class Player {
       }
       const m = marks[i++];
       if (m.enemy.alive) this._fire(m.enemy.hitPoint(m.part));
-      setTimeout(next, 170);
+      this.timers.push({ t: 0.17, fn: next });
     };
     next();
   }

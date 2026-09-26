@@ -55,10 +55,10 @@ export class Menus {
   routes() {
     const posters = ROUTES.map((r, i) => {
       const locked = i > save.unlocked;
-      return `<div class="poster ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pick'}" data-arg="${i}">
+      return `<div class="poster ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pick'}" data-arg="${i}"><div class="pin">
         <div><h3>${r.name}</h3><div class="sub">${r.from} → ${r.to}</div></div>
         <div class="sub">${r.blurb}</div>
-        <div><div class="stars">${stars(save.stars(r.id))}</div><div class="reward">REWARD $${r.reward}</div></div>
+        <div><div class="stars">${stars(save.stars(r.id))}</div><div class="reward">REWARD $${r.reward}</div></div></div>
         ${locked ? '<div class="lock">LOCKED</div>' : ''}
       </div>`;
     }).join('');
@@ -93,12 +93,14 @@ export class Menus {
       <div style="font-family:var(--font-sc);letter-spacing:.2em">ARRIVED SAFE AT</div>
       <h2>${ROUTES[i].to}</h2>
       <div class="stars">${stars(r.stars)}</div>
+      <div class="results-grid">
       <div class="line"><span>Outlaws dropped</span><span>${r.kills}</span></div>
       <div class="line"><span>Headshots</span><span>${r.headshots}</span></div>
       <div class="line"><span>Accuracy</span><span>${r.accuracy}%</span></div>
       <div class="line"><span>Coach condition</span><span>${r.coach}%</span></div>
       <div class="line"><span>Bounties</span><span>$${r.bounty}</span></div>
       <div class="line"><span>Mail contract</span><span>$${r.reward}</span></div>
+      </div>
       <div class="total">Total $${r.total}</div>
       <div class="m-row" style="margin-top:10px">
         <button class="m-btn ghost" data-act="routes">Routes</button>
@@ -151,7 +153,11 @@ export class Menus {
     const g = this.g;
     switch (a) {
       case 'title': this.title(); break;
-      case 'routes': g.toAttract(); this.routes(); break;
+      case 'routes':
+        if (g.input.touch && !document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
+        }
+        g.toAttract(); this.routes(); break;
       case 'pick': this.loadout(+arg); break;
       case 'gun': save.weapon = arg; this.loadout(this.routeIndex); break;
       case 'go': this.hide(); g.startRide(this.routeIndex, save.weapon); break;

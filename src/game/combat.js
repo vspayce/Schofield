@@ -24,16 +24,19 @@ export class Combat {
     }
     if (hit && (guaranteed || hit.t < occT)) {
       const e = hit.enemy, part = hit.part;
-      const fall = 1 - smoothstep(W.falloff[0], W.falloff[1], hit.t) * 0.85;
+      const fall = 1 - smoothstep(W.falloff[0], W.falloff[1], hit.t) * (1 - W.floor);
       let dmg = W.damage * fall * (part === 'head' ? W.headMult : 1);
+      if (guaranteed && part !== 'horse') dmg = 999; // Dead Eye shots are lethal
       const killed = e.damage(dmg, part, dir);
+      this._rattle(origin, dir, hit.t);
       g.fx.tracer(muzzle, hit.point);
       if (part === 'horse') g.fx.blood(hit.point, dir);
       else g.fx.blood(hit.point, dir);
       audio.play('hit_flesh_' + (1 + (Math.random() * 2 | 0)), { position: hit.point, volume: 1.2 });
       if (killed) this._onKill(e, part, hit.point);
-      return { hit: true, killed };
+      return { hit: true, killed, head: part === 'head' };
     }
+    this._rattle(origin, dir, Math.min(occT, 260));
     const end = origin.clone().addScaledVector(dir, Math.min(occT, 250));
     g.fx.tracer(muzzle, end);
     if (occT < W.range) {
@@ -44,6 +47,18 @@ export class Combat {
       }
     }
     return { hit: false, killed: false };
+  }
+
+  // a hit or near-miss (within 1.5 m) on a glinting rifleman spoils his shot
+  _rattle(origin, dir, maxT) {
+    for (const e of this.g.enemies.list) {
+      if (!e.alive || !(e.glintT > 0)) continue;
+      const c = e.spheres[0].c;
+      const t = _v.subVectors(c, origin).dot(dir);
+      if (t < 0 || t > maxT + 2) continue;
+      const miss = _v.copy(origin).addScaledVector(dir, t).distanceTo(c);
+      if (miss < 1.5) { e.glintT = 0; e.fireT += 1.6; this.g.hud.feedMsg('Rattled him!', false); }
+    }
   }
 
   _onKill(e, part, point) {

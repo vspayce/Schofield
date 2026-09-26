@@ -4,3 +4,5 @@ dist
 *.blend1
 tools/**/previews/
 tools/blender/*.blend
+tools/blender/build/
+tools/blender/_build/

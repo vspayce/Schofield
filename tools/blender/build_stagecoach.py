@@ -197,9 +197,9 @@ M['paint'] = L.surface('paint', L.srgb(66, 17, 13), var=0.10, rough=0.4, rough_v
                        scratches=0.45, dust=0.8, dust_z=(0.85, 2.1), dust_up=1.0, ao=0.75,
                        bump=0.06, bump_scale=35, streaks=0.35, extra=body_decal, blotch=0.25)
 M['roof'] = L.surface('roof', L.srgb(66, 24, 18), var=0.12, rough=0.6, wear_col=L.srgb(84, 60, 40),
-                      wear=0.8, dust=0.9, dust_up=1.4, dust_z=(1.0, 2.6), ao=0.75, grain='Y',
+                      wear=0.8, dust=0.55, dust_up=0.7, dust_z=(1.0, 2.6), ao=0.75, grain='Y',
                       grain_amt=0.35, blotch=0.4, bump=0.2)
-M['gear'] = L.surface('gear', L.srgb(158, 102, 36), var=0.14, rough=0.55, wear_col=L.srgb(92, 64, 40),
+M['gear'] = L.surface('gear', L.srgb(150, 96, 34), var=0.14, rough=0.55, wear_col=L.srgb(92, 64, 40),
                       wear=0.9, wear_rough=0.8, scratches=0.4, dust=1.3, dust_z=(0.0, 1.7),
                       ao=0.75, streaks=0.3, blotch=0.35, bump=0.12, edge_r=0.012)
 M['iron'] = L.surface('iron', L.srgb(40, 37, 34), var=0.15, rough=0.55, metal=0.6,
@@ -223,7 +223,7 @@ M['wood'] = L.surface('wood', L.srgb(112, 82, 54), var=0.15, rough=0.75, wear=0.
                       wear_col=L.srgb(150, 118, 84), grain='Y', grain_amt=0.6, dust=0.7, blotch=0.3)
 M['interior'] = L.surface('interior', L.srgb(34, 14, 11), var=0.1, rough=0.8, dust=0.0, ao=0.9,
                           ao_dist=0.12, bump=0.0, bevel_normal=False)
-M['canvas'] = L.surface('canvas', L.srgb(180, 162, 126), var=0.12, rough=0.9, dust=0.5, blotch=0.5,
+M['canvas'] = L.surface('canvas', L.srgb(150, 130, 98), var=0.12, rough=0.9, dust=0.25, blotch=0.5,
                         bump=0.35, bump_scale=260)
 M['rope'] = L.surface('rope', L.srgb(160, 130, 88), var=0.1, rough=0.9, dust=0.4, extra=rope_twist,
                       bump=0.7, bump_dist=0.004, bevel_normal=False)
@@ -372,7 +372,7 @@ P('front_boot', bm, M['boot'], 'Body', 'A', 0.8, smooth=40)
 
 bm = bmesh.new()
 L.add_box(bm, (1.34, 0.40, 0.09), (0, FW - 0.19, 2.265), bevel=0.03, segs=2)      # cushion
-L.add_box(bm, (1.34, 0.07, 0.30), (0, FW + 0.02, 2.42), rot=(math.radians(-8), 0, 0),
+L.add_box(bm, (1.34, 0.07, 0.22), (0, FW + 0.02, 2.38), rot=(math.radians(-8), 0, 0),
           bevel=0.025, segs=2)                                                      # back
 P('seat', bm, M['blackleather'], 'Body', 'A', 0.7, smooth=40)
 
@@ -381,7 +381,7 @@ L.add_box(bm, (1.46, 0.46, 0.04), (0, -1.72, 1.77), rot=(math.radians(-8), 0, 0)
 P('footboard', bm, M['wood'], 'Body', 'A', 0.6, smooth=None)
 
 bm = bmesh.new()
-L.add_box(bm, (1.46, 0.035, 0.26), (0, -1.955, 1.90), rot=(math.radians(12), 0, 0), bevel=0.012)
+L.add_box(bm, (1.46, 0.035, 0.18), (0, -1.955, 1.87), rot=(math.radians(16), 0, 0), bevel=0.012)
 P('dash', bm, M['blackleather'], 'Body', 'A', 0.6, smooth=None)
 
 bm = bmesh.new()
