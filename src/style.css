@@ -190,8 +190,8 @@ body.touch #btn-pause { display: block; }
 
 .poster {
   position: relative; width: clamp(150px, 21vw, 230px); aspect-ratio: 4 / 5; padding: 34% 11% 9%; color: #2b1a0d; cursor: pointer;
-  background: #d9c49a url(/assets/ui/poster.webp) center / 100% 100% no-repeat; text-align: center;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .6); transition: transform .15s; display: flex; flex-direction: column; justify-content: space-between;
+  background: url(/assets/ui/poster.webp) center / 100% 100% no-repeat; text-align: center;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .6)); transition: transform .15s; display: flex; flex-direction: column; justify-content: space-between;
 }
 .poster:nth-child(odd) { transform: rotate(-1.5deg); }
 .poster:nth-child(even) { transform: rotate(1.2deg); }
@@ -217,11 +217,12 @@ body.touch #btn-pause { display: block; }
 .stat .b i { display: block; height: 100%; background: var(--brass); }
 
 .paper {
-  color: #2b1a0d; background: #d8c39a url(/assets/ui/paper.webp) center / 100% 100% no-repeat; padding: 22px 38px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, .7); text-align: center; min-width: min(460px, 80vw); max-height: 92vh; overflow: auto;
+  color: #2b1a0d; background: url(/assets/ui/paper.webp) center / 100% 100% no-repeat; padding: 30px 46px;
+  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, .7)); text-align: center; min-width: min(460px, 80vw); max-height: 92vh; overflow: auto;
 }
 .paper h2 { font-family: var(--font-title); font-size: clamp(22px, 4vw, 36px); margin: 4px 0; }
 .paper .line { display: flex; justify-content: space-between; gap: 30px; font-size: clamp(14px, 2vw, 18px); border-bottom: 1px dotted rgba(43, 26, 13, .4); padding: 3px 0; }
+.paper .line span:last-child, .poster .reward, #bounty-val { font-family: var(--font-title); font-size: .95em; }
 .paper .total { font-family: var(--font-title); font-size: clamp(18px, 3vw, 26px); margin-top: 8px; }
 .paper .stars { font-size: 30px; color: #7a1d12; letter-spacing: 6px; }
 .paper .m-btn { color: var(--ink); }

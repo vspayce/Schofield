@@ -173,7 +173,7 @@ def duster_prims(bp):
             K(j["hip"] + np.array([0.02 * s, 0.02, 0.03]), j["kne"] + np.array([0.0, 0.08, 0.02]), 0.12, 0.085, "coat",
               ["thigh" + sfx, "hips"], k=0.05),
             # side skirt hanging down the horse's flank
-            C.box((0.30 * s, -0.08, -0.22), (0.014, 0.16, 0.20), 0.01, "coat", ["hips"], k=0.05, rot=_roty(-8 * s)),
+            C.box((0.285 * s, -0.08, -0.15), (0.014, 0.15, 0.14), 0.01, "coat", ["hips"], k=0.05, rot=_roty(-8 * s)),
         ]
     # no coat below the skirt hem, keep wrists/hands out of the sleeves
     P += [C.box((0, 0, -1.0), (1, 1, 0.58), 0.0, "cut", [], sub=True, k=0.02)]

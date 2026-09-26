@@ -3,7 +3,7 @@
 // reloads, health regen and Dead Eye target painting.
 import * as THREE from 'three';
 import { audio } from '../core/audio.js';
-import { createRider, createWeapon, rotateBoneWorld } from './characters.js';
+import { createRider, createWeapon, rotateBoneWorld, aimBone } from './characters.js';
 import { clamp, damp } from '../core/noise.js';
 
 export const WEAPONS = {
@@ -118,12 +118,15 @@ export class Player {
     const seat = coach.seatGuard || coach.body;
     const root = this.model.root;
     // the model's parent (seat) carries coach yaw; rotate model yaw by relative aim
-    root.rotation.set(0, this.yaw, 0);
+    // RideAim points the pistol ~38° to the right of the body; turn the body so the gun sits on the crosshair
+    root.rotation.set(0, this.yaw + (this.model.kind === 'glb' ? 0.67 : 0), 0);
     this.model.update(dt);
     const b = this.model.bones;
     if (b.chest && this.model.kind === 'glb') {
-      const q = new THREE.Quaternion().setFromAxisAngle(right.clone().negate(), pitchW * 0.8);
-      rotateBoneWorld(b.chest, q);
+      // aim the barrel from the hand at whatever is under the crosshair
+      const handP = this.model.hand.getWorldPosition(new THREE.Vector3());
+      const tgt = new THREE.Vector3().copy(this.camPos).addScaledVector(this.aimDir, 40);
+      aimBone(b.chest, this.model.hand, tgt.sub(handP).normalize(), 1);
     } else if (b.chest) {
       b.chest.rotation.x = -pitchW;
     }
@@ -230,9 +233,7 @@ export class Player {
     if (W.id === 'schofield') audio.play('schofield_cock', { volume: 0.25, delay: 0.14 });
     this.recoilV += W.kick * 60;
     g.shake += W.id === 'shotgun' ? 0.05 : 0.02;
-    if (this.model.has('Shoot') && this.model.actions?.Shoot) {
-      const a = this.model.actions.Shoot; a.reset(); a.setLoop(THREE.LoopOnce, 1); a.weight = 1; a.play();
-    }
+    this.model.kick?.();
     g.hud.setAmmo(W, this.ammo[W.id], false);
     if (this.ammo[W.id] <= 0) setTimeout(() => { if (this.ammo[W.id] <= 0 && this.reloading <= 0 && !this.g.over) this._reload(); }, 350);
   }

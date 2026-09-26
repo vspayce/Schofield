@@ -3,7 +3,7 @@
 // Riders live in road space (s, d) so they follow any winding road.
 import * as THREE from 'three';
 import { audio } from '../core/audio.js';
-import { createHorse, createRider, createWeapon, rotateBoneWorld } from './characters.js';
+import { createHorse, createRider, createWeapon, rotateBoneWorld, aimBone } from './characters.js';
 import { ROAD_HALF } from '../world/route.js';
 import { clamp, damp, lerp } from '../core/noise.js';
 
@@ -94,7 +94,7 @@ class Rider extends Enemy {
       const ahead = R.worldAt(this.s + 1.5, this.d, _v);
       this.horse.root.position.copy(this.pos);
       this.horse.root.rotation.set(-Math.atan2(ahead.y - this.pos.y, 1.5), this.heading, clamp(-lat * 2, -0.25, 0.25), 'YXZ');
-      this.horse.setSpeed(this.speed / 15);
+      this.horse.setSpeed(Math.min(1.32, 0.75 + this.speed / 30));
       // dust
       this.g.fx.trail(this.pos, this.speed > 6 ? 7 : 0, dt, 0.7);
 
@@ -120,7 +120,14 @@ class Rider extends Enemy {
     // thrown rider (ragdoll-ish: ballistic with spin, then lies on the ground)
     if (this.thrown) {
       const t = this.thrown;
-      if (!t.landed) {
+      if (t.animated) {
+        // the FallOff clip carries the drop; we only add the momentum, bleeding off fast
+        t.vel.multiplyScalar(Math.exp(-2.2 * dt));
+        t.o.position.x += t.vel.x * dt; t.o.position.z += t.vel.z * dt;
+        t.o.position.y = R.height(t.o.position.x, t.o.position.z) + t.seatH;
+        if (!t.landed && t.age > 0.9) { t.landed = true; g.fx.dust(_v.copy(t.o.position).setY(t.o.position.y - t.seatH), { amount: 8, size: 0.6 }); }
+        t.age += dt;
+      } else if (!t.landed) {
         t.vel.y -= 16 * dt;
         t.o.position.addScaledVector(t.vel, dt);
         t.o.rotation.x += t.spin.x * dt; t.o.rotation.z += t.spin.z * dt;
@@ -152,12 +159,14 @@ class Rider extends Enemy {
       const chest = this.man.bones.chest.getWorldPosition(_v);
       const dir = _v2.subVectors(target, chest);
       const want = Math.atan2(dir.x, dir.z);
-      let rel = want - this.heading;
-      while (rel > Math.PI) rel -= Math.PI * 2; while (rel < -Math.PI) rel += Math.PI * 2;
-      // RideAim pose points forward-right; bias
-      rel = clamp(rel + 0.6, -1.6, 1.6);
-      if (this.man.kind === 'glb') rotateBoneWorld(this.man.bones.chest, _q.setFromAxisAngle(_v3.set(0, 1, 0), rel * 0.8));
-      else this.man.bones.chest.rotation.y = rel;
+      if (this.man.kind === 'glb') {
+        const hp = this.man.hand.getWorldPosition(_v3);
+        aimBone(this.man.bones.chest, this.man.hand, _v2.subVectors(target, hp).normalize(), 0.9);
+      } else {
+        let rel = want - this.heading;
+        while (rel > Math.PI) rel -= Math.PI * 2; while (rel < -Math.PI) rel += Math.PI * 2;
+        this.man.bones.chest.rotation.y = clamp(rel, -1.6, 1.6);
+      }
     }
   }
 
@@ -231,8 +240,11 @@ class Rider extends Enemy {
     this.g.scene.add(o);
     o.position.copy(wp); o.quaternion.copy(wq);
     o.rotation.setFromQuaternion(wq, 'YXZ');
-    this.man.play(this.man.has('FallOff') ? 'FallOff' : 'Ride', { once: true, fade: 0.08 });
-    this.thrown = { o, vel, spin: new THREE.Vector3(-3 - Math.random() * 3, 0, (Math.random() - 0.5) * 4), landed: false };
+    const animated = this.man.kind === 'glb' && this.man.has('FallOff');
+    this.man.play(animated ? 'FallOff' : 'Ride', { once: true, fade: 0.08 });
+    const seatH = wp.y - this.g.route.height(wp.x, wp.z);
+    if (animated) o.rotation.set(0, this.heading, 0);
+    this.thrown = { o, vel, spin: new THREE.Vector3(-3 - Math.random() * 3, 0, (Math.random() - 0.5) * 4), landed: false, animated, seatH, age: 0 };
   }
 
   dispose() { this.g.scene.remove(this.horse.root); if (this.thrown) this.g.scene.remove(this.thrown.o); }
@@ -267,7 +279,7 @@ class Gunman extends Enemy {
     if (this.alive) {
       // face the coach
       const dir = _v.subVectors(coach.pos, this.root.position);
-      this.root.rotation.y = damp(this.root.rotation.y, Math.atan2(dir.x, dir.z) - (this.rifle ? 0.5 : 0.35), 4, dt);
+      this.root.rotation.y = damp(this.root.rotation.y, Math.atan2(dir.x, dir.z), 4, dt); // StandShoot aims straight ahead
       if (this.popup) {
         this.pop = Math.min(1, this.pop + dt * 2.5);
         this.root.position.copy(this.base).add(_v2.set(0, (this.pop - 1) * 1.2, 0));
@@ -292,6 +304,10 @@ class Gunman extends Enemy {
       if (coach.s - this.s > 70) { this.removeAt = g.time + 1; this.alive = false; this.escaped = true; }
     }
     this.root.updateMatrixWorld(true);
+    if (this.alive && this.man.kind === 'glb' && this.man.bones.chest) {
+      const hp = this.man.hand.getWorldPosition(_v3);
+      aimBone(this.man.bones.chest, this.man.hand, _v2.subVectors(g.player.headPos, hp).normalize(), 0.85);
+    }
     const [head, body] = this.spheres;
     if (this.man.bones.head) this.man.bones.head.getWorldPosition(head.c).add(_v.set(0, 0.06, 0)); else this.root.localToWorld(head.c.set(0, 1.65, 0));
     if (this.man.bones.chest) this.man.bones.chest.getWorldPosition(body.c); else this.root.localToWorld(body.c.set(0, 1.2, 0));

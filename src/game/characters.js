@@ -7,6 +7,18 @@ import { assets, findNode } from '../core/assets.js';
 
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _v = new THREE.Vector3();
 
+// Turn `bone` (usually the chest) so the hand's +Z (the gun barrel) points along
+// worldDir. Call after the mixer update. weight < 1 aims partially.
+const _hz = new THREE.Vector3(), _aq = new THREE.Quaternion(), _iq = new THREE.Quaternion();
+export function aimBone(bone, hand, worldDir, weight = 1) {
+  if (!bone || !hand) return;
+  hand.updateWorldMatrix(true, false);
+  _hz.set(0, 0, 1).applyQuaternion(hand.getWorldQuaternion(_aq));
+  _aq.setFromUnitVectors(_hz, worldDir);
+  if (weight < 1) _aq.slerp(_iq.identity(), 1 - weight);
+  rotateBoneWorld(bone, _aq);
+}
+
 // Rotate a bone by a world-space rotation R (applied after the animation pose).
 export function rotateBoneWorld(bone, R) {
   if (!bone) return;
@@ -35,7 +47,17 @@ class Animated {
     prepMaterials(this.root, tint);
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = {};
-    for (const clip of gltf.animations) this.actions[clip.name] = this.mixer.clipAction(clip);
+    for (const clip of gltf.animations) {
+      if (clip.name === 'Shoot') {
+        // recoil layered on top of whatever pose is playing
+        const add = THREE.AnimationUtils.makeClipAdditive(clip.clone());
+        this.recoil = this.mixer.clipAction(add);
+        this.recoil.blendMode = THREE.AdditiveAnimationBlendMode;
+        this.recoil.setLoop(THREE.LoopOnce, 1);
+        continue;
+      }
+      this.actions[clip.name] = this.mixer.clipAction(clip);
+    }
     this.current = null;
   }
   has(name) { return !!this.actions[name]; }
@@ -53,6 +75,7 @@ class Animated {
     return a;
   }
   setSpeed(s) { if (this.current) this.current.timeScale = s; }
+  kick() { if (this.recoil) { this.recoil.reset(); this.recoil.weight = 1; this.recoil.play(); } }
   update(dt) { this.mixer.update(dt); }
   node(name) { return findNode(this.root, name); }
 }
@@ -126,8 +149,8 @@ const BONE_ALIASES = {
   spine: ['spine', 'Spine', 'spine.001', 'mixamorigSpine'],
   chest: ['chest', 'Chest', 'spine.003', 'mixamorigSpine2'],
   head: ['head', 'Head', 'mixamorigHead'],
-  handR: ['hand.R', 'hand_R', 'Hand.R', 'handR', 'mixamorigRightHand'],
-  upperarmR: ['upperarm.R', 'upper_arm.R', 'upperarm_R', 'mixamorigRightArm'],
+  handR: ['handR', 'hand.R', 'hand_R', 'Hand.R', 'mixamorigRightHand'],
+  upperarmR: ['upperarmR', 'upperarm.R', 'upper_arm.R', 'upperarm_R', 'mixamorigRightArm'],
 };
 
 export function createRider({ variant = 'bandit', tint = null } = {}) {
@@ -185,6 +208,7 @@ function fallbackRider(variant, tint) {
     play(name) { mode = name; if (name === 'FallOff' || name === 'DieStanding') fallT = 0; },
     has: () => true,
     setSpeed() {},
+    kick() {},
     update(dt) {
       t += dt;
       if (mode === 'FallOff' || mode === 'DieStanding') {

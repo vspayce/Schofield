@@ -148,7 +148,8 @@ export class Coach {
       h.root.rotation.set(-Math.atan2(ahead.y - p.y, 1.2), Math.atan2(f2.tx, f2.tz), 0, 'YXZ');
       const gait = v < 3 ? 'Idle' : v < 11 ? 'Canter' : 'Gallop';
       if (h.has(gait)) h.play(gait);
-      h.setSpeed(gait === 'Gallop' ? v / 16 : gait === 'Canter' ? v / 9 : 1);
+      // clips match ground speed at ~6.7 m/s (gallop); beyond ~1.3x it looks frantic
+      h.setSpeed(gait === 'Gallop' ? Math.min(1.32, 0.75 + v / 30) : gait === 'Canter' ? Math.min(1.3, v / 7) : 1);
       h.update(dt);
     }
     this.driver.update(dt);
