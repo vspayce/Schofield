@@ -19,6 +19,7 @@ import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
 import { Menus, save } from './ui/menus.js';
+import { fullscreen } from './core/fullscreen.js';
 
 const DIFF = [
   { riderAcc: 0.3, rifleAcc: 0.4, fireMult: 1.15, dmgMult: 0.85, countMult: 1 },
@@ -75,11 +76,10 @@ class Game {
     fill.style.width = '100%';
     document.getElementById('loading').classList.remove('show');
     const qs = new URLSearchParams(location.search);
-    if (qs.has('unlock')) save.data.unlocked = 3;
     if (qs.has('route')) this.startRide(+qs.get('route') || 0, qs.get('weapon') || save.weapon);
     else this.menus.title();
-    const unlock = () => { audio.resume(); if (this.mode === 'attract') audio.loop('music_menu', { bus: 'music', volume: 1 }); };
-    addEventListener('pointerdown', unlock, { once: false });
+    const unlock = () => { audio.resume(); if (this.input.touch) fullscreen.enter(); if (this.mode === 'attract') audio.loop('music_menu', { bus: 'music', volume: 1 }); };
+    addEventListener('pointerdown', unlock, { capture: true }); // capture: HUD buttons stop propagation
     // pause when backgrounded or turned to portrait
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.pause(); });
     const portrait = matchMedia('(orientation: portrait)');
@@ -243,7 +243,7 @@ class Game {
     if (coachPct >= 75 && accuracy >= 50 && p.hp > 30) stars = 3;
     const reward = Math.round(ROUTES[this.routeIndex].reward * (0.5 + coachPct / 200));
     const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars };
-    save.record(this.routeIndex, ROUTES[this.routeIndex].id, stars, r.total);
+    save.record(ROUTES[this.routeIndex].id, stars, r.total);
     this._later(3500, () => { this.hud.show(false); this.menus.results(r); });
   }
 

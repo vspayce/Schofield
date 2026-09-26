@@ -2,21 +2,20 @@
 import { ROUTES } from '../world/routes.js';
 import { WEAPONS } from '../game/player.js';
 import { audio } from '../core/audio.js';
+import { fullscreen } from '../core/fullscreen.js';
 
 const el = document.getElementById('menu');
 const UI = import.meta.env.BASE_URL + 'assets/ui/';
 
 export const save = {
   data: (() => { try { return JSON.parse(localStorage.getItem('schofield.save')) || {}; } catch { return {}; } })(),
-  get unlocked() { return this.data.unlocked ?? 0; },
   stars(id) { return (this.data.stars || {})[id] || 0; },
   best(id) { return (this.data.best || {})[id] || 0; },
-  record(i, id, stars, bounty) {
+  record(id, stars, bounty) {
     const d = this.data;
     d.stars = d.stars || {}; d.best = d.best || {};
     d.stars[id] = Math.max(d.stars[id] || 0, stars);
     d.best[id] = Math.max(d.best[id] || 0, bounty);
-    if (stars > 0) d.unlocked = Math.max(d.unlocked || 0, Math.min(ROUTES.length - 1, i + 1));
     try { localStorage.setItem('schofield.save', JSON.stringify(d)); } catch {}
   },
   get weapon() { return this.data.weapon || 'schofield'; },
@@ -50,17 +49,17 @@ export class Menus {
       <div class="m-row" style="margin-top:6px">
         <button class="m-btn ghost" data-act="settings">Settings</button>
         <button class="m-btn ghost" data-act="how">How to Play</button>
-      </div>`, false, 'title');
+      </div>
+      ${fullscreen.needsHomeScreen ? '<div class="m-hint">For full screen on iPhone: tap Share, then <b>Add to Home Screen</b>, and play from the new icon.</div>' : ''}`, false, 'title');
   }
 
   routes() {
+    // every route is open from the start
     const posters = ROUTES.map((r, i) => {
-      const locked = i > save.unlocked;
-      return `<div class="poster ${locked ? 'locked' : ''}" data-act="${locked ? '' : 'pick'}" data-arg="${i}"><div class="pin">
+      return `<div class="poster" data-act="pick" data-arg="${i}"><div class="pin">
         <div><h3>${r.name}</h3><div class="sub">${r.from} → ${r.to}</div></div>
         <div class="sub">${r.blurb}</div>
         <div><div class="stars">${stars(save.stars(r.id))}</div><div class="reward">REWARD $${r.reward}</div></div></div>
-        ${locked ? '<div class="lock">LOCKED</div>' : ''}
       </div>`;
     }).join('');
     this._show(`<h2 class="m-title">Choose Your Route</h2><div class="m-row">${posters}</div>
@@ -89,7 +88,7 @@ export class Menus {
 
   results(r) {
     const i = this.g.routeIndex;
-    const next = i + 1 < ROUTES.length && i + 1 <= save.unlocked;
+    const next = i + 1 < ROUTES.length;
     this._show(`<div class="paper">
       <div style="font-family:var(--font-sc);letter-spacing:.2em">ARRIVED SAFE AT</div>
       <h2>${ROUTES[i].to}</h2>
@@ -154,11 +153,7 @@ export class Menus {
     const g = this.g;
     switch (a) {
       case 'title': this.title(); break;
-      case 'routes':
-        if (g.input.touch && !document.fullscreenElement) {
-          document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
-        }
-        g.toAttract(); this.routes(); break;
+      case 'routes': g.toAttract(); this.routes(); break;
       case 'pick': this.loadout(+arg); break;
       case 'gun': save.weapon = arg; this.loadout(this.routeIndex); break;
       case 'go': this.hide(); g.startRide(this.routeIndex, save.weapon); break;
