@@ -1,32 +1,20 @@
 // The shotgun messenger: chase camera centred behind the coach that orbits with the aim,
-// Schofield revolver / coach gun, hit-scan shooting with aim assist, recoil,
-// reloads, health regen and Dead Eye target painting.
+// a sidearm and a long gun (see weapons.js), a scope that zooms from the guard's
+// own eyes, hit-scan shooting with aim assist, recoil, reloads, health regen
+// and Dead Eye target painting.
 import * as THREE from 'three';
 import { audio } from '../core/audio.js';
 import { createRider, createWeapon, rotateBoneWorld, aimBone } from './characters.js';
 import { clamp, damp } from '../core/noise.js';
+import { WEAPONS } from './weapons.js';
 
-export const WEAPONS = {
-  schofield: {
-    id: 'schofield', name: 'Schofield Revolver', model: 'Schofield', mag: 6, interval: 0.26, reload: 1.6,
-    pellets: 1, spread: 0.0045, damage: 60, headMult: 3, range: 260, falloff: [90, 260], floor: 0.5, kick: 0.028,
-    snd: ['schofield_shot', 'schofield_shot2'], reloadSnd: 'schofield_reload',
-    stats: { power: 0.55, range: 0.85, rate: 0.8, accuracy: 0.9 },
-    blurb: 'Smith & Wesson top-break .45. Six quick, true shots and a fast reload.',
-  },
-  shotgun: {
-    id: 'shotgun', name: 'Coach Gun', model: 'CoachGun', mag: 2, interval: 0.32, reload: 1.8,
-    pellets: 9, spread: 0.06, damage: 20, headMult: 1.5, range: 70, falloff: [14, 55], floor: 0.15, kick: 0.075,
-    snd: ['shotgun_shot'], reloadSnd: 'shotgun_reload',
-    stats: { power: 1, range: 0.35, rate: 0.45, accuracy: 0.3 },
-    blurb: 'Double-barrel 10 gauge. Knocks a man clean out of the saddle up close.',
-  },
-};
+export { WEAPONS };
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
 export class Player {
-  constructor(game, weaponId) {
+  // loadout: { side, long, start } weapon ids
+  constructor(game, { side = 'schofield', long = 'shotgun', start = side } = {}) {
     this.g = game;
     this.camera = game.camera;
     this.yaw = 0;       // relative to coach heading
@@ -34,11 +22,13 @@ export class Player {
     this.recoil = 0; this.recoilV = 0; this.recoilYaw = 0;
     this.hp = 100; this.lastHit = -10;
     this.deadeye = 0.35; this.deadeyeOn = false; this.marks = []; this.executing = false;
+    this.loadout = [WEAPONS[side] || WEAPONS.schofield, WEAPONS[long] || WEAPONS.shotgun];
     this.ammo = {};
-    for (const k in WEAPONS) this.ammo[k] = WEAPONS[k].mag;
-    this.weapon = WEAPONS[weaponId] || WEAPONS.schofield;
+    for (const W of this.loadout) this.ammo[W.id] = W.mag;
+    this.weapon = this.loadout.find((W) => W.id === start) || this.loadout[0];
+    this.scoped = false; this.scopeT = 0; // scopeT eases 0 -> 1 into the scope
     this.cool = 0; this.reloading = 0; this.swapT = 0; this.holsterT = 0;
-    this.settle = 0; // seconds the aim has been steady (tightens the Schofield)
+    this.settle = 0; // seconds the aim has been steady (tightens revolvers)
     this.timers = []; // game-time callbacks (respect pause)
     this.stats = { shots: 0, hits: 0, kills: 0, headshots: 0 };
 
@@ -47,13 +37,14 @@ export class Player {
     seat.add(this.model.root);
     this.model.play(this.model.has('RideAim') ? 'RideAim' : 'Ride');
     this.guns = {};
-    for (const k in WEAPONS) {
-      const w = createWeapon(WEAPONS[k].model);
+    for (const W of this.loadout) {
+      const w = createWeapon(W.model, { finish: W.finish });
       w.root.visible = false;
       this.model.hand.add(w.root);
-      this.guns[k] = w;
+      this.guns[W.id] = w;
     }
     this._showGun();
+    game.hud.setScope(false);
     this.camPos = new THREE.Vector3();
     this.aimDir = new THREE.Vector3(0, 0, 1);
     this.fov = 60;
@@ -65,6 +56,16 @@ export class Player {
     this.g.hud.setWeapon(this.weapon, this.ammo[this.weapon.id]);
   }
 
+  // current zoom: 1 = normal view, W.zoom = fully in the scope
+  get zoom() { return 1 + (this.weapon.zoom - 1) * this.scopeT; }
+
+  setScope(on) {
+    if (on === this.scoped) return;
+    this.scoped = on;
+    audio.play('ui_click', { volume: 0.4, pitch: on ? 0.7 : 0.55 });
+    this.g.hud.setScope(on);
+  }
+
   get headPos() {
     const seat = this.g.coach.seatGuard || this.g.coach.body;
     return seat.getWorldPosition(_v2).add(_v.set(0, 0.95, 0));
@@ -73,7 +74,10 @@ export class Player {
   update(dt, rdt, inp) {
     const g = this.g;
     // ---------------------------------------------------------------- aim
-    const sens = this.deadeyeOn ? 0.75 : 1;
+    if (inp.scope) this.setScope(!this.scoped);
+    this.scopeT = damp(this.scopeT, this.scoped ? 1 : 0, 10, rdt);
+    // slower aim when magnified, so the view doesn't whip around
+    const sens = (this.deadeyeOn ? 0.75 : 1) / this.zoom;
     let dx = inp.dx * sens, dy = inp.dy * sens;
     // touch aim assist: slow down over targets + gentle pull
     if (g.input.touch && this.hover) { dx *= 0.55; dy *= 0.55; }
@@ -102,8 +106,12 @@ export class Player {
     const target = new THREE.Vector3().copy(pivot)
       .addScaledVector(this.aimDir, -back)
       .add(new THREE.Vector3(0, up + Math.max(0, -this.pitch) * 1.2, 0));
+    // the scope looks from the guard's own eyes (standing up a little), so the
+    // coach can't block it; the driver right in front is hidden meanwhile
+    if (this.scopeT > 0.001) target.lerp(_v2.copy(this.headPos).add(_v.set(0, 0.45, 0)), this.scopeT);
+    if (coach.driver) coach.driver.root.visible = this.scopeT < 0.5;
     // shake
-    const sh = coach.shake + g.shake;
+    const sh = (coach.shake + g.shake) * (1 - 0.8 * this.scopeT); // magnified shake is unplayable
     target.x += (Math.random() - 0.5) * sh; target.y += (Math.random() - 0.5) * sh;
     // keep camera above ground
     const gh = g.route.height(target.x, target.z) + 0.6;
@@ -112,8 +120,8 @@ export class Player {
     this.camera.position.copy(this.camPos);
     const look = _v2.copy(this.camPos).add(this.aimDir);
     this.camera.lookAt(look);
-    const wantFov = this.deadeyeOn ? 52 : 60;
-    this.fov = damp(this.fov, wantFov, 6, rdt);
+    const wantFov = (this.deadeyeOn ? 52 : 60) / this.zoom;
+    this.fov = this.scopeT > 0.001 ? wantFov : damp(this.fov, wantFov, 6, rdt);
     if (Math.abs(this.camera.fov - this.fov) > 0.01) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
     this.camera.updateMatrixWorld();
 
@@ -123,6 +131,7 @@ export class Player {
     // the model's parent (seat) carries coach yaw; rotate model yaw by relative aim
     // RideAim points the pistol ~38° to the right of the body; turn the body so the gun sits on the crosshair
     root.rotation.set(0, this.yaw + (this.model.kind === 'glb' ? 0.67 : 0), 0);
+    root.visible = this.scopeT < 0.5; // don't look through your own hat
     this.model.update(dt);
     const b = this.model.bones;
     if (b.chest && this.model.kind === 'glb') {
@@ -135,7 +144,7 @@ export class Player {
     }
 
     // ---------------------------------------------------------- targeting
-    this.hover = g.enemies.pick(this.camPos, this.aimDir, g.input.touch ? 0.05 : 0.02);
+    this.hover = g.enemies.pick(this.camPos, this.aimDir, (g.input.touch ? 0.05 : 0.02) / this.zoom);
     g.hud.crosshairEnemy(!!this.hover);
 
     // ------------------------------------------------------------ weapons
@@ -146,7 +155,7 @@ export class Player {
       if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); }
     }
     // the holstered gun gets reloaded while you use the other one
-    const other = W.id === 'schofield' ? WEAPONS.shotgun : WEAPONS.schofield;
+    const other = this.loadout[0] === W ? this.loadout[1] : this.loadout[0];
     if (this.ammo[other.id] < other.mag) { this.holsterT += dt; if (this.holsterT > 2.5) { this.ammo[other.id] = other.mag; this.holsterT = 0; } }
     else this.holsterT = 0;
     if (this.reloading > 0) {
@@ -154,7 +163,7 @@ export class Player {
       if (this.reloading <= 0) { this.ammo[W.id] = W.mag; g.hud.setAmmo(W, this.ammo[W.id], false); }
     }
     if (inp.swap && this.swapT <= 0 && !this.executing) {
-      this.weapon = this.weapon.id === 'schofield' ? WEAPONS.shotgun : WEAPONS.schofield;
+      this.weapon = other;
       this.reloading = 0; this.cool = 0.3; this.swapT = 0.35;
       audio.play('schofield_cock', { volume: 0.6 });
       this._showGun();
@@ -179,8 +188,8 @@ export class Player {
     }
 
     if (!this.executing) {
-      // holding fire repeats the Schofield on every platform
-      const wantsFire = W.id === 'schofield' ? inp.firePressed || inp.fire : inp.firePressed;
+      // holding fire repeats revolvers and the Gatling on every platform
+      const wantsFire = W.auto ? inp.firePressed || inp.fire : inp.firePressed;
       if (wantsFire && this.cool <= 0 && this.reloading <= 0) {
         if (this.deadeyeOn && this.marks.length) this._endDeadeye();
         else if (this.ammo[W.id] > 0) this._fire();
@@ -221,12 +230,13 @@ export class Player {
     if (forced) aimPoint = forced;
     else {
       // assist only nudges near-misses onto the body/horse surface; headshots must be earned
-      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, g.input.touch ? 0.035 : 0.01, g.input.touch ? 1.1 : 0.4);
+      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, (g.input.touch ? 0.035 : 0.01) / this.zoom, g.input.touch ? 1.1 : 0.4);
       aimPoint = hit ? hit.point : _v2.copy(this.camPos).addScaledVector(this.aimDir, 120).clone();
     }
     const baseDir = new THREE.Vector3().subVectors(aimPoint, this.camPos).normalize();
     let anyHit = false, killed = false, head = false, pelletHits = 0;
-    const steady = W.id === 'schofield' && this.settle > 0.3 ? 0.3 : 1;
+    // a steady revolver tightens up; the scope steadies everything
+    const steady = (W.kind === 'revolver' && this.settle > 0.3 ? 0.3 : 1) * (this.scoped ? 0.6 : 1);
     for (let p = 0; p < W.pellets; p++) {
       const dir = baseDir.clone();
       if (!forced) {
@@ -248,18 +258,21 @@ export class Player {
     if (g.input.touch) navigator.vibrate?.(killed ? [12, 30, 12] : 12);
     // feedback
     const dirOut = baseDir;
-    g.fx.muzzle(muzzle, dirOut, { big: W.id === 'shotgun', light: true });
-    audio.play(W.snd[Math.floor(Math.random() * W.snd.length)], { volume: W.id === 'shotgun' ? 1 : 0.9 });
-    if (W.id === 'schofield') audio.play('schofield_cock', { volume: 0.25, delay: 0.14 });
+    g.fx.muzzle(muzzle, dirOut, { big: W.kind === 'shotgun' || W.kind === 'rifle', light: true });
+    audio.play(W.snd[Math.floor(Math.random() * W.snd.length)], { volume: W.kind === 'revolver' ? 0.9 : 1, pitch: W.pitch || 1 });
+    if (W.kind === 'revolver' && W.interval > 0.2) audio.play('schofield_cock', { volume: 0.25, delay: 0.14 });
+    this.guns[W.id].spin?.(1.05);
     this.recoilV += W.kick * 60;
-    g.shake += W.id === 'shotgun' ? 0.05 : 0.02;
+    g.shake += W.kind === 'shotgun' ? 0.05 : W.kind === 'rifle' ? 0.035 : 0.02;
     this.model.kick?.();
     g.hud.setAmmo(W, this.ammo[W.id], false);
-    if (this.ammo[W.id] <= 0) this.timers.push({ t: 0.35, fn: () => { if (this.ammo[W.id] <= 0 && this.reloading <= 0 && !this.g.over) this._reload(); } });
+    // auto-reload an empty gun, unless you've swapped away from it meanwhile
+    if (this.ammo[W.id] <= 0) this.timers.push({ t: 0.35, fn: () => { if (this.weapon === W && this.ammo[W.id] <= 0 && this.reloading <= 0 && !this.g.over) this._reload(); } });
   }
 
   _startDeadeye() {
     this.deadeyeOn = true; this.marks = [];
+    this.setScope(false);
     audio.play('deadeye_in', { volume: 0.9 });
     audio.loop('heartbeat_loop', { volume: 0.55 });
     this.g.setTimeScale(0.3);

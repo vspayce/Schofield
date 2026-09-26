@@ -120,6 +120,7 @@ export class Renderer {
     this.composer.addPass(this.final);
     this.resize();
     addEventListener('resize', () => this.resize());
+    new ResizeObserver(() => this.resize()).observe(this.canvas);
   }
 
   setQuality(name) {
@@ -129,18 +130,25 @@ export class Renderer {
     this.resize();
   }
 
+  // The canvas's real on-screen size. On phones window.innerWidth/innerHeight can
+  // disagree with it while the browser's toolbars slide in and out, which
+  // stretches the picture away from the HUD drawn over it.
+  get width() { return this.canvas.clientWidth || innerWidth; }
+  get height() { return this.canvas.clientHeight || innerHeight; }
+
   _size() {
     const dpr = Math.min(devicePixelRatio || 1, this.tier.pixelRatio) * this.dynScale;
-    return { w: Math.floor(innerWidth * dpr), h: Math.floor(innerHeight * dpr), dpr };
+    return { w: Math.floor(this.width * dpr), h: Math.floor(this.height * dpr), dpr };
   }
 
   resize() {
     const { dpr } = this._size();
+    const w = this.width, h = this.height;
     this.r.setPixelRatio(dpr);
-    this.r.setSize(innerWidth, innerHeight, false);
-    if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(innerWidth, innerHeight); }
-    if (this.camera) { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); }
-    this.final.uniforms.uAspect.value = innerWidth / innerHeight;
+    this.r.setSize(w, h, false);
+    if (this.composer) { this.composer.setPixelRatio(dpr); this.composer.setSize(w, h); }
+    if (this.camera) { this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
+    this.final.uniforms.uAspect.value = w / h;
   }
 
   // Dynamic resolution: keep ~55+ fps on phones by trading pixels.

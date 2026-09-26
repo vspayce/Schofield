@@ -19,6 +19,7 @@ import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
 import { Menus, save } from './ui/menus.js';
+import { WEAPONS } from './game/weapons.js';
 import { fullscreen } from './core/fullscreen.js';
 
 const DIFF = [
@@ -76,7 +77,7 @@ class Game {
     fill.style.width = '100%';
     document.getElementById('loading').classList.remove('show');
     const qs = new URLSearchParams(location.search);
-    if (qs.has('route')) this.startRide(+qs.get('route') || 0, qs.get('weapon') || save.weapon);
+    if (qs.has('route')) this.startRide(+qs.get('route') || 0, qs.get('weapon'));
     else this.menus.title();
     const unlock = () => { audio.resume(); if (this.input.touch) fullscreen.enter(); if (this.mode === 'attract') audio.loop('music_menu', { bus: 'music', volume: 1 }); };
     addEventListener('pointerdown', unlock, { capture: true }); // capture: HUD buttons stop propagation
@@ -99,7 +100,18 @@ class Game {
     this.route = null;
   }
 
-  buildWorld(i, mode, weapon = 'schofield') {
+  // the two guns you ride with, from the save; `override` (a weapon id, e.g. the
+  // ?weapon= debug flag) swaps it into its slot and puts it in hand
+  loadout(override) {
+    const side = save.equipped('side'), long = save.equipped('long'), o = WEAPONS[override];
+    return {
+      side: o?.slot === 'side' ? o.id : side,
+      long: o?.slot === 'long' ? o.id : long,
+      start: o ? o.id : save.start === 'long' ? long : side,
+    };
+  }
+
+  buildWorld(i, mode, weapon) {
     this.disposeWorld();
     this.routeIndex = i;
     const def = ROUTES[i];
@@ -121,7 +133,7 @@ class Game {
     this.coach.speed = mode === 'attract' ? 12 : 0;
     this.coach.update(0.016, {});
     if (mode === 'ride') {
-      this.player = new Player(this, weapon);
+      this.player = new Player(this, this.loadout(weapon));
       this.hud.setRoute(def);
     } else {
       // a guard riding shotgun for the title cinematic
@@ -219,7 +231,10 @@ class Game {
     audio.stopLoop('music_town_loop', 0.5);
     audio.play('sting_death', { bus: 'music', volume: 1 });
     this.coach.stopping = true;
-    this._later(2200, () => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason); });
+    // bounties collected on the road are yours even if the run fails
+    const kept = this.bounty;
+    save.earn(kept);
+    this._later(2200, () => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason, kept); });
   }
 
   arrive() {
@@ -244,6 +259,7 @@ class Game {
     const reward = Math.round(ROUTES[this.routeIndex].reward * (0.5 + coachPct / 200));
     const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars };
     save.record(ROUTES[this.routeIndex].id, stars, r.total);
+    save.earn(r.total);
     this._later(3500, () => { this.hud.show(false); this.menus.results(r); });
   }
 

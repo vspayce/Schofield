@@ -12,6 +12,9 @@ export class HUD {
     this.feed = $('feed');
     this.bannerEl = $('banner');
     this.cyl = $('ammo-cyl'); this.shells = $('ammo-shells'); this.ammoName = $('ammo-name'); this.ammoBox = $('ammo');
+    this.count = $('ammo-count');
+    this.scope = $('scope'); this.btnScope = $('btn-scope');
+    this.shooterLayer = $('shooters'); this.shooterEls = [];
     this.hp = $('hp-meter'); this.coach = $('coach-meter'); this.de = $('de-meter');
     this.routeFill = $('route-fill'); this.routeCoach = $('route-coach');
     this.bounty = $('bounty-val');
@@ -46,17 +49,24 @@ export class HUD {
   setWeapon(W, ammo) {
     this.weapon = W;
     this.ammoName.textContent = W.name;
-    this.cyl.style.display = W.id === 'schofield' ? 'block' : 'none';
-    this.shells.style.display = W.id === 'shotgun' ? 'flex' : 'none';
-    this.cross.classList.toggle('shotgun', W.id === 'shotgun');
+    // six-shooters get the cylinder, one- and two-shot guns get cartridges, the rest a count
+    this.ammoMode = W.kind === 'revolver' && W.mag === 6 ? 'cyl' : W.mag <= 2 ? 'shells' : 'count';
+    this.cyl.style.display = this.ammoMode === 'cyl' ? 'block' : 'none';
+    this.shells.style.display = this.ammoMode === 'shells' ? 'flex' : 'none';
+    this.count.style.display = this.ammoMode === 'count' ? 'block' : 'none';
+    this.cross.classList.toggle('shotgun', W.kind === 'shotgun');
     this.setAmmo(W, ammo, false);
   }
 
   setAmmo(W, n, reloading) {
     this.ammoBox.classList.toggle('reloading', reloading);
-    if (W.id === 'schofield') {
+    if (this.ammoMode === 'cyl') {
       [...this.cyl.children].forEach((c, i) => { c.className = 'ch ' + (i < n ? 'full' : 'empty'); });
       this.cyl.style.transform = `rotate(${(6 - n) * 60}deg)`;
+    } else if (this.ammoMode === 'count') {
+      this.count.firstChild.textContent = n;
+      this.count.lastChild.textContent = '/' + W.mag;
+      this.count.classList.toggle('low', n <= Math.ceil(W.mag / 5));
     } else {
       this.shells.innerHTML = '';
       for (let i = 0; i < W.mag; i++) { const s = document.createElement('div'); s.className = 'sh ' + (i < n ? 'full' : 'empty'); this.shells.appendChild(s); }
@@ -85,8 +95,8 @@ export class HUD {
       this._last.cp = cp; this.coachPct.textContent = cp + '%';
     }
     // coach-gun pattern ring sized to the real pellet cone
-    if (p.weapon.id === 'shotgun') {
-      const r = Math.round(p.weapon.spread * (innerHeight / 2) / Math.tan(THREE.MathUtils.degToRad(game.camera.fov / 2)));
+    if (p.weapon.kind === 'shotgun') {
+      const r = Math.round(p.weapon.spread * (game.renderer.height / 2) / Math.tan(THREE.MathUtils.degToRad(game.camera.fov / 2)));
       if (this._last.ring !== r) { this._last.ring = r; Object.assign(this.ring.style, { width: r * 2 + 'px', height: r * 2 + 'px', left: -r + 'px', top: -r + 'px' }); }
     }
     this._chevrons(game);
@@ -99,6 +109,37 @@ export class HUD {
     const hv = Math.round(hitV * 20) / 20;
     if (this._last.hv !== hv) { this._last.hv = hv; this.vHit.style.opacity = hv; game.renderer.final.uniforms.uHit.value = hv * 0.6; }
     this._marks(game);
+    this._shooters(game);
+  }
+
+  setScope(on) {
+    this.scope.classList.toggle('on', on);
+    this.cross.classList.toggle('scoped', on);
+    this.btnScope.classList.toggle('active', on);
+  }
+
+  // a marker over every rifleman / gunman who can see you, so the ridges and
+  // rooftops aren't a guessing game; it flashes red when he's about to fire
+  _shooters(game) {
+    const list = [];
+    for (const e of game.enemies.list) {
+      if (!e.alive || e.type === 'rider' || !e.los) continue;
+      const dist = e.spheres[0].c.distanceTo(game.player.camPos);
+      if (dist > (e.rifle ? 320 : 80)) continue;
+      _p.copy(e.spheres[0].c); _p.y += 0.55;
+      _p.project(game.camera);
+      if (_p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
+      list.push({ x: _p.x, y: _p.y, glint: e.glintT > 0, dist });
+    }
+    while (this.shooterEls.length < list.length) { const d = document.createElement('div'); d.className = 'shooter'; this.shooterLayer.appendChild(d); this.shooterEls.push(d); }
+    while (this.shooterEls.length > list.length) this.shooterEls.pop().remove();
+    list.forEach((m, i) => {
+      const el = this.shooterEls[i];
+      el.className = 'shooter' + (m.glint ? ' glint' : '');
+      el.style.left = (m.x * 0.5 + 0.5) * 100 + '%';
+      el.style.top = (-m.y * 0.5 + 0.5) * 100 + '%';
+      el.dataset.dist = Math.round(m.dist) + 'm';
+    });
   }
 
   _marks(game) {
@@ -117,14 +158,15 @@ export class HUD {
       const el = this.marks[i];
       if (v.z > 1) { el.style.display = 'none'; return; }
       el.style.display = 'block';
-      el.style.left = (v.x * 0.5 + 0.5) * innerWidth + 'px';
-      el.style.top = (-v.y * 0.5 + 0.5) * innerHeight + 'px';
+      // percentages of the layer, which covers the canvas exactly
+      el.style.left = (v.x * 0.5 + 0.5) * 100 + '%';
+      el.style.top = (-v.y * 0.5 + 0.5) * 100 + '%';
     });
   }
 
   // edge arrows for threats you can't see (behind you, off-screen, or tiny and far)
   _chevrons(game) {
-    const list = [];
+    const list = [], W = game.renderer.width, H = game.renderer.height;
     for (const e of game.enemies.list) {
       if (!e.alive) continue;
       const dist = e.spheres[1].c.distanceTo(game.player.camPos);
@@ -136,7 +178,7 @@ export class HUD {
       if (on) continue;
       let x = behind ? -_p.x : _p.x, y = behind ? -_p.y : _p.y;
       if (behind && Math.abs(y) < 0.3) y = -0.9; // straight behind: show at the bottom
-      const a = Math.atan2(y * innerHeight, x * innerWidth);
+      const a = Math.atan2(y * H, x * W);
       const cls = e.glintT > 0 ? 'glint' : e.type === 'rider' ? '' : 'rifle';
       // merge threats in nearly the same direction (keep the most urgent)
       const near = list.find((c) => Math.abs(Math.atan2(Math.sin(c.a - a), Math.cos(c.a - a))) < 0.25);
@@ -145,10 +187,10 @@ export class HUD {
     }
     while (this.chevs.length < list.length) { const d = document.createElement('div'); d.className = 'chev'; this.chevLayer.appendChild(d); this.chevs.push(d); }
     while (this.chevs.length > list.length) this.chevs.pop().remove();
-    const rx = innerWidth / 2 - 46, ry = innerHeight / 2 - 40;
+    const rx = W / 2 - 46, ry = H / 2 - 40;
     list.forEach((c, i) => {
       const el = this.chevs[i];
-      const x = innerWidth / 2 + Math.cos(c.a) * rx, y = innerHeight / 2 - Math.sin(c.a) * ry;
+      const x = W / 2 + Math.cos(c.a) * rx, y = H / 2 - Math.sin(c.a) * ry;
       el.className = 'chev ' + c.cls;
       el.style.left = x + 'px'; el.style.top = y + 'px';
       el.style.transform = `rotate(${Math.PI / 2 - c.a}rad)`;

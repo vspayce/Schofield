@@ -22,11 +22,18 @@ good silhouettes do the heavy lifting, not polygon counts.
   Player can **whip** (speed burst, limited stamina) or **brake**.
 - Player = shotgun messenger on the coach roof, camera over the right shoulder.
   Aim anywhere 360° (drag on mobile / mouse on desktop). Soft aim-assist on touch.
-- Weapons (pick before each run, swap any time):
-  - **Schofield** revolver: 6 rounds, accurate, fast, headshots x2. Top-break reload
-    ejects all 6 then reloads (~1.6 s).
-  - **Coach gun** (double-barrel): 2 shells, 9 pellets, wide cone, brutal up close,
-    knocks riders off horses. Reload ~1.8 s.
+- Weapons: you carry a **sidearm** and a **long gun** and swap between them any time.
+  The Schofield revolver and the messenger shotgun are free; the rest are bought from the
+  **gunsmith** with your purse (bounties + mail contract, kept between runs; bounties are
+  kept even when a run fails). Definitions live in `src/game/weapons.js`.
+  - Sidearms: Schofield, Colt Paterson, Colt Navy, S&W Russian, Colt Peacemaker,
+    Colt double-action ('77 Thunderer).
+  - Long guns: messenger shotgun, Springfield Allin, Winchester 1873, Sharps "Old
+    Reliable", Gatling gun (built in code; no GLB).
+- **Scope** (button next to Dead Eye / F): magnified view from the guard's own eyes.
+  Zoom depends on the gun (revolvers 2.5x, rifles 4-8x). Slows aim, steadies spread.
+- Riflemen and gunmen who can see you get a marker overhead with their distance; it
+  flashes red when they're about to fire.
 - **Dead Eye**: meter fills with kills; activate for ~5 s of slow motion.
 - Enemies:
   - **Riders**: approach from behind / flanks, ride alongside and shoot, try to reach the

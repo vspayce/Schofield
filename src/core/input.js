@@ -9,7 +9,7 @@ export class Input {
     document.body.classList.toggle('touch', this.touch);
     this.dx = 0; this.dy = 0;
     this.fireHeld = false; this.firePressed = false;
-    this.reload = false; this.swap = false; this.deadeye = false; this.pause = false;
+    this.reload = false; this.swap = false; this.deadeye = false; this.scope = false; this.pause = false;
     this.whip = false; this.brake = false;
     this.enabled = false;
     this.sens = 1;
@@ -21,11 +21,11 @@ export class Input {
   consume() {
     const r = {
       dx: this.dx, dy: this.dy * (this.invertY ? -1 : 1), fire: this.fireHeld, firePressed: this.firePressed,
-      reload: this.reload, swap: this.swap, deadeye: this.deadeye, pause: this.pause,
+      reload: this.reload, swap: this.swap, deadeye: this.deadeye, scope: this.scope, pause: this.pause,
       whip: this.whip, brake: this.brake,
     };
     this.dx = this.dy = 0;
-    this.firePressed = this.reload = this.swap = this.deadeye = this.pause = false;
+    this.firePressed = this.reload = this.swap = this.deadeye = this.scope = this.pause = false;
     return r;
   }
 
@@ -44,6 +44,7 @@ export class Input {
       if (document.pointerLockElement !== this.canvas && !this._noLock) { this.lock(); return; }
       if (e.button === 0) { this.fireHeld = true; this.firePressed = true; }
       if (e.button === 2) this.deadeye = true;
+      if (e.button === 1) { this.scope = true; e.preventDefault(); }
     });
     window.addEventListener('mouseup', (e) => { if (e.button === 0) this.fireHeld = false; });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -53,6 +54,7 @@ export class Input {
         case 'KeyR': this.reload = true; break;
         case 'KeyQ': case 'Digit1': case 'Digit2': case 'Tab': this.swap = true; e.preventDefault(); break;
         case 'KeyE': case 'Space': this.deadeye = true; e.preventDefault(); break;
+        case 'KeyF': case 'KeyZ': this.scope = true; break;
         case 'KeyW': case 'ShiftLeft': this.whip = true; break;
         case 'KeyS': case 'ControlLeft': this.brake = true; break;
         case 'Escape': case 'KeyP': this.pause = true; break;
@@ -110,6 +112,7 @@ export class Input {
     btn('btn-reload', 'tap', () => { this.reload = true; });
     btn('btn-swap', 'tap', () => { this.swap = true; });
     btn('btn-deadeye', 'tap', () => { this.deadeye = true; });
+    btn('btn-scope', 'tap', () => { this.scope = true; });
     btn('btn-whip', 'whip', () => { this.whip = true; });
     btn('btn-brake', 'brake', () => { this.brake = true; });
     document.getElementById('btn-pause').addEventListener('pointerdown', (e) => { e.stopPropagation(); if (this.enabled) this.pause = true; });
