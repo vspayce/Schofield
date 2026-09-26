@@ -14,6 +14,7 @@ import { Towns } from './world/town.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
+import { createRider } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
@@ -86,7 +87,7 @@ class Game {
     this.enemies?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
-    this.player = null;
+    this.player = null; this.attractGuard = null;
     this.route = null;
   }
 
@@ -114,6 +115,13 @@ class Game {
     if (mode === 'ride') {
       this.player = new Player(this, weapon);
       this.hud.setRoute(def);
+    } else {
+      // a guard riding shotgun for the title cinematic
+      const guard = createRider({ variant: 'player' });
+      (this.coach.seatGuard || this.coach.body).add(guard.root);
+      guard.root.rotation.y = 0.5;
+      if (guard.has('RideAim')) guard.play('Ride');
+      this.attractGuard = guard;
     }
     this.terrain.prime(this.coach.pos.x, this.coach.pos.z);
     this.camera.position.copy(this.coach.pos).add(new THREE.Vector3(0, 4, -8));
@@ -131,9 +139,16 @@ class Game {
     audio.loop('music_menu', { bus: 'music', volume: 1 });
   }
 
-  startRide(i, weapon) {
+  async startRide(i, weapon) {
     audio.stopAll(0.3);
+    // show a loading card while the territory is built (can take a couple of seconds on phones)
+    const ld = document.getElementById('loading');
+    document.getElementById('load-msg').textContent = `${ROUTES[i].from} to ${ROUTES[i].to}…`;
+    document.getElementById('load-fill').style.width = '100%';
+    ld.classList.add('show');
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     this.buildWorld(i, 'ride', weapon);
+    ld.classList.remove('show');
     this.hud.show(true);
     this.input.setEnabled(true);
     this.input.lock();
@@ -257,6 +272,7 @@ class Game {
       this.hud.update(this);
     } else {
       this._attractCam(rdt);
+      this.attractGuard?.update(dt);
     }
     // dust from wheels and team
     const back = new THREE.Vector3().copy(coach.pos).addScaledVector(coach.fwd, -1.6);
