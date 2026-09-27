@@ -10,3 +10,4 @@ tools/blender/_build/
 # reference photos stay local, never on GitHub
 reference/
 references/
+__pycache__/

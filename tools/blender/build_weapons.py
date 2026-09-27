@@ -1,12 +1,16 @@
-"""Build public/assets/models/weapons.glb — Schofield revolver, coach gun, Winchester.
+"""Build public/assets/models/weapons.glb — the Schofield revolver, coach gun and
+Winchester are defined here; the gunsmith's long guns come from the w_*.py modules
+listed in weapon_mods.py.
 
 Run:
   /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
-      --python tools/blender/build_weapons.py [-- --quick]
+      --python tools/blender/build_weapons.py [-- --quick] [--geom] [--out PATH]
 
 Blender space: barrel points -Y (=> +Z in glTF), Z up, origin at the grip (where the
-firing hand holds). Each weapon is one root mesh with a child empty Muzzle_<Name> at
-the muzzle.  All three share one baked 1024 atlas / material "Weapons".
+firing hand holds). The gun's right side is forward x up = -X, so a lock, hammer or
+loading gate goes at -X. Each weapon is one root mesh with a child empty
+Muzzle_<Name> at the muzzle, plus any sub=... node (see P) it needs to animate.
+Every weapon shares one baked 2048 atlas / material "Weapons".
 """
 import bpy
 import bmesh
@@ -30,7 +34,7 @@ OUT = os.path.join(ROOT, 'public', 'assets', 'models', 'weapons.glb')
 if '--out' in ARGS:             # private export path, so parallel builds don't collide
     OUT = os.path.abspath(ARGS[ARGS.index('--out') + 1])
 BUILD = os.path.join(HERE, "build", os.path.splitext(os.path.basename(OUT))[0])
-TEX = 256 if QUICK else 1024
+TEX = 256 if QUICK else 2048    # six guns share one atlas; 1024 left them soft
 PY = shutil.which('python3') or '/usr/bin/python3'
 T0 = time.time()
 
@@ -86,8 +90,10 @@ M['walnut'] = L.surface('walnut', L.srgb(92, 50, 26), var=0.15, var_scale=12, ro
 PARTS = []
 
 
-def P(name, bm, mat, weapon, smooth=35, prio=1.0):
-    ob = L.obj_from_bm(name, bm, mat, smooth=smooth, props=dict(weapon=weapon, prio=prio))
+def P(name, bm, mat, weapon, smooth=35, prio=1.0, sub=None):
+    """sub='Barrels' keeps the part out of the weapon's joined mesh and exports it
+    as a child node <Weapon>_<sub>, so code can animate it (the Gatling cluster)."""
+    ob = L.obj_from_bm(name, bm, mat, smooth=smooth, props=dict(weapon=weapon, prio=prio, sub=sub or ''))
     PARTS.append(ob)
     return ob
 
@@ -410,11 +416,27 @@ GROUPS = {}
 for o in PARTS:
     GROUPS.setdefault(o['weapon'], []).append(o)
 for wname, muzzle in [(S, SCH_MUZZLE), (C, CG_MUZZLE), (W, WIN_MUZZLE)] + [(n, m) for n, (m, _) in EXTRA.items()]:
-    objs = GROUPS[wname]
+    objs = list(GROUPS[wname])
+    # parts tagged sub=... stay separate so the game can animate them
+    subs = {}
+    for o in list(objs):
+        tag = o.get('sub') or ''
+        if tag:
+            subs.setdefault(tag, []).append(o)
+            objs.remove(o)
     ob = L.join(objs, wname)
     for key in list(ob.keys()):
         del ob[key]
     L.empty('Muzzle_' + wname, muzzle, ob, 0.03, 'ARROWS')
+    for tag, sobjs in subs.items():
+        sob = L.join(sobjs, '%s_%s' % (wname, tag))
+        for key in list(sob.keys()):
+            del sob[key]
+        # spin axis = the bore, so the origin goes on it, midway along the part
+        sbb = [sob.matrix_world @ Vector(c) for c in sob.bound_box]
+        L.set_origin(sob, Vector((muzzle[0], (min(v.y for v in sbb) + max(v.y for v in sbb)) / 2, muzzle[2])))
+        L.parent_keep(sob, ob)
+        log('  sub-node %s_%s (%d tris)' % (wname, tag, L.tri_count(sob)))
     roots[wname] = ob
     bb = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
     log('%-11s tris %5d  length %.3f m  (y %.3f..%.3f)' % (wname, L.tri_count(ob),

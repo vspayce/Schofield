@@ -89,6 +89,8 @@ export class HUD {
     const ready = p.deadeye >= 0.2;
     if (this._last.deReady !== ready) { this._last.deReady = ready; this.de.classList.toggle('ready', ready); this.btnDE.classList.toggle('disabled', !ready); }
     if (this._last.deOn !== p.deadeyeOn) { this._last.deOn = p.deadeyeOn; this.deOverlay.classList.toggle('on', p.deadeyeOn); this.btnDE.classList.toggle('active', p.deadeyeOn); if (p.deadeyeOn) this.btnDE.classList.remove('disabled'); }
+    // no scope on a sidearm
+    if (this._last.canScope !== p.canScope) { this._last.canScope = p.canScope; this.btnScope.classList.toggle('disabled', !p.canScope); }
     const cp = Math.max(0, Math.round(c.hp));
     if (this._last.cp !== cp) {
       if (this._last.cp !== undefined && cp < this._last.cp) { this.coach.classList.remove('flash'); void this.coach.offsetWidth; this.coach.classList.add('flash'); clearTimeout(this._cf); this._cf = setTimeout(() => this.coach.classList.remove('flash'), 400); }

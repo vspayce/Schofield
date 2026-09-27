@@ -227,7 +227,6 @@ function fallbackRider(variant, tint) {
 // finish: RGB multiplier over the gun (weapons.glb is one texture atlas), so
 // one revolver model can pass for blued, nickel or brass-framed guns.
 export function createWeapon(name, { finish = null } = {}) {
-  if (name === 'Gatling') return gatling();
   const g = assets.models.weapons;
   if (g) {
     const src = findNode(g.scene, name);
@@ -242,9 +241,14 @@ export function createWeapon(name, { finish = null } = {}) {
         }
       });
       const muzzle = findNode(c, 'Muzzle_' + name) || c;
-      return { root: c, muzzle };
+      // a gun may ship a moving sub-node (the Gatling's barrel cluster, whose
+      // origin the exporter puts on the bore axis) — spin it about its own Z
+      const barrels = findNode(c, name + '_Barrels');
+      return { root: c, muzzle, spin: barrels ? (a) => { barrels.rotation.z += a; } : undefined };
     }
   }
+  // no GLB (or no node by that name): primitive stand-ins, as elsewhere here
+  if (name === 'Gatling') return gatling();
   const root = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0x2a2b2e, metalness: 0.8, roughness: 0.35 });
   if (finish) metal.color.multiply(new THREE.Color(...finish));
