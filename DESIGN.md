@@ -4,6 +4,10 @@ A 3rd-person western rail-shooter for the browser (mobile landscape first).
 You ride shotgun on a Concord stagecoach between frontier towns, fighting off
 riders who try to overtake the coach and riflemen on the ridgelines.
 
+Reference photos live in `reference/` and `references/` (guns). Both are
+gitignored — they stay on the artist's machine and never go to GitHub, so the
+paths below won't resolve in a fresh clone.
+
 Visual target: Red Dead Redemption 2 mood (reference/images-7/8) — warm
 golden-hour light, atmospheric haze/fog, dusty painterly palette, heavy
 silhouettes. We're a web game, so: strong lighting + fog + colour grade +
@@ -99,8 +103,17 @@ good silhouettes do the heavy lifting, not polygon counts.
 
 ### models/weapons.glb
 - `Schofield` (nickel/blued S&W revolver, ~0.32 m, grip origin), `CoachGun` (double
-  barrel, ~0.95 m, grip origin), `Winchester` (enemy rifle). Muzzle empties
-  `Muzzle_Schofield`, `Muzzle_CoachGun`, `Muzzle_Winchester`.
+  barrel, ~0.95 m, grip origin), `Winchester` (enemy rifle + player lever gun),
+  `Springfield` (~1.31 m trapdoor musket), `Sharps` (~1.25 m falling block),
+  `Gatling` (~1.19 m, six barrels). Each has a muzzle empty `Muzzle_<Name>`.
+- The gun's **right** side is -X in Blender (forward x up, with the barrel down -Y),
+  so a lock, hammer or loading gate belongs at -X.
+- A weapon may ship one animated child node: `Gatling_Barrels` is the barrel cluster,
+  its origin on the bore axis, spun about local Z by `createWeapon(...).spin()`.
+- The five other revolvers reuse the `Schofield` mesh with a colour `finish`, and are
+  told apart by their engravings in the gunsmith rather than in the hand.
+- Built by `tools/blender/build_weapons.py`; the three long guns above live in
+  `tools/blender/w_*.py` (see `weapon_mods.py`). All six share one baked 2048 atlas.
 
 ### models/props.glb (one file, many named root objects, each origin at base)
 `Pine_A`, `Pine_B`, `Pine_Snow`, `DeadTree`, `Saguaro`, `Joshua`, `Sagebrush`,

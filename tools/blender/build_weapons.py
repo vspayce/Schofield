@@ -1,12 +1,16 @@
-"""Build public/assets/models/weapons.glb — Schofield revolver, coach gun, Winchester.
+"""Build public/assets/models/weapons.glb — the Schofield revolver, coach gun and
+Winchester are defined here; the gunsmith's long guns come from the w_*.py modules
+listed in weapon_mods.py.
 
 Run:
   /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
-      --python tools/blender/build_weapons.py [-- --quick]
+      --python tools/blender/build_weapons.py [-- --quick] [--geom] [--out PATH]
 
 Blender space: barrel points -Y (=> +Z in glTF), Z up, origin at the grip (where the
-firing hand holds). Each weapon is one root mesh with a child empty Muzzle_<Name> at
-the muzzle.  All three share one baked 1024 atlas / material "Weapons".
+firing hand holds). The gun's right side is forward x up = -X, so a lock, hammer or
+loading gate goes at -X. Each weapon is one root mesh with a child empty
+Muzzle_<Name> at the muzzle, plus any sub=... node (see P) it needs to animate.
+Every weapon shares one baked 2048 atlas / material "Weapons".
 """
 import bpy
 import bmesh
@@ -24,10 +28,13 @@ import sch_lib as L  # noqa: E402
 
 ARGS = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 QUICK = '--quick' in ARGS
+GEOM = '--geom' in ARGS         # build shapes, skip the bake (fast iteration)
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT = os.path.join(ROOT, 'public', 'assets', 'models', 'weapons.glb')
-BUILD = os.path.join(HERE, 'build', 'weapons')
-TEX = 256 if QUICK else 1024
+if '--out' in ARGS:             # private export path, so parallel builds don't collide
+    OUT = os.path.abspath(ARGS[ARGS.index('--out') + 1])
+BUILD = os.path.join(HERE, "build", os.path.splitext(os.path.basename(OUT))[0])
+TEX = 256 if QUICK else 2048    # six guns share one atlas; 1024 left them soft
 PY = shutil.which('python3') or '/usr/bin/python3'
 T0 = time.time()
 
@@ -83,8 +90,10 @@ M['walnut'] = L.surface('walnut', L.srgb(92, 50, 26), var=0.15, var_scale=12, ro
 PARTS = []
 
 
-def P(name, bm, mat, weapon, smooth=35, prio=1.0):
-    ob = L.obj_from_bm(name, bm, mat, smooth=smooth, props=dict(weapon=weapon, prio=prio))
+def P(name, bm, mat, weapon, smooth=35, prio=1.0, sub=None):
+    """sub='Barrels' keeps the part out of the weapon's joined mesh and exports it
+    as a child node <Weapon>_<sub>, so code can animate it (the Gatling cluster)."""
+    ob = L.obj_from_bm(name, bm, mat, smooth=smooth, props=dict(weapon=weapon, prio=prio, sub=sub or ''))
     PARTS.append(ob)
     return ob
 
@@ -325,9 +334,24 @@ P('win_butt', bm, M['brass'], W, smooth=40, prio=0.4)
 WIN_MUZZLE = (0, -0.762, WZ)
 
 # ----------------------------------------------------------------------------
+# the gunsmith's long guns, one module each (see weapon_mods.py)
+# ----------------------------------------------------------------------------
+import weapon_mods  # noqa: E402
+
+_ctx = weapon_mods.WeaponCtx(L=L, M=M, P=lambda name, bm, mat, **kw: P(name, bm, mat, _ctx.weapon, **kw),
+                             extrude=extrude, tube_y=tube_y, sweep_round=sweep_round,
+                             sweep_rect=sweep_rect, bmesh=bmesh, math=math, Matrix=Matrix,
+                             Vector=Vector, log=log)
+EXTRA = weapon_mods.load(_ctx, strict=not GEOM)
+for _n, (_mz, _len) in EXTRA.items():
+    log('module %-12s muzzle %s' % (_n, ['%.3f' % v for v in _mz]))
+
+# ----------------------------------------------------------------------------
 # bake (weapons laid apart so AO doesn't cross-contaminate)
 # ----------------------------------------------------------------------------
 OFFS = {S: 0.0, C: 0.6, W: 1.2}
+for _i, _n in enumerate(EXTRA):
+    OFFS[_n] = 1.8 + _i * 0.6
 for o in PARTS:
     o.location.x = OFFS[o['weapon']]
 tot = {}
@@ -335,6 +359,22 @@ for o in PARTS:
     tot[o['weapon']] = tot.get(o['weapon'], 0) + L.tri_count(o)
     log('  %-14s %5d' % (o.name, L.tri_count(o)))
 log('tris per weapon', tot)
+
+# --geom: shape only, no bake or export. Prints each weapon's size so a new
+# module can be checked against the real gun in seconds instead of minutes.
+if GEOM:
+    for wname in sorted({o['weapon'] for o in PARTS}):
+        objs = [o for o in PARTS if o['weapon'] == wname]
+        pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
+        dx = max(p.x for p in pts) - min(p.x for p in pts)
+        dy = max(p.y for p in pts) - min(p.y for p in pts)
+        dz = max(p.z for p in pts) - min(p.z for p in pts)
+        log('%-12s tris %5d  L %.3f m  W %.3f  H %.3f  (y %.3f..%.3f, z %.3f..%.3f)'
+            % (wname, sum(L.tri_count(o) for o in objs), dy, dx, dz,
+               min(p.y for p in pts) - OFFS.get(wname, 0) * 0, max(p.y for p in pts),
+               min(p.z for p in pts), max(p.z for p in pts)))
+    log('geometry only — stopping before bake')
+    sys.exit(0)
 
 L.uv_atlas(PARTS, margin=0.006 if TEX >= 1024 else 0.012)
 IMGS = {}
@@ -375,12 +415,28 @@ roots = {}
 GROUPS = {}
 for o in PARTS:
     GROUPS.setdefault(o['weapon'], []).append(o)
-for wname, muzzle in ((S, SCH_MUZZLE), (C, CG_MUZZLE), (W, WIN_MUZZLE)):
-    objs = GROUPS[wname]
+for wname, muzzle in [(S, SCH_MUZZLE), (C, CG_MUZZLE), (W, WIN_MUZZLE)] + [(n, m) for n, (m, _) in EXTRA.items()]:
+    objs = list(GROUPS[wname])
+    # parts tagged sub=... stay separate so the game can animate them
+    subs = {}
+    for o in list(objs):
+        tag = o.get('sub') or ''
+        if tag:
+            subs.setdefault(tag, []).append(o)
+            objs.remove(o)
     ob = L.join(objs, wname)
     for key in list(ob.keys()):
         del ob[key]
     L.empty('Muzzle_' + wname, muzzle, ob, 0.03, 'ARROWS')
+    for tag, sobjs in subs.items():
+        sob = L.join(sobjs, '%s_%s' % (wname, tag))
+        for key in list(sob.keys()):
+            del sob[key]
+        # spin axis = the bore, so the origin goes on it, midway along the part
+        sbb = [sob.matrix_world @ Vector(c) for c in sob.bound_box]
+        L.set_origin(sob, Vector((muzzle[0], (min(v.y for v in sbb) + max(v.y for v in sbb)) / 2, muzzle[2])))
+        L.parent_keep(sob, ob)
+        log('  sub-node %s_%s (%d tris)' % (wname, tag, L.tri_count(sob)))
     roots[wname] = ob
     bb = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
     log('%-11s tris %5d  length %.3f m  (y %.3f..%.3f)' % (wname, L.tri_count(ob),

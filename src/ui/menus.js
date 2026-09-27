@@ -47,10 +47,9 @@ export const save = {
 function click() { audio.play('ui_click', { volume: 0.6 }); }
 function stars(n) { return '★'.repeat(n) + '☆'.repeat(3 - n); }
 
-// menu art exists for the revolver and the shotgun; other guns show their year
+// every gun has its own engraving in assets/ui; the year stands in if one is missing
 function gunPic(W) {
-  const art = W.model === 'Schofield' ? 'schofield' : W.model === 'CoachGun' ? 'shotgun' : null;
-  return art ? `<img src="${UI}weapon_${art}.png" alt="" onerror="this.style.visibility='hidden'"/>` : `<div class="gun-yr">${W.year}</div>`;
+  return `<img src="${UI}weapon_${W.id}.png" alt="" onerror="this.outerHTML='<div class=&quot;gun-yr&quot;>${W.year}</div>'"/>`;
 }
 function statBars(W) {
   return Object.entries(W.stats).map(([k, v]) => `<div class="stat"><span>${k}</span><div class="b"><i style="width:${v * 100}%"></i></div></div>`).join('');
@@ -132,6 +131,7 @@ export class Menus {
           : `<button class="m-btn sm ${afford ? '' : 'poor'}" data-act="${afford ? 'buy' : ''}" data-arg="${W.id}" ${afford ? '' : 'aria-disabled="true"'}>Buy $${W.price}</button>`;
       return `<div class="shop-card ${carried ? 'sel' : ''}">
         <div class="shop-head"><h3>${W.name}</h3><span class="yr">${W.year}</span></div>
+        <div class="shop-pic">${gunPic(W)}</div>
         <p>${W.blurb}</p>
         ${statBars(W)}
         <div class="shop-foot">${btn}</div>

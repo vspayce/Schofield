@@ -56,10 +56,14 @@ export class Player {
     this.g.hud.setWeapon(this.weapon, this.ammo[this.weapon.id]);
   }
 
+  // you sight down a long gun, not a revolver held at arm's length
+  get canScope() { return this.weapon.zoom > 1; }
+
   // current zoom: 1 = normal view, W.zoom = fully in the scope
-  get zoom() { return 1 + (this.weapon.zoom - 1) * this.scopeT; }
+  get zoom() { return this.canScope ? 1 + (this.weapon.zoom - 1) * this.scopeT : 1; }
 
   setScope(on) {
+    if (on && !this.canScope) return;
     if (on === this.scoped) return;
     this.scoped = on;
     audio.play('ui_click', { volume: 0.4, pitch: on ? 0.7 : 0.55 });
@@ -165,6 +169,7 @@ export class Player {
     if (inp.swap && this.swapT <= 0 && !this.executing) {
       this.weapon = other;
       this.reloading = 0; this.cool = 0.3; this.swapT = 0.35;
+      if (!this.canScope) this.setScope(false);   // swapping to a pistol drops the scope
       audio.play('schofield_cock', { volume: 0.6 });
       this._showGun();
     }

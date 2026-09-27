@@ -324,6 +324,8 @@ ALL = {f.__name__: f for f in (cyl_full, cyl_empty, revolver_cylinder, shell_ful
 
 if __name__ == '__main__':
     import gen_ui2  # noqa: registers buttons / panels / weapons / logo
+    import gen_weapons  # noqa: registers the gunsmith's nine guns
     ALL.update(gen_ui2.ALL)
+    ALL.update(gen_weapons.ALL)
     for nm in sys.argv[1:] or list(ALL):
         ALL[nm]()

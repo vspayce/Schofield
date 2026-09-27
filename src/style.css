@@ -64,9 +64,18 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #crosshair.scoped { opacity: 0; }
 /* shooters on ridges / rooftops */
 #shooters { position: absolute; inset: 0; }
-.shooter { position: absolute; width: 0; height: 0; margin: -18px 0 0 -8px; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 13px solid #ffb347; filter: drop-shadow(0 0 3px #000); }
-.shooter::after { content: attr(data-dist); position: absolute; left: -20px; top: -30px; width: 40px; text-align: center; font: 11px var(--font-sc); color: #ffd79a; text-shadow: 0 1px 2px #000; }
-.shooter.glint { border-top-color: #ff3b2f; animation: chev .2s infinite alternate; }
+/* corner-bracket target box, sized in JS to the man's apparent height */
+.shooter { position: absolute; transform: translate(-50%, -50%); --c: #ffb347; }
+.shooter i { position: absolute; width: 30%; height: 30%; border: 2px solid var(--c); filter: drop-shadow(0 0 2px #000); }
+.shooter i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+.shooter i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.shooter i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+.shooter i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+.shooter b { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 3px; font: 11px var(--font-sc); font-weight: normal; color: #ffd79a; text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; }
+/* too far to make out: fill the box so it reads as a dot on the hillside */
+.shooter.far i { width: 42%; height: 42%; background: rgba(255, 179, 71, .22); }
+.shooter.glint { --c: #ff3b2f; animation: chev .2s infinite alternate; }
+.shooter.glint b { color: #ff8e7a; }
 #hitmarker {
   position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; opacity: 0;
   background:
@@ -293,6 +302,8 @@ body.touch #btn-pause { display: block; }
 .shop-head h3 { font-family: var(--font-title); font-size: 17px; margin: 0; font-weight: normal; }
 .shop-head .yr { font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); }
 .shop-card p { margin: 0 0 4px; font-style: italic; font-size: 13px; line-height: 1.3; color: var(--ink-dim); flex: 1; }
+.shop-pic img { display: block; width: 100%; height: 52px; object-fit: contain; object-position: center; filter: invert(.92) sepia(.55) saturate(1.3) drop-shadow(0 2px 3px #000); }
+.shop-pic .gun-yr { height: 52px; font-size: 26px; }
 .shop-foot { display: flex; justify-content: flex-end; margin-top: 4px; }
 
 @media (max-height: 480px) {
