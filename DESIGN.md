@@ -153,6 +153,10 @@ Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index
   buffalo/bears/goats and circling hawks. Shootable for a hide price; butchering
   gives meat that restores health. Deliberately not Enemies, so chevrons and Dead
   Eye ignore them. Per-route in `routes.js` as `wildlife: { kinds, every }`.
+- `src/world/town.js` — the start and end towns are populated: townsfolk stand in
+  twos and threes on the boardwalks and turn to watch the stage come in. The
+  ghost town stays deserted. Rider meshes have frustum culling off, so folk are
+  hidden and unanimated beyond 150 m.
 - `src/world/railroad.js` — a line under construction crossing the road: graded
   ballast, ties, rail up to a railhead just past the crossing, a water tower from
   the town kit, material stacks and a gang swinging sledges. No trains. The coach

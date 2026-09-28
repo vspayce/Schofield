@@ -332,6 +332,7 @@ class Game {
     this.fx.update(dt);
     this.shake = damp(this.shake, 0, 6, rdt);
     this.rail?.update(dt, coach);
+    this.towns.update(dt, coach);
     this.terrain.update(coach.pos.x, coach.pos.z, 1);
     this.camera.updateMatrixWorld();
     this.scatter.update(this.camera, coach.pos);
