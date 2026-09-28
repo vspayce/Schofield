@@ -22,14 +22,17 @@ export class Railroad {
     this.workers = [];
     this.solids = [];
     const rnd = mulberry32(route.def.seed + 17);
-    const s = this.s = Math.round(route.len * (def.at ?? 0.6));
-    // the line crosses the road at a lazy angle rather than square on
-    const skew = (rnd() - 0.5) * 0.5;
+    // A railroad is graded, not draped over hills, so it wants flat ground.
+    // Search near the requested point for the corridor with the least fall.
+    const want = Math.round(route.len * (def.at ?? 0.6));
+    const pick = this._site(want, rnd);
+    const s = this.s = pick.s;
+    this.dir = pick.dir;
     const f = route.frame(s, {});
     this.centre = new THREE.Vector3(f.x, route.roadHeightAt(s), f.z);
-    // unit vector along the rails: the road's right, rotated by the skew
-    const ang = Math.atan2(f.rx, f.rz) + skew;
-    this.dir = new THREE.Vector3(Math.sin(ang), 0, Math.cos(ang));
+    // Grade: level through the crossing so the road meets it flush, then a
+    // gentle ruling gradient away. Real track never exceeds a couple of percent.
+    this.grade = THREE.MathUtils.clamp(pick.slope, -0.018, 0.018);
 
     // Track is laid from one side, through the crossing, and the gang is still
     // working at the railhead just past the road. Beyond that, only graded bed.
@@ -40,33 +43,83 @@ export class Railroad {
     this._camp(rnd, def);
   }
 
+  // Score candidate crossings within +/-8% of the route for how flat the rail
+  // corridor is, and take the best. Returns its s, direction and best-fit slope.
+  _site(want, rnd) {
+    const R = this.route;
+    const span = Math.min(0.08 * R.len, 260);
+    let best = null;
+    for (let k = 0; k < 26; k++) {
+      const s = Math.round(THREE.MathUtils.clamp(want + (rnd() - 0.5) * 2 * span, 140, R.len - 200));
+      const f = R.frame(s, {});
+      const ang = Math.atan2(f.rx, f.rz) + (rnd() - 0.5) * 0.45;
+      const dir = new THREE.Vector3(Math.sin(ang), 0, Math.cos(ang));
+      // sample terrain along the corridor and fit a line through it
+      const us = [], ys = [];
+      for (let u = -90; u <= 90; u += 10) {
+        const x = f.x + dir.x * u, z = f.z + dir.z * u;
+        us.push(u); ys.push(R.height(x, z));
+      }
+      const n = us.length, my = ys.reduce((a, b) => a + b, 0) / n;
+      let num = 0, den = 0;
+      for (let i = 0; i < n; i++) { num += us[i] * (ys[i] - my); den += us[i] * us[i]; }
+      const slope = num / den;
+      // residual off that best-fit line = how much cut and fill the line needs
+      let resid = 0;
+      for (let i = 0; i < n; i++) resid += Math.abs(ys[i] - (my + slope * us[i]));
+      const score = -resid / n - Math.abs(slope) * 40;
+      if (!best || score > best.score) best = { s, dir, slope, score };
+    }
+    return best;
+  }
+
+  // the graded rail height `u` metres from the crossing — a straight ruling
+  // gradient, NOT the terrain
+  _gradeY(u) { return this.centre.y + this.grade * u; }
+
   // where the line is, `u` metres from the crossing point along the rails
   _at(u, out = new THREE.Vector3()) {
     out.copy(this.centre).addScaledVector(this.dir, u);
-    out.y = this.route.height(out.x, out.z);
+    out.y = this._gradeY(u);
     return out;
   }
 
-  // a raised gravel bed, built as one ribbon so it hugs the terrain
+  // The graded bed: a level top at rail height with embankment shoulders sloping
+  // down to meet the ground. Where the ground falls away the fill gets deeper and
+  // the shoulders wider, which is what makes a railroad read as engineered
+  // rather than draped over the landscape.
   _ballast(rnd) {
-    const segs = Math.floor((REACH * 2) / 4);
+    const R = this.route;
+    const segs = Math.floor((REACH * 2) / 3);
     const pos = [], idx = [], uvs = [];
     const side = new THREE.Vector3(this.dir.z, 0, -this.dir.x);
+    const TOP = 2.5;          // half-width of the ballast top
+    const SLOPE = 1.7;        // embankment run per unit rise
+    const at = (u, off, y) => {
+      const x = this.centre.x + this.dir.x * u + side.x * off;
+      const z = this.centre.z + this.dir.z * u + side.z * off;
+      return [x, y === undefined ? R.height(x, z) : y, z];
+    };
     for (let i = 0; i <= segs; i++) {
       const u = -REACH + (i / segs) * REACH * 2;
-      const c = this._at(u, _v.clone());
-      // tapers away at the far ends so it doesn't stop dead, and drops flush
-      // where it meets the road — a level crossing, not a ramp
-      const fade = Math.min(1, (REACH - Math.abs(u)) / 26);
-      const flat = Math.min(1, Math.max(0, (Math.abs(u) - 4.5) / 4));
-      const w = 2.6 * fade, h = 0.26 * fade * flat;
-      for (const k of [-1, 1]) {
-        pos.push(c.x + side.x * w * k, c.y + h, c.z + side.z * w * k);
-        uvs.push(k * 0.5 + 0.5, u / 6);
+      const gy = this._gradeY(u);
+      const fade = Math.min(1, (REACH - Math.abs(u)) / 30);
+      // how far the bed stands proud of the ground here
+      const gnd = R.height(this.centre.x + this.dir.x * u, this.centre.z + this.dir.z * u);
+      const fill = Math.max(0, (gy - gnd)) * fade;
+      const top = TOP * fade;
+      const toe = top + fill * SLOPE + 0.4;
+      const topY = gnd + fill;     // = gy where there is fill, ground where cut
+      for (const [off, y] of [[-toe, undefined], [-top, topY], [top, topY], [toe, undefined]]) {
+        const v = at(u, off, y);
+        pos.push(v[0], v[1], v[2]);
+        uvs.push((off / 5) + 0.5, u / 5);
       }
       if (i < segs) {
-        const b = i * 2;
-        idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
+        const b0 = i * 4;
+        for (let q = 0; q < 3; q++) {
+          idx.push(b0 + q, b0 + q + 1, b0 + q + 4, b0 + q + 1, b0 + q + 5, b0 + q + 4);
+        }
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -75,10 +128,10 @@ export class Railroad {
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const tex = assets.textures.gravel;
-    const mat = new THREE.MeshStandardMaterial({ color: 0x8a8076, roughness: 1, map: tex || null });
-    if (tex) { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; }
+    if (tex) tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6d6459, roughness: 1, map: tex || null });
     const m = new THREE.Mesh(geo, mat);
-    m.receiveShadow = true;
+    m.receiveShadow = true; m.castShadow = true;
     this.group.add(m);
   }
 

@@ -283,31 +283,40 @@ export class Wildlife {
   }
 
   // ---------------------------------------------------------- ambient
-  // a few animals dotted along the route, spawned just ahead as you travel
+  // Animals dotted along the route, spawned ahead of the coach as it travels.
+  // They come in small groups, because one lone goat on an empty plain reads as
+  // a glitch while three grazing together reads as wildlife.
   _ambient(dt) {
     const g = this.g, R = g.route;
     if (g.coach.s < this._ambientAt) return;
     const c = this.cfg;
-    this._ambientAt = g.coach.s + (c.every || 260) * (0.6 + Math.random() * 0.8);
+    this._ambientAt = g.coach.s + (c.every || 110) * (0.7 + Math.random() * 0.6);
     const kinds = c.kinds || ['goat'];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    const s = g.coach.s + 130 + Math.random() * 90;
+    const s = g.coach.s + 120 + Math.random() * 110;
     if (s > R.len - 60) return;
     if (kind === 'hawk') {
-      const d = (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 40);
-      const a = new Animal(g, 'hawk', s, d, { heading: Math.random() * 6.3 });
-      a.flyH = 22 + Math.random() * 14;
-      this.list.push(a);
+      // a pair on the same thermal, low enough to actually notice
+      for (let i = 0; i < 1 + (Math.random() < 0.5 ? 1 : 0); i++) {
+        const d = (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 30);
+        const a = new Animal(g, 'hawk', s + i * 9, d, { heading: Math.random() * 6.3 });
+        a.flyH = 13 + Math.random() * 10;
+        this.list.push(a);
+      }
       return;
     }
-    // off the road, on ground that isn't a cliff
-    for (let k = 0; k < 10; k++) {
-      const d = (Math.random() < 0.5 ? -1 : 1) * (12 + Math.random() * 30);
-      const p = R.worldAt(s, d, _v2);
+    // a small group on ground that isn't a cliff
+    const want = kind === 'buffalo' ? 2 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 3);
+    const sideSign = Math.random() < 0.5 ? -1 : 1;
+    let placed = 0;
+    for (let k = 0; k < 24 && placed < want; k++) {
+      const d = sideSign * (10 + Math.random() * 26);
+      const ss = s + (Math.random() - 0.5) * 16;
+      const p = R.worldAt(ss, d, _v2);
       const slope = Math.hypot(R.height(p.x + 2, p.z) - p.y, R.height(p.x, p.z + 2) - p.y) / 2;
       if (slope > 0.55) continue;
-      this.list.push(new Animal(g, kind, s, d, { heading: Math.random() * 6.3 }));
-      return;
+      this.list.push(new Animal(g, kind, ss, d, { heading: Math.random() * 6.3 }));
+      placed++;
     }
   }
 

@@ -36,7 +36,7 @@ export const ROUTES = [
       { kind: 'CowSkull', density: 0.1, minRoad: 5, scale: [1, 1] },
     ],
     grass: { density: 3.5, color: C('#c9a860'), height: 0.42 },
-    wildlife: { kinds: ['buffalo', 'goat', 'hawk', 'hawk'], every: 240 },
+    wildlife: { kinds: ['buffalo', 'buffalo', 'goat', 'goat', 'hawk'], every: 105 },
     railroad: { at: 0.62, workers: 7 },
     waves: [
       { at: 0.08, type: 'riders', count: 2, from: 'behind' },
@@ -55,7 +55,7 @@ export const ROUTES = [
     from: 'Dry Creek', to: 'Silver Notch',
     blurb: 'A winding mountain road. Riflemen on every ridge; mind the drop.',
     seed: 1874, length: 2800, biome: 'mountain', reward: 650,
-    wildlife: { kinds: ['goat', 'goat', 'bear', 'hawk'], every: 300 },
+    wildlife: { kinds: ['goat', 'goat', 'goat', 'bear', 'hawk'], every: 120 },
     wind: 1.2, winding: 1.0,
     light: {
       sunElev: 24, sunAzim: 150, sunColor: C('#ffe2c0'), sunIntensity: 3.0,
@@ -98,7 +98,7 @@ export const ROUTES = [
     from: 'Silver Notch', to: 'Red Mesa',
     blurb: 'Straight through a ghost town at dusk. Gunmen in every window.',
     seed: 1877, length: 2400, biome: 'desert', reward: 900,
-    wildlife: { kinds: ['goat', 'hawk', 'hawk'], every: 340 },
+    wildlife: { kinds: ['goat', 'goat', 'hawk'], every: 130 },
     railroad: { at: 0.34, workers: 5 },
     wind: 1.0, winding: 0.25,
     ghostTown: { start: 0.38, length: 420 },
@@ -141,7 +141,7 @@ export const ROUTES = [
     from: 'Red Mesa', to: 'Fort Providence',
     blurb: 'A red canyon at sundown. Every gun in the territory wants your strongbox.',
     seed: 1879, length: 3000, biome: 'canyon', reward: 1400,
-    wildlife: { kinds: ['bear', 'goat', 'hawk', 'hawk'], every: 280 },
+    wildlife: { kinds: ['bear', 'goat', 'goat', 'hawk'], every: 115 },
     wind: 1.1, winding: 0.6,
     light: {
       sunElev: 16, sunAzim: 200, sunColor: C('#ffb070'), sunIntensity: 4.2,
