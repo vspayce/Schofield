@@ -147,6 +147,17 @@ Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index
 `wind_loop`, `whip_crack`, `deadeye_in`, `deadeye_out`, `heartbeat_loop`, `bell_town`,
 `music_ride_loop`, `music_menu`, `sting_victory`, `sting_death`, `ui_click`.
 
+## Wildlife and the railroad
+- `src/game/wildlife.js` — a buffalo herd crosses the road (timed off how long the
+  coach takes to reach it at cruise, so reining is the answer), plus grazing
+  buffalo/bears/goats and circling hawks. Shootable for a hide price; butchering
+  gives meat that restores health. Deliberately not Enemies, so chevrons and Dead
+  Eye ignore them. Per-route in `routes.js` as `wildlife: { kinds, every }`.
+- `src/world/railroad.js` — a line under construction crossing the road: graded
+  ballast, ties, rail up to a railhead just past the crossing, a water tower from
+  the town kit, material stacks and a gang swinging sledges. No trains. The coach
+  bangs over the rails. Per-route as `railroad: { at, workers }`.
+
 ## Code layout
 ```
 src/

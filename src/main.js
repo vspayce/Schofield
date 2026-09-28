@@ -11,6 +11,7 @@ import { Terrain } from './world/terrain.js';
 import { Scatter, setImpostorRenderer } from './world/scatter.js';
 import { Sky } from './world/sky.js';
 import { Towns } from './world/town.js';
+import { Railroad } from './world/railroad.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
@@ -94,7 +95,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -123,6 +124,9 @@ class Game {
     this.scatter = new Scatter(this.route, this.scene, this.renderer.tier);
     this.terrain.onTile = (t, c) => this.scatter.onTile(t, c);
     this.towns = new Towns(this.route, this.scene);
+    this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
+    if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
+    if (this.rail) this.towns.solids.push(...this.rail.solids);
     this.coach = new Coach(this.route, this.scene);
     this.fx = new FX(this.scene, this.route);
     this.combat = new Combat(this);
@@ -327,6 +331,7 @@ class Game {
     this.fx.trail(team, coach.speed > 4 ? coach.speed * 0.5 : 0, dt, 0.8);
     this.fx.update(dt);
     this.shake = damp(this.shake, 0, 6, rdt);
+    this.rail?.update(dt, coach);
     this.terrain.update(coach.pos.x, coach.pos.z, 1);
     this.camera.updateMatrixWorld();
     this.scatter.update(this.camera, coach.pos);
