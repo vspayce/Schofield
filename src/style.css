@@ -355,3 +355,13 @@ body.touch #btn-pause { display: block; }
   .job-card { padding: 8px 10px; gap: 2px; }
   .job-card p { display: none; }
 }
+
+.paper .how-h { font-family: var(--font-title); font-size: clamp(15px, 2.2vw, 19px); margin: 12px 0 2px; color: #6b3a0e; }
+.paper u { text-decoration-color: rgba(107, 58, 14, .5); }
+@media (max-height: 480px) { .paper .how-h { font-size: 14px; margin: 7px 0 1px; } }
+/* A long paper (How to Play) grows to its content and the wrapper scrolls.
+   body sets touch-action:none for the aim drag, so menus must opt back in or
+   the overflow is unreachable on a phone. */
+#menu.tall .paper { max-height: none; flex-shrink: 0; }
+.m-wrap { touch-action: pan-y; }
+#menu .paper { touch-action: pan-y; }
