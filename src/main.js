@@ -11,10 +11,12 @@ import { Terrain } from './world/terrain.js';
 import { Scatter, setImpostorRenderer } from './world/scatter.js';
 import { Sky } from './world/sky.js';
 import { Towns } from './world/town.js';
+import { Railroad } from './world/railroad.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
-import { createRider } from './game/characters.js';
+import { Wildlife } from './game/wildlife.js';
+import { createRider, createWeapon } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
@@ -93,7 +95,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -122,10 +124,14 @@ class Game {
     this.scatter = new Scatter(this.route, this.scene, this.renderer.tier);
     this.terrain.onTile = (t, c) => this.scatter.onTile(t, c);
     this.towns = new Towns(this.route, this.scene);
+    this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
+    if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
+    if (this.rail) this.towns.solids.push(...this.rail.solids);
     this.coach = new Coach(this.route, this.scene);
     this.fx = new FX(this.scene, this.route);
     this.combat = new Combat(this);
     this.enemies = new Enemies(this);
+    this.wildlife = new Wildlife(this);
     this.mode = mode;
     this.over = false; this.arrived = false;
     this.bounty = 0; this.hud.setBounty(0);
@@ -134,13 +140,18 @@ class Game {
     this.coach.update(0.016, {});
     if (mode === 'ride') {
       this.player = new Player(this, this.loadout(weapon));
+      this.enemies.planFor(this.player);
       this.hud.setRoute(def);
     } else {
       // a guard riding shotgun for the title cinematic
       const guard = createRider({ variant: 'player' });
       (this.coach.seatGuard || this.coach.body).add(guard.root);
       guard.root.rotation.y = 0.5;
-      if (guard.has('RideAim')) guard.play('Ride');
+      // he's the shotgun messenger — give him the coach gun and the aiming pose,
+      // rather than bobbing along empty-handed
+      const cg = createWeapon('CoachGun');
+      guard.hand.add(cg.root);
+      guard.play(guard.has('RideAim') ? 'RideAim' : 'Ride');
       this.attractGuard = guard;
     }
     this.terrain.prime(this.coach.pos.x, this.coach.pos.z);
@@ -290,6 +301,7 @@ class Game {
     if (this.mode === 'ride') {
       this.player.update(dt, rdt, this.over ? { dx: 0, dy: 0 } : inp);
       this.enemies.update(dt);
+      this.wildlife.update(dt);
       if (!this.over && coach.s >= this.route.len - 40) this.arrive();
       // ghost town music
       const inTown = this.route.inTown(coach.s + 40);
@@ -299,7 +311,10 @@ class Game {
         else { audio.stopLoop('music_town_loop', 1.5); audio.loopVolume('music_ride_loop', 0.8, 1.5); }
       }
       const sp = coach.speed / 15;
-      audio.loopRate('horse_gallop_loop', Math.max(0.5, sp));
+      // Rate-shifting a sample moves its pitch as much as its tempo, so keep the
+      // swing narrow — speed/15 outright ran from 0.53x to 1.47x, nearly an
+      // octave and a half, and the team sounded like a tape being spun.
+      audio.loopRate('horse_gallop_loop', Math.min(1.13, Math.max(0.92, 0.92 + (sp - 0.53) * 0.21)));
       audio.loopVolume('horse_gallop_loop', Math.min(0.6, sp * 0.5), 0.2);
       audio.loopVolume('coach_rumble_loop', Math.min(0.6, sp * 0.45), 0.2);
       if (inp.whip && coach.stamina > 0.05 && !this._whipCd) { audio.play('whip_crack', { volume: 0.7 }); this._whipCd = 1.2; }
@@ -316,6 +331,7 @@ class Game {
     this.fx.trail(team, coach.speed > 4 ? coach.speed * 0.5 : 0, dt, 0.8);
     this.fx.update(dt);
     this.shake = damp(this.shake, 0, 6, rdt);
+    this.rail?.update(dt, coach);
     this.terrain.update(coach.pos.x, coach.pos.z, 1);
     this.camera.updateMatrixWorld();
     this.scatter.update(this.camera, coach.pos);
