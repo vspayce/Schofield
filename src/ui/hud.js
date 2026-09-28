@@ -136,7 +136,7 @@ export class HUD {
       _p.copy(e.spheres[1].c).project(game.camera);
       if (_p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
       // a man is about 1.8 m; never smaller than a thumb-sized box
-      const px = Math.max(18, Math.min(120, (1.9 / dist) * perM));
+      const px = Math.max(30, Math.min(140, (1.9 / dist) * perM));
       list.push({ x: _p.x, y: _p.y, px, glint: e.glintT > 0, dist });
     }
     while (this.shooterEls.length < list.length) {
@@ -148,7 +148,7 @@ export class HUD {
     while (this.shooterEls.length > list.length) this.shooterEls.pop().remove();
     list.forEach((m, i) => {
       const el = this.shooterEls[i];
-      el.className = 'shooter' + (m.glint ? ' glint' : '') + (m.px < 26 ? ' far' : '');
+      el.className = 'shooter' + (m.glint ? ' glint' : '') + (m.px < 40 ? ' far' : '');
       el.style.left = (m.x * 0.5 + 0.5) * 100 + '%';
       el.style.top = (-m.y * 0.5 + 0.5) * 100 + '%';
       el.style.width = m.px + 'px';

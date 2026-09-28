@@ -86,6 +86,10 @@ export class Coach {
     this.reins.frustumCulled = false;
     scene.add(this.reins);
 
+    this.livery = 'concord';
+    this.extras = new THREE.Group();     // strongbox, shutters, cage
+    this.body.add(this.extras);
+
     this.s = 0;
     this.speed = 0;
     this.cruise = 15;
@@ -99,6 +103,55 @@ export class Coach {
     this.vel = new THREE.Vector3();
     this.shake = 0;
     this._fr = {}; this._p = new THREE.Vector3(); this._p2 = new THREE.Vector3();
+  }
+
+  // Dress the coach for the job. The Concord is the mail coach as built; the
+  // treasure and prison rigs are the same vehicle with ironwork added and a
+  // darker finish, so they read as heavier without a second model.
+  setLivery(kind) {
+    this.livery = kind;
+    this.extras.clear();
+    if (kind === 'concord') return;
+    const iron = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.55, metalness: 0.65 });
+    const wood = new THREE.MeshStandardMaterial({ color: 0x2b2f2a, roughness: 0.8 });
+    const brass = new THREE.MeshStandardMaterial({ color: 0x8a6a2e, roughness: 0.45, metalness: 0.8 });
+    // darken the painted body for both working liveries
+    this.model.traverse((o) => {
+      if (!o.isMesh || !o.material?.color) return;
+      if (!o.userData._liv) { o.userData._liv = o.material; o.material = o.material.clone(); }
+      o.material.color.copy(o.userData._liv.color).multiply(
+        kind === 'treasure' ? new THREE.Color(0.55, 0.68, 0.58) : new THREE.Color(0.6, 0.6, 0.64));
+    });
+    const add = (m, x, y, z, rx = 0) => { m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = true; this.extras.add(m); return m; };
+    if (kind === 'treasure') {
+      // iron shutters with a firing slot over each window
+      for (const sx of [-0.79, 0.79]) {
+        for (const z of [0.35, -0.55]) {
+          const sh = add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.62, 0.72), iron), sx, 1.92, z);
+          sh.rotation.y = 0;
+          const slot = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.42), brass);
+          slot.position.set(sx * 1.02, 2.0, z); this.extras.add(slot);
+        }
+      }
+      // strongbox lashed to the roof rack
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.46, 0.66), wood), 0, 2.95, -0.35);
+      for (const z of [-0.06, -0.64]) add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.06), iron), 0, 2.95, z);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.7), iron), 0, 2.95, -0.35);
+    } else if (kind === 'prison') {
+      // barred cage over the windows and a padlocked rear door
+      for (const sx of [-0.8, 0.8]) {
+        for (const z of [0.35, -0.55]) {
+          for (let i = 0; i < 4; i++) {
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.04), iron), sx, 1.92, z - 0.27 + i * 0.18);
+          }
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.66), iron), sx, 2.2, z);
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.66), iron), sx, 1.64, z);
+        }
+      }
+      const door = add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.07), iron), 0, 1.85, -1.5);
+      door.rotation.y = 0;
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), brass), 0, 1.7, -1.56);
+    }
   }
 
   update(dt, ctl) {

@@ -147,6 +147,15 @@ Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index
 `wind_loop`, `whip_crack`, `deadeye_in`, `deadeye_out`, `heartbeat_loop`, `bell_town`,
 `music_ride_loop`, `music_menu`, `sting_victory`, `sting_death`, `ui_click`.
 
+## Missions
+- `src/game/missions.js` — the same route three ways. **Mail** is the baseline;
+  **Bank** pays 2.1x with one extra marauder band and an armoured coach;
+  **Prisoner** pays 3.4x with three bands and the hardest opposition. The choice
+  sits between route select and loadout, and multiplies into the route's DIFF.
+- The coach is dressed for the job by `Coach.setLivery`: `concord` as built,
+  `treasure` (iron shutters with firing slots, roof strongbox, dark green) and
+  `prison` (barred windows, padlocked rear door). Same model, added ironwork.
+
 ## Wildlife and the railroad
 - `src/game/wildlife.js` — a buffalo herd crosses the road (timed off how long the
   coach takes to reach it at cruise, so reining is the answer), plus grazing

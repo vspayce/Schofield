@@ -1,6 +1,7 @@
 // Title / route select / loadout / gunsmith / pause / results / settings screens.
 import { ROUTES } from '../world/routes.js';
 import { WEAPONS, STARTERS, SIDEARMS, LONG_GUNS } from '../game/weapons.js';
+import { MISSIONS, MISSION_LIST } from '../game/missions.js';
 import { audio } from '../core/audio.js';
 import { fullscreen } from '../core/fullscreen.js';
 
@@ -42,6 +43,9 @@ export const save = {
   // which of the two is in hand when the ride starts
   get start() { return this.data.start === 'long' ? 'long' : 'side'; },
   set start(v) { this.data.start = v; persist(this.data); },
+  // the job you're hauling
+  get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'mail'; },
+  set mission(v) { this.data.mission = v; persist(this.data); },
 };
 
 function click() { audio.play('ui_click', { volume: 0.6 }); }
@@ -101,6 +105,26 @@ export class Menus {
       <button class="m-btn ghost" style="margin-top:14px" data-act="title">Back</button>`);
   }
 
+  // pick what you're carrying: sets the pay, the opposition and the coach
+  jobs(i) {
+    this.routeIndex = i;
+    const R = ROUTES[i];
+    const card = (M) => {
+      const pay = Math.round(R.reward * M.pay);
+      const pips = (n) => '<span class="risk">' + '◆'.repeat(n) + '<i>' + '◆'.repeat(4 - n) + '</i></span>';
+      return `<div class="job-card ${save.mission === M.id ? 'sel' : ''}" data-act="job" data-arg="${M.id}">
+        <div class="job-head"><h3>${M.name}</h3><span class="pay">$${pay}</span></div>
+        <div class="cargo">${M.cargo}</div>
+        <p>${M.blurb}</p>
+        <div class="job-foot"><span>risk</span>${pips(Math.round(M.risk * 4))}</div>
+      </div>`;
+    };
+    this._show(`<h2 class="m-title">${R.name}</h2>
+      <div class="m-tag" style="margin:-6px 0 12px">What are you hauling? The road pays for the risk.</div>
+      <div class="m-row">${MISSION_LIST.map(card).join('')}</div>
+      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="routes">Back</button></div>`, true, 'tall');
+  }
+
   loadout(i) {
     this.routeIndex = i;
     const slot = (key, label, all) => {
@@ -118,7 +142,7 @@ export class Menus {
     this._show(`<h2 class="m-title">${ROUTES[i].name}</h2>
       <div class="m-tag" style="margin:-6px 0 12px">Tap the gun to start with in hand. Swap any time on the coach.</div>
       <div class="m-row">${slot('side', 'Sidearm', SIDEARMS)}${slot('long', 'Long gun', LONG_GUNS)}</div>
-      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="routes">Back</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn" data-act="go">All Aboard</button></div>`, true, 'tall');
+      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="jobs">${MISSIONS[save.mission].name} ▸</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn" data-act="go">All Aboard</button></div>`, true, 'tall');
   }
 
   // buy guns with the purse; back = 'loadout' | 'results'
@@ -155,7 +179,7 @@ export class Menus {
     const i = this.g.routeIndex;
     const next = i + 1 < ROUTES.length;
     this._show(`<div class="paper">
-      <div style="font-family:var(--font-sc);letter-spacing:.2em">ARRIVED SAFE AT</div>
+      <div style="font-family:var(--font-sc);letter-spacing:.2em">${(r.mission || 'Mail Contract').toUpperCase()} — ARRIVED AT</div>
       <h2>${ROUTES[i].to}</h2>
       <div class="stars">${stars(r.stars)}</div>
       <div class="results-grid">
@@ -222,7 +246,9 @@ export class Menus {
     switch (a) {
       case 'title': this.title(); break;
       case 'routes': g.toAttract(); this.routes(); break;
-      case 'pick': this.loadout(+arg); break;
+      case 'pick': this.jobs(+arg); break;
+      case 'job': save.mission = arg; this.loadout(this.routeIndex); break;
+      case 'jobs': this.jobs(this.routeIndex); break;
       case 'start': save.start = arg; this.loadout(this.routeIndex); break;
       case 'cycle': {
         const [slot, step] = arg.split(':');
