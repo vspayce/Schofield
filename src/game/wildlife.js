@@ -106,7 +106,9 @@ class Animal {
       // grazing: head dips, the odd shuffle
       for (const l of this.legs) l.rotation.x = damp(l.rotation.x, 0, 3, dt);
       this.graze += dt * 0.12;
-      if (this.head) this.head.rotation.x = 0.5 + Math.sin(this.graze) * 0.35;
+      // the models are rigid, not skinned: past ~35 deg the neck starts to
+      // intersect the body, so keep the dip inside that
+      if (this.head) this.head.rotation.x = 0.30 + Math.sin(this.graze) * 0.28;
     }
   }
 
