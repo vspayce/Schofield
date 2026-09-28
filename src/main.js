@@ -15,7 +15,7 @@ import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
 import { Wildlife } from './game/wildlife.js';
-import { createRider } from './game/characters.js';
+import { createRider, createWeapon } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
@@ -136,13 +136,18 @@ class Game {
     this.coach.update(0.016, {});
     if (mode === 'ride') {
       this.player = new Player(this, this.loadout(weapon));
+      this.enemies.planFor(this.player);
       this.hud.setRoute(def);
     } else {
       // a guard riding shotgun for the title cinematic
       const guard = createRider({ variant: 'player' });
       (this.coach.seatGuard || this.coach.body).add(guard.root);
       guard.root.rotation.y = 0.5;
-      if (guard.has('RideAim')) guard.play('Ride');
+      // he's the shotgun messenger — give him the coach gun and the aiming pose,
+      // rather than bobbing along empty-handed
+      const cg = createWeapon('CoachGun');
+      guard.hand.add(cg.root);
+      guard.play(guard.has('RideAim') ? 'RideAim' : 'Ride');
       this.attractGuard = guard;
     }
     this.terrain.prime(this.coach.pos.x, this.coach.pos.z);

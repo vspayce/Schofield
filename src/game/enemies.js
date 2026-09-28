@@ -354,6 +354,15 @@ export class Enemies {
     this.list = [];
     this.waves = game.route.def.waves.map((w) => ({ ...w, done: false }));
     this._spawnQ = [];
+    this.riderCap = 5;
+  }
+
+  // Called once the player exists, since the loadout decides this: word gets
+  // around that the coach is carrying a Gatling, and a marauder band comes for
+  // it — which is the whole reason to own the thing.
+  planFor(player) {
+    if (!player.loadout.some((w) => w.id === 'gatling')) return;
+    this.waves.push({ at: 0.46, type: 'marauders', count: 14, done: false });
   }
 
   get aliveCount() { return this.list.filter((e) => e.alive).length; }
@@ -368,12 +377,13 @@ export class Enemies {
     for (let i = this._spawnQ.length - 1; i >= 0; i--) {
       const q = this._spawnQ[i]; q.t -= dt;
       if (q.t <= 0) {
-        if (q.rider && riders >= 5) { q.t = 1; continue; } // cap live riders
+        if (q.rider && riders >= this.riderCap) { q.t = 1; continue; } // cap live riders
         this._spawnQ.splice(i, 1); q.fn();
       }
     }
     // patch the coach up a little whenever a fight is cleared
     const busy = this.aliveCount > 0 || this._spawnQ.length > 0;
+    if (this._marauders && !busy) { this._marauders = false; this.riderCap = 5; }
     if (this._engaged && !busy && !g.over) {
       g.coach.hp = Math.min(100, g.coach.hp + 10);
       g.hud.feedMsg('Coach patched up +10', false);
@@ -399,6 +409,22 @@ export class Enemies {
         const side = i % 2 === 0 ? 1 : -1;
         this._spawnQ.push({ t: i * 0.9, rider: true, fn: () => this.list.push(new Rider(g, { from: w.from, slot: sl, side })) });
       }
+    } else if (w.type === 'marauders') {
+      g.hud.banner('They want the Gatling!', 'Marauders, all sides', 3);
+      audio.play('horse_neigh', { volume: 1, pitch: 0.85 });
+      this.riderCap = 10;                       // a band, not a patrol
+      const froms = ['behind', 'flank', 'ahead'];
+      const used = new Set(this.list.filter((e) => e.type === 'rider' && e.alive).map((e) => e.slot));
+      let slot = 0;
+      for (let i = 0; i < n; i++) {
+        while (used.has(slot)) slot++;
+        const sl = slot++;
+        this._spawnQ.push({
+          t: i * 0.55, rider: true,
+          fn: () => this.list.push(new Rider(g, { from: froms[i % froms.length], slot: sl, side: i % 2 ? 1 : -1 })),
+        });
+      }
+      this._marauders = true;
     } else if (w.type === 'ridge') {
       g.hud.banner('Riflemen on the ridge!', 'Watch for the glint', 1.5);
       for (let i = 0; i < n; i++) this._spawnQ.push({ t: i * 1.2, fn: () => this._spawnRidge(i) });

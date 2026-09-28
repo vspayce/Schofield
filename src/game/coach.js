@@ -75,6 +75,17 @@ export class Coach {
     (this.seatDriver || this.body).add(this.driver.root);
     if (this.driver.has('Drive')) this.driver.play('Drive'); else this.driver.play('Ride');
 
+    // Reins: a line from the driver's hands to each horse's collar. Rebuilt every
+    // frame in world space, because the team is parented to the scene (it follows
+    // the road ahead of the coach) while the driver rides on the body.
+    this.reinSegs = 3;                       // segments per rein, so it can sag
+    this.reinPts = this.team.length * this.reinSegs * 2;
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.reinPts * 3), 3));
+    this.reins = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x2a1a0e, transparent: true, opacity: 0.9 }));
+    this.reins.frustumCulled = false;
+    scene.add(this.reins);
+
     this.s = 0;
     this.speed = 0;
     this.cruise = 15;
@@ -153,6 +164,32 @@ export class Coach {
       h.update(dt);
     }
     this.driver.update(dt);
+    this._reins();
+  }
+
+  // run the lines from the driver's hands forward to each horse's collar
+  _reins() {
+    const hand = this.driver.hand || this.driver.root;
+    hand.updateWorldMatrix(true, false);
+    const from = hand.getWorldPosition(this._p);
+    const a = this.reins.geometry.attributes.position;
+    const N = this.reinSegs;
+    let k = 0;
+    this.team.forEach((h) => {
+      // the collar sits at the base of the neck, a little above the withers
+      const to = h.root.localToWorld(this._p2.set(0, 1.35, 0.75));
+      // leather hangs: drop a little in the middle, less the harder they pull
+      const sag = 0.14 * Math.max(0.35, 1 - this.speed / 26) * from.distanceTo(to) / 4;
+      for (let j = 0; j < N; j++) {
+        for (const t of [j / N, (j + 1) / N]) {
+          a.setXYZ(k++,
+            from.x + (to.x - from.x) * t,
+            from.y + (to.y - from.y) * t - Math.sin(t * Math.PI) * sag,
+            from.z + (to.z - from.z) * t);
+        }
+      }
+    });
+    a.needsUpdate = true;
   }
 
   // world-space aim point for enemies (random spot on the coach)
@@ -164,5 +201,6 @@ export class Coach {
   dispose() {
     this.scene.remove(this.root);
     this.team.forEach((h) => this.scene.remove(h.root));
+    this.scene.remove(this.reins); this.reins.geometry.dispose(); this.reins.material.dispose();
   }
 }
