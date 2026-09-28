@@ -159,7 +159,7 @@ const riverFrag = /* glsl */`
     float lam = max(dot(N, uSunDir), 0.0);
 
     // depth colour: pale warm shallows, dark green-blue in the channel
-    float dt = 1.0 - exp(-max(depth, 0.0) * 0.6);
+    float dt = 1.0 - exp(-max(depth, 0.0) * 0.85);
     vec3 body = mix(uShallow, uDeep, dt);
     body *= mix(uHemiGnd, uHemiSky, 0.65) * 0.9 + uSunCol * lam * 0.55;
     body += uSunCol * (1.0 - dt) * 0.10 * lam;                 // light through the shallows
@@ -173,13 +173,14 @@ const riverFrag = /* glsl */`
     float spec = pow(ndh, uSpecPow) * 1.4 + pow(ndh, 24.0) * 0.06;
     col += uSunCol * spec * (2.2 + rapid * 2.0);
 
-    // foam: at the bank, over the shallows, and heavy through the rapids
+    // foam: a line along the true waterline (where the bed comes up through the
+    // surface), a wash over the shallows, and whitewater through the rapids
     float f1 = texture2D(tFoam, vec2(fu / 6.0, fv / 7.0 - uTime * 0.2 * flowSpd)).r;
     float f2 = texture2D(tFoam, vec2(fu / 1.9 + 0.5, fv / 2.3 - uTime * 0.5 * flowSpd)).r;
-    float turb = f1 * 0.55 + f2 * 0.55;
-    float bank = smoothstep(0.5, 0.92, edge);
-    float shal = 1.0 - smoothstep(0.1, 1.3, depth);
-    float foam = smoothstep(0.62, 1.12, turb + bank * 0.72 + shal * 0.5 + rapid * 1.0);
+    float turb = f1 * 0.5 + f2 * 0.5;
+    float shore = 1.0 - smoothstep(0.03, 0.55, depth);
+    float shal = 1.0 - smoothstep(0.5, 2.2, depth);
+    float foam = smoothstep(0.82, 1.35, turb + shore * 0.95 + shal * 0.3 + rapid * 0.8 + smoothstep(0.6, 0.95, edge) * 0.3);
     foam = clamp(foam, 0.0, 1.0) * uFoam;
     vec3 fc = uFoamCol * (0.62 + 0.5 * lam + 0.25 * F);
     col = mix(col, fc, foam);
@@ -479,7 +480,7 @@ export class Water {
 
     this.poolMat = mk(poolVert, poolFrag, {
       tFoam: { value: this.texFoam }, tNorm: { value: this.texNorm }, uOpacity: { value: 1 },
-    }, { order: 2 });
+    }, { order: 2, side: THREE.DoubleSide });
 
     // --------------------------------------------------------------- geometry
     this._buildRiver();
@@ -559,8 +560,9 @@ export class Water {
     for (let i = 0; i < n; i++) {
       const i0 = Math.max(0, i - 2), i1 = Math.min(n - 1, i + 2);
       const g = (a[i0] - a[i1]) / ((i1 - i0) * LSTEP);
-      const patch = fbm(this.noise, (R.from + i * LSTEP) / 90, 3.3, 3) * 0.5 + 0.5;
-      rap[i] = clamp(smoothstep(0.012, 0.075, g) * 0.75 + smoothstep(0.45, 0.85, patch) * 0.55, 0, 1);
+      // steep reaches run white, but only in patches — a river is not one long rapid
+      const patch = fbm(this.noise, (R.from + i * LSTEP) / 70, 3.3, 3) * 0.5 + 0.5;
+      rap[i] = clamp(smoothstep(0.018, 0.09, g) * (0.25 + 1.05 * smoothstep(0.35, 0.8, patch)), 0, 1);
     }
     this.rapid = rap;
   }
@@ -626,9 +628,11 @@ export class Water {
       const idx = new Uint16Array((nr - 1) * (COLS - 1) * 6);
       let k = 0;
       for (let b = 0; b < nr - 1; b++) for (let a2 = 0; a2 < COLS - 1; a2++) {
+        // (lateral, downstream) is the opposite handedness to terrain's (x, z),
+        // so the winding is flipped from the terrain grid or every face points down
         const v0 = b * COLS + a2, v1 = v0 + 1, v2 = v0 + COLS, v3 = v2 + 1;
-        idx[k++] = v0; idx[k++] = v2; idx[k++] = v1;
-        idx[k++] = v1; idx[k++] = v2; idx[k++] = v3;
+        idx[k++] = v0; idx[k++] = v1; idx[k++] = v2;
+        idx[k++] = v1; idx[k++] = v3; idx[k++] = v2;
       }
       g.setIndex(new THREE.BufferAttribute(idx, 1));
       g.computeBoundingSphere();
