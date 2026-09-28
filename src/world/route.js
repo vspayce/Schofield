@@ -11,6 +11,12 @@ export class Route {
   constructor(def) {
     this.def = def;
     this.biome = def.biome;
+    if (this.biome === 'gorge') {
+      const gd = def.gorge || {};
+      this.riverSide = gd.side ?? 1;        // which hand the water is on
+      this.gorgeDepth = gd.depth ?? 26;     // road ledge height above the water
+      this.falls = gd.falls ? { s: def.length * gd.falls.at, drop: gd.falls.drop ?? 30, width: gd.falls.width ?? 26 } : null;
+    }
     this.len = def.length;
     this.noise = makeNoise2D(def.seed);
     this.noise2 = makeNoise2D(def.seed * 7 + 3);
@@ -90,6 +96,13 @@ export class Route {
         let mesa = smoothstep(0.35, 0.42, fbm(n2, x / 520 + 3, z / 520 - 9, 3)) * 55;
         mesa = Math.floor(mesa / 11) * 11 + (mesa % 11) * 0.15;
         return big + mid + mesa;
+      }
+      case 'gorge': {
+        // high forested shoulders falling into a cut river valley
+        const big = fbm(n, x / 520, z / 520, 4) * 70;
+        const ridge = ridged(n2, x / 300 + 5, z / 300, 4) * 48;
+        const mid = fbm(n2, x / 120, z / 120, 3) * 9;
+        return big + ridge + mid + 20;
       }
       case 'canyon': {
         let plat = 62 + fbm(n, x / 400, z / 400, 4) * 22;
@@ -208,6 +221,23 @@ export class Route {
     if (rc.s > this.len - 150) townFlat = Math.max(townFlat, smoothstep(this.len - 150, this.len - 90, rc.s));
     if (this._town && rc.s > this._town.s0 - 60 && rc.s < this._town.s1 + 60)
       townFlat = Math.max(townFlat, smoothstep(this._town.s0 - 60, this._town.s0, rc.s) * (1 - smoothstep(this._town.s1, this._town.s1 + 60, rc.s)));
+    if (this.biome === 'gorge') {
+      // A shelf blasted into the valley side: road level out to the shoulder,
+      // then the ground drops away hard on the river side and climbs on the
+      // other. riverD is which side the water is on.
+      const sideD = rc.d * this.riverSide;          // >0 = the river side
+      const shelf = ROAD_HALF + 3.4;
+      const wallGrain = fbm(this.noise2, x / 16, z / 16, 3) * 5 + Math.abs(this.noise(x / 46 + 3, z / 46)) * 4;
+      if (sideD > 0) {
+        // drop to the water: steep bank, then the river bed
+        const t = smoothstep(shelf, shelf + 26, sideD + wallGrain * 0.5);
+        const bed = this.riverBedAt(rc.s) - 1.2 + fbm(this.noise, x / 30, z / 30, 2) * 1.4;
+        return lerp(rh + crown, bed, t * t * (3 - 2 * t));
+      }
+      // the inland side climbs into the valley wall
+      const t = smoothstep(shelf, shelf + 34, -sideD + wallGrain * 0.7);
+      return lerp(rh + crown, Math.max(nat, rh + 12) + wallGrain * 0.8, t * t * (3 - 2 * t));
+    }
     if (this.biome === 'canyon') {
       // canyon walls: sandy floor, then steep stepped walls up to the plateau
       const floorW = 16 + 6 * this.noise(rc.s / 120, 1.7);
@@ -224,6 +254,18 @@ export class Route {
     const w = smoothstep(inner, inner + blendW + townFlat * 30, ad + this.noise(x / 40, z / 40) * 3);
     return lerp(rh + crown, nat, w);
   }
+
+  // --------------------------------------------------------------- river
+  // Bed height under the river at station s — a steady fall down the valley,
+  // the road ledge riding above it the whole way.
+  riverBedAt(s) {
+    return this.roadHeightAt(s) - this.gorgeDepth;
+  }
+
+  // The falls are a side stream off the inland wall that pours across the road
+  // and on down into the river. `s` is where the curtain crosses the roadway —
+  // this is the bit the coach bursts through.
+  fallsAt() { return this.falls; }
 
   // ----------------------------------------------------------- road frames
   // world position of road station s with lateral offset d (right-positive)
