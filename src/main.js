@@ -12,6 +12,7 @@ import { Scatter, setImpostorRenderer } from './world/scatter.js';
 import { Sky } from './world/sky.js';
 import { Towns } from './world/town.js';
 import { Railroad } from './world/railroad.js';
+import { Water } from './world/water.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
@@ -96,7 +97,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -126,6 +127,18 @@ class Game {
     this.scatter = new Scatter(this.route, this.scene, this.renderer.tier);
     this.terrain.onTile = (t, c) => this.scatter.onTile(t, c);
     this.towns = new Towns(this.route, this.scene);
+    // the gorge river and the falls the road runs under
+    this.water = null;
+    if (def.gorge) {
+      const F = this.route.fallsAt();
+      this.water = new Water(this.route, this.scene, this.renderer, {
+        // out on the valley floor, clear of the wall: the wall occupies roughly
+        // 7-34 m off the roadway, so a river inside that is half-buried in it
+        // and renders as one long shoreline
+        river: { from: 0, to: this.route.len, d: 48 * (this.route.riverSide || 1), width: 24, depth: 2.8 },
+        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop }] : [],
+      });
+    }
     this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
     if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
     if (this.rail) this.towns.solids.push(...this.rail.solids);
@@ -335,6 +348,7 @@ class Game {
     this.fx.update(dt);
     this.shake = damp(this.shake, 0, 6, rdt);
     this.rail?.update(dt, coach);
+    this.water?.update(dt, this.camera, coach.pos);
     this.towns.update(dt, coach);
     this.terrain.update(coach.pos.x, coach.pos.z, 1);
     this.camera.updateMatrixWorld();

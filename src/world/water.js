@@ -230,10 +230,10 @@ const fallsFrag = /* glsl */`
     float roll = phi < 0.0 ? 1.0 : 0.0;                  // the sheet rolling over the edge
     float dens = mix(1.0, 0.3, smoothstep(0.08, 1.0, max(phi, 0.0)));
 
-    float a = dens * (0.34 + 0.8 * thread);
+    float a = dens * (0.10 + 0.95 * thread);
     // breaking up into spray toward the foot
     a *= mix(1.0, smoothstep(0.34, 0.8, brk * 0.75 + thread * 0.6), smoothstep(0.25, 1.0, max(phi, 0.0)));
-    a += (lip + roll) * 0.5;
+    a += (lip + roll) * 0.22;
     a *= 1.0 - smoothstep(0.74, 1.0, edge);
     a *= vS.y;
 
@@ -242,15 +242,15 @@ const fallsFrag = /* glsl */`
     float lam = max(dot(N, uSunDir), 0.0);
     // white water, greener where the sheet is thick at the lip
     vec3 glass = mix(uDeep, uShallow, 0.45);
-    vec3 col = mix(glass, uFoamCol, clamp(0.35 + thread * 0.75 + lip * 0.6, 0.0, 1.0));
+    vec3 col = mix(glass, uFoamCol, clamp(0.12 + thread * 0.8 + lip * 0.45, 0.0, 1.0));
     col *= 0.62 + 0.55 * lam + 0.2;
     // backlight: looking toward the sun through the sheet makes it glow, which is
     // what keeps it readable from behind as the coach comes out the far side
     float tr = pow(max(dot(-V, uSunDir), 0.0), 3.0);
-    col += uSunCol * tr * 0.55 * dens;
-    col += uSunCol * (lip + roll) * 0.35;
+    col += uSunCol * tr * 0.18 * dens;
+    col += uSunCol * (lip + roll) * 0.16;
     vec3 H = normalize(uSunDir + V);
-    col += uSunCol * pow(max(dot(N, H), 0.0), 28.0) * 0.9;
+    col += uSunCol * pow(max(dot(N, H), 0.0), 28.0) * 0.3;
     col += skyAt(reflect(-V, N)) * 0.12;
 
     gl_FragColor = vec4(col, clamp(a, 0.0, 1.0) * uOpacity);

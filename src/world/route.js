@@ -227,12 +227,24 @@ export class Route {
       // other. riverD is which side the water is on.
       const sideD = rc.d * this.riverSide;          // >0 = the river side
       const shelf = ROAD_HALF + 3.4;
-      const wallGrain = fbm(this.noise2, x / 16, z / 16, 3) * 5 + Math.abs(this.noise(x / 46 + 3, z / 46)) * 4;
+      // Erosion, not a smooth ramp: broad buttresses, narrower gullies cut down
+      // the face, and a fine break-up so the rock reads as rock at any distance.
+      const butt = fbm(this.noise, x / 58 + 4, z / 58, 3) * 9;
+      const gully = Math.pow(Math.abs(this.noise(x / 21 + 9, z / 21)), 0.7) * 7;
+      const fine = fbm(this.noise2, x / 9, z / 9, 3) * 2.2;
+      const wallGrain = butt + gully + fine;
       if (sideD > 0) {
         // drop to the water: steep bank, then the river bed
         const t = smoothstep(shelf, shelf + 26, sideD + wallGrain * 0.5);
         const bed = this.riverBedAt(rc.s) - 1.2 + fbm(this.noise, x / 30, z / 30, 2) * 1.4;
-        return lerp(rh + crown, bed, t * t * (3 - 2 * t));
+        let y = lerp(rh + crown, bed, t * t * (3 - 2 * t));
+        // bedding planes: step the face so it terraces like cut rock
+        if (t > 0.05 && t < 0.97) {
+          const step = 3.2;
+          const q = Math.floor(y / step) * step + (y % step) * 0.34;
+          y = lerp(y, q, 0.55);
+        }
+        return y;
       }
       // the inland side climbs into the valley wall
       const t = smoothstep(shelf, shelf + 34, -sideD + wallGrain * 0.7);
