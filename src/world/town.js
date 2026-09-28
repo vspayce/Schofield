@@ -1,8 +1,17 @@
-// Places town buildings along the road (start town, end town, ghost town) and
-// collects gunman spawn points from the kit's Spawn_* empties.
+// Places town buildings along the road (start town, end town, ghost town),
+// collects gunman spawn points from the kit's Spawn_* empties, and puts
+// townsfolk on the boardwalks of the two living towns.
 import * as THREE from 'three';
 import { assets, findNode } from '../core/assets.js';
-import { mulberry32 } from '../core/noise.js';
+import { createRider } from '../game/characters.js';
+import { mulberry32, damp } from '../core/noise.js';
+
+// hats and coats for people who aren't outlaws
+const FOLK = ['driver', 'player', 'bandit2', 'driver', 'player'];
+const FOLK_TINT = [
+  new THREE.Color(1, 1, 1), new THREE.Color(0.72, 0.74, 0.8), new THREE.Color(0.95, 0.88, 0.72),
+  new THREE.Color(0.6, 0.62, 0.58), new THREE.Color(1.05, 0.95, 0.85), new THREE.Color(0.8, 0.7, 0.66),
+];
 
 const KIT = ['Saloon', 'GeneralStore', 'Sheriff', 'Bank', 'Hotel', 'Livery', 'Shack'];
 // footprint width (along the street) and depth, metres — from town.glb
@@ -53,13 +62,16 @@ export class Towns {
     this.route = route; this.scene = scene;
     this.group = new THREE.Group(); scene.add(this.group);
     this.spawns = []; // { pos: Vector3, face: Vector3 (toward road), s, kind }
+    this.folk = [];   // townsfolk in the living towns
     this.solids = []; // AABBs for bullet blocking
     const rnd = mulberry32(route.def.seed + 5);
     // start and end towns
     this._street(20, 110, rnd, 0.8, false);
     this._street(route.len - 130, route.len - 10, rnd, 0.8, false);
+    this._folk(24, 108, rnd);
+    this._folk(route.len - 126, route.len - 14, rnd);
     const T = route.townRange;
-    if (T) this._street(T.s0, T.s1, rnd, 1, true);
+    if (T) this._street(T.s0, T.s1, rnd, 1, true);   // ghost town stays empty
   }
 
   _place(name, s, side, rnd, ghost, extraOffset = 0) {
@@ -125,6 +137,59 @@ export class Towns {
     if (ghost) this._place('Gallows', s0 + 40, -1, rnd, ghost, 2);
   }
 
+  // People on the boardwalks: mostly standing in twos and threes, clear of the
+  // road. They turn to watch the stage come in.
+  _folk(s0, s1, rnd) {
+    const r = this.route;
+    let s = s0 + 4 + rnd() * 8;
+    while (s < s1) {
+      const side = rnd() < 0.5 ? -1 : 1;
+      const group = 1 + Math.floor(rnd() * 2.6);      // singles, pairs, the odd trio
+      for (let i = 0; i < group; i++) {
+        const p = createRider({ variant: FOLK[Math.floor(rnd() * FOLK.length)],
+          tint: FOLK_TINT[Math.floor(rnd() * FOLK_TINT.length)] });
+        const ps = s + i * (0.7 + rnd() * 0.5);
+        const off = 5.8 + rnd() * 2.4;                 // boardwalk, not the roadway
+        const f = r.frame(ps, {});
+        const x = f.x + f.rx * off * side, z = f.z + f.rz * off * side;
+        p.root.position.set(x, r.height(x, z), z);
+        // facing the street, give or take — a trio turns in on itself
+        const toStreet = Math.atan2(-f.rx * side, -f.rz * side);
+        p.baseYaw = toStreet + (group > 2 ? (i - 1) * 0.8 : (rnd() - 0.5) * 1.1);
+        p.root.rotation.y = p.baseYaw;
+        p.s = ps;
+        if (p.has('StandIdle')) p.play('StandIdle');
+        this.scene.add(p.root);
+        this.folk.push(p);
+      }
+      s += 9 + rnd() * 15;
+    }
+  }
+
+  // Rider meshes are built with frustumCulled off (skinned bounds are
+  // unreliable), so a townsful of them would draw every frame from anywhere on
+  // the route. Show and animate only the ones you're near.
+  update(dt, coach) {
+    const cs = coach ? coach.s : 0;
+    for (const p of this.folk) {
+      const away = Math.abs(p.s - cs);
+      const near = away < 150;
+      if (p.root.visible !== near) p.root.visible = near;
+      if (!near) continue;
+      p.update(dt);
+      // watch the stage go past
+      if (away < 26 && coach) {
+        const dx = coach.pos.x - p.root.position.x, dz = coach.pos.z - p.root.position.z;
+        let want = Math.atan2(dx, dz) - p.baseYaw;
+        while (want > Math.PI) want -= Math.PI * 2;
+        while (want < -Math.PI) want += Math.PI * 2;
+        p.root.rotation.y = damp(p.root.rotation.y, p.baseYaw + want, 3, dt);
+      } else {
+        p.root.rotation.y = damp(p.root.rotation.y, p.baseYaw, 2, dt);
+      }
+    }
+  }
+
   _clutter(s, side, rnd) {
     const props = assets.models.props;
     if (!props) return;
@@ -147,5 +212,9 @@ export class Towns {
     }
   }
 
-  dispose() { this.scene.remove(this.group); }
+  dispose() {
+    this.scene.remove(this.group);
+    this.folk.forEach((p) => this.scene.remove(p.root));
+    this.folk = [];
+  }
 }

@@ -71,9 +71,13 @@ export function makeTerrainMaterial(route) {
         vec3 n = normalize(vWNorm);
         float slope = 1.0 - n.y;
         vec3 bw = pow(abs(n), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
-        vec3 rx = texture2D(tRock, vWPos.zy / 9.0).rgb;
-        vec3 ry = texture2D(tRock, vWPos.xz / 9.0).rgb;
-        vec3 rz = texture2D(tRock, vWPos.xy / 9.0).rgb;
+        // warp the rock UVs by the macro noise: the crack motif repeated on an
+        // obvious grid on long cliff faces, and a warp breaks the lattice up
+        // without paying for more texture reads
+        vec2 rwarp = (vec2(m1, m2) - 0.5) * 5.0;
+        vec3 rx = texture2D(tRock, (vWPos.zy + rwarp) / 11.0).rgb;
+        vec3 ry = texture2D(tRock, (vWPos.xz + rwarp) / 11.0).rgb;
+        vec3 rz = texture2D(tRock, (vWPos.xy + rwarp) / 11.0).rgb;
         vec3 rock = (rx * bw.x + ry * bw.y + rz * bw.z) * uRockTint;
         float rockW = smoothstep(uRockSlope, uRockSlope + 0.14, slope + (m2 - 0.5) * 0.18 + (m1 - 0.5) * 0.25);
 
@@ -95,8 +99,8 @@ export function makeTerrainMaterial(route) {
         // road UV runs across/along the road; rotate its tangent frame roughly into world by using the ground frame (subtle anyway)
         vec2 nd = mix(ng * 0.7, nr, roadW);
         vec3 wn = normalize(n + vec3(nd.x, 0.0, nd.y) * (1.0 - rockW) * (1.0 - sn * 0.6));
-        vec2 nrx = texture2D(tRockN, vWPos.zy / 9.0).xy * 2.0 - 1.0;
-        vec2 nrz = texture2D(tRockN, vWPos.xy / 9.0).xy * 2.0 - 1.0;
+        vec2 nrx = texture2D(tRockN, (vWPos.zy + rwarp) / 11.0).xy * 2.0 - 1.0;
+        vec2 nrz = texture2D(tRockN, (vWPos.xy + rwarp) / 11.0).xy * 2.0 - 1.0;
         vec3 rockPert = vec3(0.0, nrx.y, nrx.x) * bw.x + vec3(nrz.x, nrz.y, 0.0) * bw.z;
         gWN = normalize(wn + rockPert * rockW * 0.9);
         diffuseColor.rgb *= col;

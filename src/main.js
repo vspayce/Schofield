@@ -12,6 +12,7 @@ import { Scatter, setImpostorRenderer } from './world/scatter.js';
 import { Sky } from './world/sky.js';
 import { Towns } from './world/town.js';
 import { Railroad } from './world/railroad.js';
+import { Water } from './world/water.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
@@ -22,6 +23,7 @@ import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
 import { Menus, save } from './ui/menus.js';
 import { WEAPONS } from './game/weapons.js';
+import { MISSIONS, applyMission } from './game/missions.js';
 import { fullscreen } from './core/fullscreen.js';
 
 const DIFF = [
@@ -95,7 +97,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -117,17 +119,35 @@ class Game {
     this.disposeWorld();
     this.routeIndex = i;
     const def = ROUTES[i];
-    this.diff = DIFF[i] || DIFF[DIFF.length - 1];
+    this.mission = MISSIONS[save.mission] || MISSIONS.mail;
+    this.diff = applyMission(DIFF[i] || DIFF[DIFF.length - 1], this.mission);
     this.route = new Route(def);
     this.sky = new Sky(this.scene, this.renderer, this.route);
     this.terrain = new Terrain(this.route, this.scene, this.renderer.tier);
     this.scatter = new Scatter(this.route, this.scene, this.renderer.tier);
     this.terrain.onTile = (t, c) => this.scatter.onTile(t, c);
     this.towns = new Towns(this.route, this.scene);
+    // the gorge river and the falls the road runs under
+    this.water = null;
+    if (def.gorge) {
+      const F = this.route.fallsAt();
+      this.water = new Water(this.route, this.scene, this.renderer, {
+        // out on the valley floor, clear of the wall: the wall occupies roughly
+        // 7-34 m off the roadway, so a river inside that is half-buried in it
+        // and renders as one long shoreline
+        river: { from: 0, to: this.route.len, d: 48 * (this.route.riverSide || 1), width: 24, depth: 2.8 },
+        // lean: left to itself the sheet slants ~23 m out toward the river as it
+        // falls, so from the road you see the broad face of a slanted banner
+        // rather than a wall of water to drive through. Keep it near vertical
+        // where it crosses the roadway.
+        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop, lean: 7, ref: 'road', top: 11 }] : [],
+      });
+    }
     this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
     if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
     if (this.rail) this.towns.solids.push(...this.rail.solids);
-    this.coach = new Coach(this.route, this.scene);
+    this.coach = new Coach(this.route, this.scene, this.mission.coach);
+    this.coach.setLivery(this.mission.livery);
     this.fx = new FX(this.scene, this.route);
     this.combat = new Combat(this);
     this.enemies = new Enemies(this);
@@ -191,7 +211,7 @@ class Game {
     this.setTimeScale(1); this.timeScale = 1;
     this.time = 0;
     const def = ROUTES[i];
-    this.hud.banner(def.name, `${def.from} to ${def.to}`, 3.5);
+    this.hud.banner(def.name, `${this.mission.name} — ${def.from} to ${def.to}`, 3.5);
     audio.play('whip_crack', { volume: 0.9 });
     audio.play('horse_neigh', { volume: 0.5, delay: 0.3 });
     audio.loop('horse_gallop_loop', { volume: 0.5 });
@@ -267,8 +287,8 @@ class Game {
     let stars = 1;
     if (coachPct >= 50 && accuracy >= 35) stars = 2;
     if (coachPct >= 75 && accuracy >= 50 && p.hp > 30) stars = 3;
-    const reward = Math.round(ROUTES[this.routeIndex].reward * (0.5 + coachPct / 200));
-    const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars };
+    const reward = Math.round(ROUTES[this.routeIndex].reward * this.mission.pay * (0.5 + coachPct / 200));
+    const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars, mission: this.mission.name };
     save.record(ROUTES[this.routeIndex].id, stars, r.total);
     save.earn(r.total);
     this._later(3500, () => { this.hud.show(false); this.menus.results(r); });
@@ -332,6 +352,8 @@ class Game {
     this.fx.update(dt);
     this.shake = damp(this.shake, 0, 6, rdt);
     this.rail?.update(dt, coach);
+    this.water?.update(dt, this.camera, coach.pos);
+    this.towns.update(dt, coach);
     this.terrain.update(coach.pos.x, coach.pos.z, 1);
     this.camera.updateMatrixWorld();
     this.scatter.update(this.camera, coach.pos);

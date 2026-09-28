@@ -306,17 +306,19 @@ class Gunman extends Enemy {
       if (dist < range && this.los) {
         this.fireT -= dt;
         // telegraph: lens glint for riflemen, a brief glint + hammer cock for pistols
-        if (this.fireT < 1.1 && this.fireT + dt >= 1.1 && this.rifle) this.glintT = 1.1;
+        if (this.fireT < 1.5 && this.fireT + dt >= 1.5 && this.rifle) this.glintT = 1.5;
         if (!this.rifle && this.fireT < 0.6 && this.fireT + dt >= 0.6) { this.glintT = 0.6; audio.play('schofield_cock', { position: this.root.position, volume: 0.9 }); }
         if (this.glintT > 0) {
           this.glintT -= dt;
           const hp = this.spheres[0].c;
-          if (Math.floor(this.glintT * 14) % 3 === 0) g.fx.glint(_v3.copy(hp).add(_v2.set(0, -0.05, 0)), 0.8 + dist / 120);
+          if (Math.floor(this.glintT * 16) % 2 === 0) g.fx.glint(_v3.copy(hp).add(_v2.set(0, -0.05, 0)), 1.5 + dist / 70);
         }
         if (this.fireT <= 0) {
-          this.fireT = (this.rifle ? 3.8 : 2.2) * g.diff.fireMult + Math.random() * 1.5;
+          this.fireT = (this.rifle ? 2.9 : 2.2) * g.diff.fireMult + Math.random() * 1.3;
           const muzzle = this.gun.muzzle.getWorldPosition(new THREE.Vector3());
-          g.combat.enemyShot(this, muzzle, { dist, acc: this.rifle ? g.diff.rifleAcc : g.diff.riderAcc, dmgPlayer: this.rifle ? 16 : 9, dmgCoach: this.rifle ? 8 : 5, rifle: this.rifle });
+          // a man with a rifle on high ground is the most dangerous thing out
+          // here; he telegraphs first, so a hit should really cost you
+          g.combat.enemyShot(this, muzzle, { dist, acc: this.rifle ? g.diff.rifleAcc : g.diff.riderAcc, dmgPlayer: this.rifle ? 28 : 9, dmgCoach: this.rifle ? 13 : 5, rifle: this.rifle });
         }
       }
       if (coach.s - this.s > 70) { this.removeAt = g.time + 1; this.alive = false; this.escaped = true; }
@@ -361,8 +363,14 @@ export class Enemies {
   // around that the coach is carrying a Gatling, and a marauder band comes for
   // it — which is the whole reason to own the thing.
   planFor(player) {
-    if (!player.loadout.some((w) => w.id === 'gatling')) return;
-    this.waves.push({ at: 0.46, type: 'marauders', count: 14, done: false });
+    // the job itself draws trouble: a bullion run brings one band, a prisoner
+    // transfer brings his friends the whole way
+    for (const at of this.g.mission?.bands || []) {
+      this.waves.push({ at, type: 'marauders', count: 11, done: false });
+    }
+    if (player.loadout.some((w) => w.id === 'gatling')) {
+      this.waves.push({ at: 0.46, type: 'marauders', count: 14, done: false });
+    }
   }
 
   get aliveCount() { return this.list.filter((e) => e.alive).length; }
@@ -410,7 +418,7 @@ export class Enemies {
         this._spawnQ.push({ t: i * 0.9, rider: true, fn: () => this.list.push(new Rider(g, { from: w.from, slot: sl, side })) });
       }
     } else if (w.type === 'marauders') {
-      g.hud.banner('They want the Gatling!', 'Marauders, all sides', 3);
+      g.hud.banner(g.mission?.id === 'prisoner' ? 'They want him back!' : 'Marauders!', 'All sides', 3);
       audio.play('horse_neigh', { volume: 1, pitch: 0.85 });
       this.riderCap = 10;                       // a band, not a patrol
       const froms = ['behind', 'flank', 'ahead'];

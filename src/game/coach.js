@@ -38,10 +38,12 @@ function fallbackCoach() {
 }
 
 export class Coach {
-  constructor(route, scene) {
+  // `model` picks the GLB: the Concord mail coach, or the armoured
+  // Abbott-Downing used for bullion and prisoner work.
+  constructor(route, scene, model = 'stagecoach') {
     this.route = route; this.scene = scene;
     this.root = new THREE.Group();
-    const g = assets.models.stagecoach;
+    const g = assets.models[model] || assets.models.stagecoach;
     this.model = g ? g.scene.clone(true) : fallbackCoach();
     this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.root.add(this.model);
@@ -86,6 +88,10 @@ export class Coach {
     this.reins.frustumCulled = false;
     scene.add(this.reins);
 
+    this.livery = 'concord';
+    this.extras = new THREE.Group();     // strongbox, shutters, cage
+    this.body.add(this.extras);
+
     this.s = 0;
     this.speed = 0;
     this.cruise = 15;
@@ -99,6 +105,33 @@ export class Coach {
     this.vel = new THREE.Vector3();
     this.shake = 0;
     this._fr = {}; this._p = new THREE.Vector3(); this._p2 = new THREE.Vector3();
+  }
+
+  // Extra ironwork on top of whichever coach was loaded. The Abbott-Downing
+  // already carries its shutters, strapping and strongbox in the model, so this
+  // only has to add the prisoner cage.
+  setLivery(kind) {
+    this.livery = kind;
+    this.extras.clear();
+    if (kind !== 'prison') return;
+    const iron = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.55, metalness: 0.65 });
+    const brass = new THREE.MeshStandardMaterial({ color: 0x8a6a2e, roughness: 0.45, metalness: 0.8 });
+    const add = (m, x, y, z) => { m.position.set(x, y, z); m.castShadow = true; this.extras.add(m); return m; };
+    {
+      // barred cage over the windows and a padlocked rear door
+      for (const sx of [-0.8, 0.8]) {
+        for (const z of [0.35, -0.55]) {
+          for (let i = 0; i < 4; i++) {
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.6, 0.04), iron), sx, 1.92, z - 0.27 + i * 0.18);
+          }
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.66), iron), sx, 2.2, z);
+          add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.66), iron), sx, 1.64, z);
+        }
+      }
+      const door = add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.2, 0.07), iron), 0, 1.85, -1.5);
+      door.rotation.y = 0;
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.1), brass), 0, 1.7, -1.56);
+    }
   }
 
   update(dt, ctl) {

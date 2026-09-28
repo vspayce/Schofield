@@ -66,15 +66,17 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #shooters { position: absolute; inset: 0; }
 /* corner-bracket target box, sized in JS to the man's apparent height */
 .shooter { position: absolute; transform: translate(-50%, -50%); --c: #ffb347; }
-.shooter i { position: absolute; width: 30%; height: 30%; border: 2px solid var(--c); filter: drop-shadow(0 0 2px #000); }
+.shooter i { position: absolute; width: 30%; height: 30%; border: 2.5px solid var(--c); filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 6px rgba(0,0,0,.7)); }
+.shooter::before { content: ''; position: absolute; inset: -22%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--c) 26%, transparent) 0%, transparent 68%); }
 .shooter i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
 .shooter i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
 .shooter i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
 .shooter i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
 .shooter b { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 3px; font: 11px var(--font-sc); font-weight: normal; color: #ffd79a; text-shadow: 0 1px 2px #000, 0 0 4px #000; white-space: nowrap; }
 /* too far to make out: fill the box so it reads as a dot on the hillside */
-.shooter.far i { width: 42%; height: 42%; background: rgba(255, 179, 71, .22); }
-.shooter.glint { --c: #ff3b2f; animation: chev .2s infinite alternate; }
+.shooter.far i { width: 46%; height: 46%; background: color-mix(in srgb, var(--c) 32%, transparent); }
+.shooter.glint { --c: #ff3b2f; animation: chev .16s infinite alternate; }
+.shooter.glint i { border-width: 3.5px; }
 .shooter.glint b { color: #ff8e7a; }
 #hitmarker {
   position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; opacity: 0;
@@ -330,4 +332,26 @@ body.touch #btn-pause { display: block; }
   .gun-card h3 { margin: 2px 0; }
   .stat { margin: 1px 0; }
   .opts { font-size: 14px; gap: 4px 14px; margin: 4px 0 8px; }
+}
+
+/* job board: what the coach is carrying */
+.job-card {
+  width: clamp(200px, 27vw, 300px); padding: 14px 16px; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 5px;
+  background: rgba(26, 17, 10, .86); border: 2px solid rgba(169, 122, 59, .45); border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .6);
+}
+.job-card.sel { border-color: var(--brass); box-shadow: 0 0 0 2px var(--brass), 0 10px 24px rgba(0, 0, 0, .6); }
+.job-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.job-head h3 { font-family: var(--font-title); font-size: clamp(15px, 2.1vw, 19px); margin: 0; font-weight: normal; }
+.job-head .pay { font-family: var(--font-title); color: #ffcf6e; font-size: clamp(15px, 2.1vw, 19px); }
+.job-card .cargo { font-family: var(--font-sc); font-size: 12.5px; letter-spacing: .05em; color: var(--brass); }
+.job-card p { margin: 2px 0 6px; font-style: italic; font-size: 13px; line-height: 1.35; color: var(--ink-dim); flex: 1; }
+.job-foot { display: flex; align-items: center; gap: 8px; font-family: var(--font-sc); font-size: 12px; color: var(--ink-dim); }
+.risk { color: var(--blood); letter-spacing: 2px; }
+.risk i { color: rgba(243, 230, 200, .22); font-style: normal; }
+
+@media (max-height: 480px) {
+  .job-card { padding: 8px 10px; gap: 2px; }
+  .job-card p { display: none; }
 }
