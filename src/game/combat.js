@@ -13,7 +13,10 @@ export class Combat {
   // ray from the camera (dir already includes spread). Returns {hit, killed}
   playerShot(origin, dir, W, muzzle, guaranteed) {
     const g = this.g;
+    // game before outlaws: whichever is nearer along the ray
+    const beast = g.wildlife && g.wildlife.rayHit(origin, dir, W.range);
     const hit = g.enemies.rayHit(origin, dir, W.range);
+    if (beast && (!hit || beast.t < hit.t)) return this._animalShot(beast, origin, dir, W, muzzle);
     // occluders: terrain and town buildings
     let occT = g.terrain.raycast(origin, dir, Math.min(W.range, hit ? hit.t : W.range));
     let occKind = 'ground';
@@ -47,6 +50,27 @@ export class Combat {
       }
     }
     return { hit: false, killed: false };
+  }
+
+  // Game animals: no headshots, no bounty feed spam — a kill pays a hide price
+  // and, for anything worth butchering, sends up some meat that heals you.
+  _animalShot(hit, origin, dir, W, muzzle) {
+    const g = this.g, a = hit.animal;
+    const fall = 1 - smoothstep(W.falloff[0], W.falloff[1], hit.t) * (1 - W.floor);
+    const killed = a.damage(W.damage * fall, dir);   // called once per pellet, as for enemies
+    g.fx.tracer(muzzle, hit.point);
+    g.fx.blood(hit.point, dir);
+    audio.play('hit_flesh_' + (1 + (Math.random() * 2 | 0)), { position: hit.point, volume: 1.1 });
+    if (killed) {
+      const p = g.player;
+      if (a.cfg.hide) g.addBounty(a.cfg.hide, `${a.kind[0].toUpperCase()}${a.kind.slice(1)} hide +$${a.cfg.hide}`, false);
+      if (a.cfg.meat && p.hp < 100) {
+        p.hp = Math.min(100, p.hp + a.cfg.meat);
+        g.hud.feedMsg(`Fresh meat +${a.cfg.meat} health`, true);
+      }
+      g.hitStop(0.05);
+    }
+    return { hit: true, killed, head: false };
   }
 
   // a hit or near-miss (within 1.5 m) on a glinting rifleman spoils his shot

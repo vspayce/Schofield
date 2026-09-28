@@ -14,6 +14,7 @@ import { Towns } from './world/town.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
+import { Wildlife } from './game/wildlife.js';
 import { createRider } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
@@ -93,7 +94,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -126,6 +127,7 @@ class Game {
     this.fx = new FX(this.scene, this.route);
     this.combat = new Combat(this);
     this.enemies = new Enemies(this);
+    this.wildlife = new Wildlife(this);
     this.mode = mode;
     this.over = false; this.arrived = false;
     this.bounty = 0; this.hud.setBounty(0);
@@ -290,6 +292,7 @@ class Game {
     if (this.mode === 'ride') {
       this.player.update(dt, rdt, this.over ? { dx: 0, dy: 0 } : inp);
       this.enemies.update(dt);
+      this.wildlife.update(dt);
       if (!this.over && coach.s >= this.route.len - 40) this.arrive();
       // ghost town music
       const inTown = this.route.inTown(coach.s + 40);
@@ -299,7 +302,10 @@ class Game {
         else { audio.stopLoop('music_town_loop', 1.5); audio.loopVolume('music_ride_loop', 0.8, 1.5); }
       }
       const sp = coach.speed / 15;
-      audio.loopRate('horse_gallop_loop', Math.max(0.5, sp));
+      // Rate-shifting a sample moves its pitch as much as its tempo, so keep the
+      // swing narrow — speed/15 outright ran from 0.53x to 1.47x, nearly an
+      // octave and a half, and the team sounded like a tape being spun.
+      audio.loopRate('horse_gallop_loop', Math.min(1.13, Math.max(0.92, 0.92 + (sp - 0.53) * 0.21)));
       audio.loopVolume('horse_gallop_loop', Math.min(0.6, sp * 0.5), 0.2);
       audio.loopVolume('coach_rumble_loop', Math.min(0.6, sp * 0.45), 0.2);
       if (inp.whip && coach.stamina > 0.05 && !this._whipCd) { audio.play('whip_crack', { volume: 0.7 }); this._whipCd = 1.2; }
