@@ -107,7 +107,10 @@ export class HUD {
     const prog = Math.min(1, c.s / game.route.len);
     const pr = Math.round(prog * 400) / 4;
     if (this._last.prog !== pr) { this._last.prog = pr; this.routeFill.style.width = pr + '%'; this.routeCoach.style.left = pr + '%'; }
-    const hitV = Math.max(0, 1 - p.hp / 100) * 0.7 + (game.time - p.lastHit < 0.3 ? 0.4 : 0);
+    // a hit has to read instantly: a bigger, longer flash on top of the
+    // standing low-health vignette
+    const since = game.time - p.lastHit;
+    const hitV = Math.max(0, 1 - p.hp / 100) * 0.7 + Math.max(0, 1 - since / 0.5) * 0.8;
     const hv = Math.round(hitV * 20) / 20;
     if (this._last.hv !== hv) { this._last.hv = hv; this.vHit.style.opacity = hv; game.renderer.final.uniforms.uHit.value = hv * 0.6; }
     this._marks(game);
@@ -239,6 +242,16 @@ export class HUD {
     this.bannerEl.classList.add('show');
     clearTimeout(this._bt);
     this._bt = setTimeout(() => this.bannerEl.classList.remove('show'), secs * 1000);
+  }
+
+  // flash the heart so you can see where the damage went
+  pulseHealth(heavy) {
+    this.hp.classList.remove('flash', 'heavy');
+    void this.hp.offsetWidth;
+    this.hp.classList.add('flash');
+    if (heavy) this.hp.classList.add('heavy');
+    clearTimeout(this._hpf);
+    this._hpf = setTimeout(() => this.hp.classList.remove('flash', 'heavy'), heavy ? 620 : 380);
   }
 
   damage(from, camPos, aimDir) {

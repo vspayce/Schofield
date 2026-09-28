@@ -148,6 +148,7 @@ class Game {
     if (this.rail) this.towns.solids.push(...this.rail.solids);
     this.coach = new Coach(this.route, this.scene, this.mission.coach);
     this.coach.setLivery(this.mission.livery);
+    if (mode === 'ride') this.coach.hp = save.coachHp;
     this.fx = new FX(this.scene, this.route);
     this.combat = new Combat(this);
     this.enemies = new Enemies(this);
@@ -265,6 +266,7 @@ class Game {
     // bounties collected on the road are yours even if the run fails
     const kept = this.bounty;
     save.earn(kept);
+    save.wearCoach(this.coach.hp);      // you limp home with whatever is left
     this._later(2200, () => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason, kept); });
   }
 
@@ -291,6 +293,7 @@ class Game {
     const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars, mission: this.mission.name };
     save.record(ROUTES[this.routeIndex].id, stars, r.total);
     save.earn(r.total);
+    save.wearCoach(this.coach.hp);
     this._later(3500, () => { this.hud.show(false); this.menus.results(r); });
   }
 

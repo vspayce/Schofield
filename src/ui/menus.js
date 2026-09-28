@@ -46,6 +46,28 @@ export const save = {
   // the job you're hauling
   get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'mail'; },
   set mission(v) { this.data.mission = v; persist(this.data); },
+
+  // ---------------------------------------------------------- the coach
+  // Damage carries between runs. The driver patches what he can for nothing
+  // between towns; anything better costs money at the livery.
+  FREE_PATCH: 18,
+  REPAIR_RATE: 5,          // dollars per point of condition
+  get coachHp() { return this.data.coachHp === undefined ? 100 : this.data.coachHp; },
+  set coachHp(v) { this.data.coachHp = Math.max(0, Math.min(100, Math.round(v))); persist(this.data); },
+  // called when a run ends: bank the wear, then the free patch
+  wearCoach(endHp) { this.coachHp = Math.min(100, Math.max(0, endHp) + this.FREE_PATCH); },
+  repairCost(to = 100) { return Math.max(0, Math.ceil((to - this.coachHp) * this.REPAIR_RATE)); },
+  repair() {
+    const cost = this.repairCost();
+    if (cost <= 0) return 'full';
+    const afford = Math.min(cost, this.cash);
+    if (afford < this.REPAIR_RATE) return 'poor';
+    const points = Math.floor(afford / this.REPAIR_RATE);
+    this.data.cash -= points * this.REPAIR_RATE;
+    this.coachHp = this.coachHp + points;
+    persist(this.data);
+    return points;
+  },
 };
 
 function click() { audio.play('ui_click', { volume: 0.6 }); }
@@ -145,6 +167,8 @@ export class Menus {
     this._show(`<h2 class="m-title">${ROUTES[i].name}</h2>
       <div class="m-tag" style="margin:-6px 0 12px">Tap the gun to start with in hand. Swap any time on the coach.</div>
       <div class="m-row">${slot('side', 'Sidearm', SIDEARMS)}${slot('long', 'Long gun', LONG_GUNS)}</div>
+      <div class="coach-cond ${save.coachHp < 55 ? 'bad' : ''}">Coach condition <b>${save.coachHp}%</b>${
+        save.coachHp < 100 ? ` · <button class="m-btn ghost sm" data-act="repair">Repair $${save.repairCost()}</button>` : ' · sound'}</div>
       <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="jobs">${MISSIONS[save.mission].name} ▸</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn" data-act="go">All Aboard</button></div>`, true, 'tall');
   }
 
@@ -270,6 +294,12 @@ export class Menus {
         const owned = (slot === 'side' ? SIDEARMS : LONG_GUNS).filter((w) => save.owns(w.id));
         const k = owned.indexOf(WEAPONS[save.equipped(slot)]);
         save.equip(owned[(k + +step + owned.length) % owned.length].id);
+        this.loadout(this.routeIndex); break;
+      }
+      case 'repair': {
+        const r = save.repair();
+        if (r === 'poor') g.hud.feedMsg?.('Not enough for the livery', false);
+        else audio.play('ui_click', { volume: 0.7, pitch: 0.8 });
         this.loadout(this.routeIndex); break;
       }
       case 'shop': this.gunsmith(arg); break;

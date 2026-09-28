@@ -318,7 +318,7 @@ class Gunman extends Enemy {
           const muzzle = this.gun.muzzle.getWorldPosition(new THREE.Vector3());
           // a man with a rifle on high ground is the most dangerous thing out
           // here; he telegraphs first, so a hit should really cost you
-          g.combat.enemyShot(this, muzzle, { dist, acc: this.rifle ? g.diff.rifleAcc : g.diff.riderAcc, dmgPlayer: this.rifle ? 28 : 9, dmgCoach: this.rifle ? 13 : 5, rifle: this.rifle });
+          g.combat.enemyShot(this, muzzle, { dist, acc: this.rifle ? g.diff.rifleAcc : g.diff.riderAcc, dmgPlayer: this.rifle ? 20 : 9, dmgCoach: this.rifle ? 11 : 5, rifle: this.rifle });
         }
       }
       if (coach.s - this.s > 70) { this.removeAt = g.time + 1; this.alive = false; this.escaped = true; }

@@ -312,9 +312,14 @@ export class Player {
   damage(amount, fromPos) {
     if (this.g.over) return;
     this.hp -= amount; this.lastHit = this.g.time;
+    const heavy = amount >= 15;                  // a rifle round, not a pistol
     this.g.hud.damage(fromPos, this.camPos, this.aimDir);
-    this.g.shake += 0.06;
-    audio.play('hit_flesh_' + (1 + Math.floor(Math.random() * 2)), { volume: 0.8 });
+    this.g.hud.pulseHealth(heavy);
+    this.g.shake += heavy ? 0.14 : 0.06;
+    if (heavy) this.g.hitStop(0.05);
+    audio.play('hit_flesh_' + (1 + Math.floor(Math.random() * 2)), { volume: heavy ? 1 : 0.8, pitch: heavy ? 0.82 : 1 });
+    if (heavy) audio.play('hit_wood_1', { volume: 0.5, pitch: 0.7 });
+    if (this.g.input.touch) navigator.vibrate?.(heavy ? [30, 40, 30] : 18);
     if (this.hp <= 0) this.g.fail('You were shot dead.');
   }
 }
