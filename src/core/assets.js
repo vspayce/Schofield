@@ -44,7 +44,7 @@ function loadAudio(name) {
   }).catch(() => null);
 }
 
-export const MODEL_LIST = ['stagecoach', 'horse', 'rider', 'weapons', 'props', 'town', 'animals'];
+export const MODEL_LIST = ['stagecoach', 'stagecoach_treasure', 'horse', 'rider', 'weapons', 'props', 'town', 'animals'];
 export const TEX_LIST = [
   ['dirt_road'], ['dry_grass'], ['green_grass'], ['sand'], ['rock'], ['red_rock'], ['snow'], ['gravel'],
   ...['dirt_road', 'dry_grass', 'green_grass', 'sand', 'rock', 'red_rock', 'snow', 'gravel'].map((n) => [n + '_n', { srgb: false }]),

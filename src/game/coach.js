@@ -38,10 +38,12 @@ function fallbackCoach() {
 }
 
 export class Coach {
-  constructor(route, scene) {
+  // `model` picks the GLB: the Concord mail coach, or the armoured
+  // Abbott-Downing used for bullion and prisoner work.
+  constructor(route, scene, model = 'stagecoach') {
     this.route = route; this.scene = scene;
     this.root = new THREE.Group();
-    const g = assets.models.stagecoach;
+    const g = assets.models[model] || assets.models.stagecoach;
     this.model = g ? g.scene.clone(true) : fallbackCoach();
     this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.root.add(this.model);
@@ -105,39 +107,17 @@ export class Coach {
     this._fr = {}; this._p = new THREE.Vector3(); this._p2 = new THREE.Vector3();
   }
 
-  // Dress the coach for the job. The Concord is the mail coach as built; the
-  // treasure and prison rigs are the same vehicle with ironwork added and a
-  // darker finish, so they read as heavier without a second model.
+  // Extra ironwork on top of whichever coach was loaded. The Abbott-Downing
+  // already carries its shutters, strapping and strongbox in the model, so this
+  // only has to add the prisoner cage.
   setLivery(kind) {
     this.livery = kind;
     this.extras.clear();
-    if (kind === 'concord') return;
+    if (kind !== 'prison') return;
     const iron = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.55, metalness: 0.65 });
-    const wood = new THREE.MeshStandardMaterial({ color: 0x2b2f2a, roughness: 0.8 });
     const brass = new THREE.MeshStandardMaterial({ color: 0x8a6a2e, roughness: 0.45, metalness: 0.8 });
-    // darken the painted body for both working liveries
-    this.model.traverse((o) => {
-      if (!o.isMesh || !o.material?.color) return;
-      if (!o.userData._liv) { o.userData._liv = o.material; o.material = o.material.clone(); }
-      o.material.color.copy(o.userData._liv.color).multiply(
-        kind === 'treasure' ? new THREE.Color(0.55, 0.68, 0.58) : new THREE.Color(0.6, 0.6, 0.64));
-    });
-    const add = (m, x, y, z, rx = 0) => { m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = true; this.extras.add(m); return m; };
-    if (kind === 'treasure') {
-      // iron shutters with a firing slot over each window
-      for (const sx of [-0.79, 0.79]) {
-        for (const z of [0.35, -0.55]) {
-          const sh = add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.62, 0.72), iron), sx, 1.92, z);
-          sh.rotation.y = 0;
-          const slot = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.42), brass);
-          slot.position.set(sx * 1.02, 2.0, z); this.extras.add(slot);
-        }
-      }
-      // strongbox lashed to the roof rack
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.46, 0.66), wood), 0, 2.95, -0.35);
-      for (const z of [-0.06, -0.64]) add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.06), iron), 0, 2.95, z);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.7), iron), 0, 2.95, -0.35);
-    } else if (kind === 'prison') {
+    const add = (m, x, y, z) => { m.position.set(x, y, z); m.castShadow = true; this.extras.add(m); return m; };
+    {
       // barred cage over the windows and a padlocked rear door
       for (const sx of [-0.8, 0.8]) {
         for (const z of [0.35, -0.55]) {

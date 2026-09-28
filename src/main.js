@@ -129,7 +129,7 @@ class Game {
     this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
     if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
     if (this.rail) this.towns.solids.push(...this.rail.solids);
-    this.coach = new Coach(this.route, this.scene);
+    this.coach = new Coach(this.route, this.scene, this.mission.coach);
     this.coach.setLivery(this.mission.livery);
     this.fx = new FX(this.scene, this.route);
     this.combat = new Combat(this);
