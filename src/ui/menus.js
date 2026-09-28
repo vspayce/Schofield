@@ -94,7 +94,10 @@ export class Menus {
 
   routes() {
     // every route is open from the start
+    // `wip` routes stay out of the list but keep their index, so ?route=N and
+    // save data are unaffected
     const posters = ROUTES.map((r, i) => {
+      if (r.wip) return '';
       return `<div class="poster" data-act="pick" data-arg="${i}"><div class="pin">
         <div><h3>${r.name}</h3><div class="sub">${r.from} → ${r.to}</div></div>
         <div class="sub">${r.blurb}</div>
