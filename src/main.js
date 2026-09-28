@@ -136,7 +136,11 @@ class Game {
         // 7-34 m off the roadway, so a river inside that is half-buried in it
         // and renders as one long shoreline
         river: { from: 0, to: this.route.len, d: 48 * (this.route.riverSide || 1), width: 24, depth: 2.8 },
-        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop }] : [],
+        // lean: left to itself the sheet slants ~23 m out toward the river as it
+        // falls, so from the road you see the broad face of a slanted banner
+        // rather than a wall of water to drive through. Keep it near vertical
+        // where it crosses the roadway.
+        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop, lean: 7, ref: 'road', top: 11 }] : [],
       });
     }
     this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
