@@ -1,0 +1,19 @@
+node_modules
+dist
+.DS_Store
+*.blend1
+tools/**/previews/
+tools/blender/*.blend
+tools/blender/build/
+tools/blender/_build/
+
+# reference photos stay local, never on GitHub
+reference/
+references/
+__pycache__/
+
+# secrets
+.env
+.env.*
+!.env.example
+.claude/worktrees/
