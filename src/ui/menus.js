@@ -68,6 +68,13 @@ export const save = {
     persist(this.data);
     return points;
   },
+
+  // start over: purse, guns, stars, coach wear. Settings are kept separately
+  // (schofield.settings) and survive this.
+  wipe() {
+    this.data = {};
+    try { localStorage.removeItem('schofield.save'); } catch {}
+  },
 };
 
 function click() { audio.play('ui_click', { volume: 0.6 }); }
@@ -273,13 +280,22 @@ export class Menus {
         <label>Music</label><input id="opt-mus" type="range" min="0" max="1" step="0.05" value="${audio.volumes.music}"/>
         <label>Effects</label><input id="opt-sfx" type="range" min="0" max="1" step="0.05" value="${audio.volumes.sfx}"/>
       </div>
-      <button class="m-btn" data-act="${back === 'pause' ? 'pause' : 'title'}">Done</button></div>`);
+      <button class="m-btn" data-act="${back === 'pause' ? 'pause' : 'title'}">Done</button>
+      ${back === 'pause' ? '' : '<div style="margin-top:14px"><button class="m-btn ghost sm" data-act="wipe">Start Over…</button></div>'}</div>`);
     const s = (id, fn) => document.getElementById(id).addEventListener('input', (e) => { fn(e.target); this.g.saveSettings(); });
     s('opt-q', (t) => this.g.renderer.setQuality(t.value));
     s('opt-sens', (t) => (this.g.input.sens = +t.value));
     s('opt-inv', (t) => (this.g.input.invertY = t.checked));
     s('opt-mus', (t) => audio.setVolume('music', +t.value));
     s('opt-sfx', (t) => audio.setVolume('sfx', +t.value));
+  }
+
+  // wiping the save can't be undone, so it asks first
+  confirmWipe() {
+    this._show(`<div class="paper"><h2>Start Over?</h2>
+      <div style="font-style:italic;margin:6px 0 14px">Your purse ($${save.cash}), every gun you've bought, your stars and
+      the coach's wear all go. Your settings stay. This can't be undone.</div>
+      <div class="m-row"><button class="m-btn" data-act="wipe-yes">Start Over</button><button class="m-btn ghost" data-act="settings">Keep My Progress</button></div></div>`);
   }
 
   _act(a, arg) {
@@ -317,6 +333,9 @@ export class Menus {
       // Fullscreen and home-screen launches have no address bar, so there is no
       // way to reload a wedged game from outside it.
       case 'reload': location.reload(); break;
+      case 'wipe': this.confirmWipe(); break;
+      // reload so nothing in memory carries the old progress over
+      case 'wipe-yes': save.wipe(); location.reload(); break;
       case 'settings': this.settings('title'); break;
       case 'settings-pause': this.settings('pause'); break;
       case 'how': this.how(); break;
