@@ -40,7 +40,7 @@ const frag = /* glsl */`
     }
   }`;
 
-class Pool {
+export class Pool {
   constructor(scene, max, map, additive) {
     this.max = max;
     const base = new THREE.PlaneGeometry(1, 1);

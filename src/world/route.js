@@ -206,7 +206,47 @@ export class Route {
   }
 
   // ------------------------------------------------------------ final height
+  // A railroad is graded, not draped: once one is registered here, the land
+  // along it is cut down or built up to a level bed at rail height, so the line
+  // (and anything running on it) never plunges into a hillside. The road wins
+  // where the two cross.
+  setRail(r) { this.rail = r; }
+
+  // metres from the rail centreline (Infinity past the ends of the line)
+  railDist(x, z) {
+    const r = this.rail;
+    if (!r) return Infinity;
+    const dx = x - r.x, dz = z - r.z;
+    const u = dx * r.dx + dz * r.dz;
+    if (Math.abs(u) > r.reach + 20) return Infinity;
+    return Math.abs(dx * r.dz - dz * r.dx);
+  }
+
   height(x, z) {
+    const h = this._height(x, z);
+    const r = this.rail;
+    if (!r) return h;
+    const dx = x - r.x, dz = z - r.z;
+    const u = dx * r.dx + dz * r.dz;
+    const au = Math.abs(u);
+    if (au > r.reach + 30) return h;
+    const lat = Math.abs(dx * r.dz - dz * r.dx);
+    const bed = r.y + r.grade * u - 0.28;
+    const diff = h - bed;
+    // side slopes a railroad engineer would cut: wider where the cut or fill is deep
+    const run = 3 + Math.abs(diff) * 1.6;
+    let w = 1 - smoothstep(r.half, r.half + run, lat);
+    if (w <= 0) return h;
+    w *= 1 - smoothstep(r.reach, r.reach + 30, au);
+    // leave the road alone where it crosses, except to ramp it up flush with
+    // the crossing planks
+    const rc = this.roadCoords(x, z, _rc2);
+    const onRoad = rc.s >= 0 ? 1 - smoothstep(ROAD_HALF + 0.5, ROAD_HALF + 4, Math.abs(rc.d)) : 0;
+    const ramp = onRoad * 0.32 * (1 - smoothstep(2.4, 7.5, lat));
+    return lerp(h, bed, w * (1 - onRoad)) + ramp;
+  }
+
+  _height(x, z) {
     const rc = this.roadCoords(x, z, _rc);
     const nat = this.natural(x, z);
     if (rc.s < 0) return nat;
@@ -304,5 +344,5 @@ export class Route {
   get townRange() { return this._town; }
 }
 
-const _rc = { d: 0, s: 0 };
+const _rc = { d: 0, s: 0 }, _rc2 = { d: 0, s: 0 };
 const _fr = {};
