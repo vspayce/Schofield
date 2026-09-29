@@ -37,6 +37,7 @@ export const ROUTES = [
     ],
     grass: { density: 3.5, color: C('#c9a860'), height: 0.42 },
     wildlife: { kinds: ['buffalo', 'goat', 'goat', 'bear', 'hawk'], every: 95 },
+    billboards: { count: 3 },
     railroad: { at: 0.62, workers: 7 },
     waves: [
       { at: 0.08, type: 'riders', count: 2, from: 'behind' },
@@ -56,6 +57,7 @@ export const ROUTES = [
     blurb: 'A winding mountain road. Riflemen on every ridge; mind the drop.',
     seed: 1874, length: 2800, biome: 'mountain', reward: 650,
     wildlife: { kinds: ['goat', 'goat', 'goat', 'bear', 'hawk'], every: 120 },
+    billboards: { count: 2 },
     wind: 1.2, winding: 1.0,
     light: {
       sunElev: 24, sunAzim: 150, sunColor: C('#ffe2c0'), sunIntensity: 3.0,
@@ -99,6 +101,7 @@ export const ROUTES = [
     blurb: 'Straight through a ghost town at dusk. Gunmen in every window.',
     seed: 1877, length: 2400, biome: 'desert', reward: 900,
     wildlife: { kinds: ['goat', 'goat', 'hawk'], every: 130 },
+    billboards: { count: 3 },
     railroad: { at: 0.34, workers: 5 },
     wind: 1.0, winding: 0.25,
     ghostTown: { start: 0.38, length: 420 },
@@ -142,6 +145,7 @@ export const ROUTES = [
     blurb: 'A red canyon at sundown. Every gun in the territory wants your strongbox.',
     seed: 1879, length: 3000, biome: 'canyon', reward: 1400,
     wildlife: { kinds: ['bear', 'goat', 'goat', 'hawk'], every: 115 },
+    billboards: { count: 3 },
     wind: 1.1, winding: 0.6,
     light: {
       sunElev: 16, sunAzim: 200, sunColor: C('#ffb070'), sunIntensity: 4.2,
@@ -212,6 +216,7 @@ export const ROUTES = [
     ],
     grass: { density: 2.6, color: C('#8fa864'), height: 0.36 },
     wildlife: { kinds: ['goat', 'goat', 'bear', 'hawk'], every: 110 },
+    billboards: { count: 2 },
     waves: [
       { at: 0.1, type: 'riders', count: 3, from: 'behind' },
       { at: 0.22, type: 'ridge', count: 3 },

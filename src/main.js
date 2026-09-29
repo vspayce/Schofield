@@ -13,6 +13,7 @@ import { Sky } from './world/sky.js';
 import { Towns } from './world/town.js';
 import { Railroad } from './world/railroad.js';
 import { Water } from './world/water.js';
+import { Billboards } from './world/billboards.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
@@ -97,7 +98,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -144,6 +145,7 @@ class Game {
       });
     }
     this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
+    this.boards = new Billboards(this.route, this.scene, def.billboards || {});
     if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
     if (this.rail) this.towns.solids.push(...this.rail.solids);
     this.coach = new Coach(this.route, this.scene, this.mission.coach);

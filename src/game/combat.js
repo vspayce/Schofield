@@ -17,6 +17,14 @@ export class Combat {
     const beast = g.wildlife && g.wildlife.rayHit(origin, dir, W.range);
     const hit = g.enemies.rayHit(origin, dir, W.range);
     if (beast && (!hit || beast.t < hit.t)) return this._animalShot(beast, origin, dir, W, muzzle);
+    // a roadside sign, shot for a wagon repair
+    const sign = g.boards && g.boards.rayHit(origin, dir, W.range);
+    if (sign && (!hit || sign.t < hit.t) && (!beast || sign.t < beast.t)) {
+      g.fx.tracer(muzzle, sign.point);
+      sign.board.strike(g, sign.point);
+      g.onCoachDamage?.();
+      return { hit: true, killed: false, head: false };
+    }
     // occluders: terrain and town buildings
     let occT = g.terrain.raycast(origin, dir, Math.min(W.range, hit ? hit.t : W.range));
     let occKind = 'ground';
