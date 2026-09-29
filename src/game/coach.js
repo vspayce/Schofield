@@ -138,12 +138,16 @@ export class Coach {
     const R = this.route;
     // speed control
     let target = this.cruise;
-    if (ctl.whip && this.stamina > 0.02) { target = this.cruise + 7; this.stamina = Math.max(0, this.stamina - dt * 0.22); }
+    // Whip and rein were +/-7 around a cruise of 15, which is barely felt.
+    // A real hand on the reins can haul the team down to a walk.
+    if (ctl.whip && this.stamina > 0.02) { target = this.cruise + 11; this.stamina = Math.max(0, this.stamina - dt * 0.22); }
     else this.stamina = Math.min(1, this.stamina + dt * 0.07);
-    if (ctl.brake) target = this.cruise - 7;
+    if (ctl.brake) target = 2.5;
     if (this.stopping) target = 0;
     if (this.s < 30 && !this.stopping) target = Math.min(target, 4 + this.s * 0.5);
-    this.speed = damp(this.speed, target, this.stopping ? 0.9 : 0.6, dt);
+    // brake harder than you accelerate, so reining in actually arrests you
+    const rate = this.stopping ? 0.9 : (ctl.brake ? 1.5 : 0.7);
+    this.speed = damp(this.speed, target, rate, dt);
     this.s = Math.min(R.len, this.s + this.speed * dt);
 
     // position/orientation from road

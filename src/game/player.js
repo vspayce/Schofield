@@ -199,6 +199,16 @@ export class Player {
         if (this.deadeyeOn && this.marks.length) this._endDeadeye();
         else if (this.ammo[W.id] > 0) this._fire();
         else { audio.play('schofield_cock', { volume: 0.5, pitch: 1.6 }); this._reload(); }
+      } else if (inp.firePressed && this.reloading > 0) {
+        // pressing fire mid-reload used to do nothing at all, silently — which
+        // reads as the gun being broken, especially on a single-shot long gun
+        // where you spend most of the fight reloading
+        this.dryT = (this.dryT || 0);
+        if (g.time - this.dryT > 0.25) {
+          this.dryT = g.time;
+          audio.play('schofield_cock', { volume: 0.32, pitch: 1.9 });
+          g.hud.nudgeReload();
+        }
       }
     }
     // health regen

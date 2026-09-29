@@ -36,7 +36,7 @@ export const ROUTES = [
       { kind: 'CowSkull', density: 0.1, minRoad: 5, scale: [1, 1] },
     ],
     grass: { density: 3.5, color: C('#c9a860'), height: 0.42 },
-    wildlife: { kinds: ['buffalo', 'buffalo', 'goat', 'goat', 'hawk'], every: 105 },
+    wildlife: { kinds: ['buffalo', 'goat', 'goat', 'bear', 'hawk'], every: 95 },
     railroad: { at: 0.62, workers: 7 },
     waves: [
       { at: 0.08, type: 'riders', count: 2, from: 'behind' },

@@ -376,3 +376,14 @@ body.touch #btn-pause { display: block; }
 #hp-meter.heavy .bar { box-shadow: 0 0 22px #ff2a18; border-color: #ff3b2f; }
 #hp-meter.heavy img { animation: hpkick .62s ease-out; }
 @keyframes hpkick { 0% { transform: scale(1.55); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+/* reload progress under the crosshair, where the eye already is */
+#reload-ring { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); width: 108px; opacity: 0; transition: opacity .12s; text-align: center; }
+#reload-ring.on { opacity: 1; }
+#reload-ring i { display: block; height: 4px; width: 0; background: linear-gradient(90deg, #8a5a2b, var(--brass)); border-radius: 2px; box-shadow: 0 0 4px #000; }
+#reload-ring::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: rgba(0, 0, 0, .55); border-radius: 2px; }
+#reload-ring i { position: relative; }
+#reload-ring span { display: block; margin-top: 2px; font: 10px var(--font-sc); letter-spacing: .14em; color: var(--ink-dim); text-shadow: 0 1px 2px #000; }
+#reload-ring.nudge { animation: rlnudge .3s ease-out; }
+@keyframes rlnudge { 0% { transform: translateX(-50%) scale(1.3); } 100% { transform: translateX(-50%) scale(1); } }
+#reload-ring.nudge span { color: #ff9a6a; }

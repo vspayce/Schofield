@@ -14,6 +14,7 @@ export class HUD {
     this.cyl = $('ammo-cyl'); this.shells = $('ammo-shells'); this.ammoName = $('ammo-name'); this.ammoBox = $('ammo');
     this.count = $('ammo-count');
     this.scope = $('scope'); this.btnScope = $('btn-scope');
+    this.reloadRing = $('reload-ring'); this.reloadFill = this.reloadRing.querySelector('i');
     this.shooterLayer = $('shooters'); this.shooterEls = [];
     this.hp = $('hp-meter'); this.coach = $('coach-meter'); this.de = $('de-meter');
     this.routeFill = $('route-fill'); this.routeCoach = $('route-coach');
@@ -115,6 +116,20 @@ export class HUD {
     if (this._last.hv !== hv) { this._last.hv = hv; this.vHit.style.opacity = hv; game.renderer.final.uniforms.uHit.value = hv * 0.6; }
     this._marks(game);
     this._shooters(game);
+    // reload progress, right under the crosshair where you are already looking
+    const rl = p.reloading > 0;
+    if (this._last.rl !== rl) { this._last.rl = rl; this.reloadRing.classList.toggle('on', rl); }
+    if (rl) {
+      const frac = 1 - p.reloading / Math.max(0.01, p.weapon.reload);
+      this.reloadFill.style.width = Math.round(frac * 100) + '%';
+    }
+  }
+
+  // the gun isn't broken, it's reloading — say so when they try to fire
+  nudgeReload() {
+    this.reloadRing.classList.remove('nudge');
+    void this.reloadRing.offsetWidth;
+    this.reloadRing.classList.add('nudge');
   }
 
   setScope(on) {
