@@ -41,8 +41,6 @@ function adTexture(ad) {
     const r = 18 + Math.random() * 70;
     x.beginPath(); x.arc(Math.random() * W, Math.random() * H, r, 0, 6.3); x.fill();
   }
-  x.strokeStyle = 'rgba(70,50,30,0.18)'; x.lineWidth = 2;
-  for (let i = 1; i < 6; i++) { x.beginPath(); x.moveTo(0, i * H / 6); x.lineTo(W, i * H / 6); x.stroke(); }
   x.strokeStyle = ad.accent; x.lineWidth = 7;
   x.strokeRect(13, 13, W - 26, H - 26);
   x.textAlign = 'center';
@@ -72,11 +70,11 @@ class Board {
     this.route = route; this.scene = scene; this.ad = ad; this.s = s;
     this.used = false;
     const f = route.frame(s, {});
-    const off = 15 + Math.random() * 4;
+    const off = route.biome === 'gorge' ? 9 : 15 + Math.random() * 4;
+    if (route.biome === 'gorge') side = -route.riverSide;
     const x = f.x + f.rx * off * side, z = f.z + f.rz * off * side;
-    const y = route.height(x, z);
     this.root = new THREE.Group();
-    this.root.position.set(x, y, z);
+    this.root.position.set(x, 0, z);
     // Face the coming coach, not straight across the road: square-on to the
     // road the board is edge-on the whole way in and only reads as you pass.
     // Aim at the road a good way back, which angles it like a real roadside sign.
@@ -87,7 +85,13 @@ class Board {
     const post = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.95 });
     const back = new THREE.MeshStandardMaterial({ color: 0x6b5336, roughness: 1 });
     const W = 11, H = 5.5, base = 3.2;
-    for (const px of [-W / 2 + 0.6, 0, W / 2 - 0.6]) {
+    let ground = -Infinity;
+    for (const px of [-W / 2 + 0.6, W / 2 - 0.6]) {
+      const foot = this.root.localToWorld(new THREE.Vector3(px, 0, 0));
+      ground = Math.max(ground, route.height(foot.x, foot.z));
+    }
+    this.root.position.y = ground + 0.15;
+    for (const px of [-W / 2 + 0.6, W / 2 - 0.6]) {
       const p = new THREE.Mesh(new THREE.BoxGeometry(0.34, base + H, 0.34), post);
       p.position.set(px, (base + H) / 2, 0);
       p.castShadow = true; this.root.add(p);

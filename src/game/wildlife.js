@@ -266,7 +266,7 @@ export class Wildlife {
       // glancing at a crawl, ruinous at a gallop
       const v = Math.max(0, coach.speed);
       const dmg = clamp(v * 1.5 * a.cfg.mass, 4, 26);
-      coach.hp -= dmg;
+      g.damageCoach(dmg);
       coach.speed = Math.max(2, coach.speed * 0.45);
       g.shake += 0.5;
       g.hitStop(0.09);

@@ -194,7 +194,7 @@ export class Crossing {
     const v = Math.max(0, c.speed);
     // a glancing knock at a walk, ruinous at a gallop — worse than any herd
     const dmg = clamp(14 + v * 2.4, 16, 55);
-    c.hp -= dmg;
+    g.damageCoach(dmg);
     c.speed = 0;
     // knocked clear: back off the rails, or on across if mostly over already
     const mid = (back + front) / 2;

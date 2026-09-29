@@ -144,6 +144,11 @@ export const ROUTES = [
     from: 'Red Mesa', to: 'Fort Providence',
     blurb: 'A red canyon at sundown. Every gun in the territory wants your strongbox.',
     seed: 1879, length: 3000, biome: 'canyon', reward: 1400,
+    arches: [
+      { at: 0.24, span: 96, base: 30, rise: 25 },
+      { at: 0.57, span: 88, base: 33, rise: 27 },
+      { at: 0.82, span: 102, base: 29, rise: 26 },
+    ],
     wildlife: { kinds: ['bear', 'goat', 'goat', 'hawk'], every: 115 },
     billboards: { count: 3 },
     wind: 1.1, winding: 0.6,
@@ -186,11 +191,15 @@ export const ROUTES = [
     id: 'gorge',
     name: 'Thunder Gorge',
     from: 'Fort Providence', to: 'Cascade',
-    blurb: 'A ledge blasted into the gorge wall. The road runs under the falls — go through, or go over the side.',
+    blurb: 'Cross a high timber trestle over the gorge before the road runs beneath the falls.',
     seed: 1883, length: 2700, biome: 'gorge', reward: 1800,
 
     wind: 1.1, winding: 0.75,
-    gorge: { side: 1, depth: 27, falls: { at: 0.54, drop: 34, width: 24 } },
+    gorge: {
+      side: 1, depth: 27,
+      bridge: { at: 0.22, length: 300, width: 8.4, cutHalf: 46, depth: 76 },
+      falls: { at: 0.54, drop: 34, width: 24 },
+    },
     light: {
       sunElev: 19, sunAzim: 118, sunColor: C('#ffe6c4'), sunIntensity: 3.4,
       hemiSky: C('#93b4d6'), hemiGround: C('#3f4a3a'), hemiIntensity: 0.95, env: 0.4, tintShadow: [0.78, 0.9, 1.15],

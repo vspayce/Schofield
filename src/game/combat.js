@@ -128,7 +128,7 @@ export class Combat {
       g.fx.tracer(muzzle, target);
       if (atPlayer) g.player.damage(dmgPlayer * g.diff.dmgMult, muzzle);
       else {
-        g.coach.hp -= dmgCoach * g.diff.dmgMult;
+        g.damageCoach(dmgCoach * g.diff.dmgMult);
         g.fx.splinters(target, dir);
         audio.play('hit_wood_' + (1 + (Math.random() * 2 | 0)), { position: target, volume: 1 });
         g.onCoachDamage();

@@ -14,6 +14,8 @@ import { Towns } from './world/town.js';
 import { Railroad } from './world/railroad.js';
 import { Water } from './world/water.js';
 import { Billboards } from './world/billboards.js';
+import { GorgeBridge } from './world/gorgebridge.js';
+import { RockArches } from './world/rockarches.js';
 import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
@@ -48,7 +50,7 @@ class Game {
     this.menus = new Menus(this);
     this.mode = 'boot';
     this.time = 0; this.timeScale = 1; this.targetScale = 1;
-    this.shake = 0; this.bountyTotal = 0;
+    this.shake = 0; this.bountyTotal = 0; this.godMode = false;
     this.timer = new THREE.Timer();
     this.hitStopT = 0;
     this._loadSettings();
@@ -60,12 +62,13 @@ class Game {
       const s = JSON.parse(localStorage.getItem('schofield.settings')) || {};
       if (s.sens) this.input.sens = s.sens;
       this.input.invertY = !!s.invertY;
+      this.godMode = !!s.godMode;
       if (s.music !== undefined) audio.volumes.music = s.music;
       if (s.sfx !== undefined) audio.volumes.sfx = s.sfx;
     } catch {}
   }
   saveSettings() {
-    try { localStorage.setItem('schofield.settings', JSON.stringify({ sens: this.input.sens, invertY: this.input.invertY, music: audio.volumes.music, sfx: audio.volumes.sfx })); } catch {}
+    try { localStorage.setItem('schofield.settings', JSON.stringify({ sens: this.input.sens, invertY: this.input.invertY, godMode: this.godMode, music: audio.volumes.music, sfx: audio.volumes.sfx })); } catch {}
   }
 
   async boot() {
@@ -104,7 +107,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.crossing?.dispose(); this.crossing = null; this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
+    this.crossing?.dispose(); this.crossing = null; this.bridge?.dispose(); this.bridge = null; this.rockArches?.dispose(); this.rockArches = null; this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -129,6 +132,8 @@ class Game {
     this.mission = MISSIONS[save.mission] || MISSIONS.mail;
     this.diff = applyMission(DIFF[i] || DIFF[DIFF.length - 1], this.mission);
     this.route = new Route(def);
+    this.bridge = this.route.bridge ? new GorgeBridge(this.route, this.scene) : null;
+    this.rockArches = def.arches ? new RockArches(this.route, this.scene, def.arches) : null;
     this.sky = new Sky(this.scene, this.renderer, this.route);
     // the railroad first: it grades the land along its line, which the terrain
     // and the scatter have to see
@@ -146,11 +151,9 @@ class Game {
         // 7-34 m off the roadway, so a river inside that is half-buried in it
         // and renders as one long shoreline
         river: { from: 0, to: this.route.len, d: 48 * (this.route.riverSide || 1), width: 24, depth: 2.8 },
-        // lean: left to itself the sheet slants ~23 m out toward the river as it
-        // falls, so from the road you see the broad face of a slanted banner
-        // rather than a wall of water to drive through. Keep it near vertical
-        // where it crosses the roadway.
-        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop, lean: 7, ref: 'road', top: 11, arch: true }] : [],
+        // Let the sheet follow the gorge face to the river rather than burying
+        // it in the near shoulder, and carry its foot through the water surface.
+        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop + 5, ref: 'road', top: 11, arch: true }] : [],
       });
     }
     // punching through the curtain rocks the coach
@@ -253,6 +256,10 @@ class Game {
   addBounty(v, label, hs) {
     this.bounty += v; this.hud.setBounty(this.bounty);
     this.hud.feedMsg(label, hs);
+  }
+
+  damageCoach(amount) {
+    if (!this.godMode) this.coach.hp -= amount;
   }
 
   onCoachDamage() {

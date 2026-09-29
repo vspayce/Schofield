@@ -185,7 +185,7 @@ class Rider extends Enemy {
     if (ds > 4 && ds < 12 && Math.abs(this.d) < 5) {
       this.atTeam += dt;
       if (this.atTeam > 1 && !this._warned) { this._warned = true; g.hud.banner("They're going for the team!", '', 1.5); }
-      if (this.atTeam > 5) { this.atTeam = 0; this._warned = false; coach.hp -= 12; g.onCoachDamage(); this.targetDs = -6; }
+      if (this.atTeam > 5) { this.atTeam = 0; this._warned = false; g.damageCoach(12); g.onCoachDamage(); this.targetDs = -6; }
     } else this.atTeam = Math.max(0, this.atTeam - dt);
     // riders who've been in the fight a long time peel away
     this.life = (this.life || 0) + dt;

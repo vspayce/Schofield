@@ -320,7 +320,7 @@ export class Player {
   addDeadeye(v) { if (!this.deadeyeOn) this.deadeye = Math.min(1, this.deadeye + v); }
 
   damage(amount, fromPos) {
-    if (this.g.over) return;
+    if (this.g.over || this.g.godMode) return;
     this.hp -= amount; this.lastHit = this.g.time;
     const heavy = amount >= 15;                  // a rifle round, not a pistol
     this.g.hud.damage(fromPos, this.camPos, this.aimDir);

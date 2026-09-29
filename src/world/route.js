@@ -16,6 +16,13 @@ export class Route {
       this.riverSide = gd.side ?? 1;        // which hand the water is on
       this.gorgeDepth = gd.depth ?? 26;     // road ledge height above the water
       this.falls = gd.falls ? { s: def.length * gd.falls.at, drop: gd.falls.drop ?? 30, width: gd.falls.width ?? 26 } : null;
+      this.bridge = gd.bridge ? {
+        s0: def.length * gd.bridge.at - gd.bridge.length * 0.5,
+        s1: def.length * gd.bridge.at + gd.bridge.length * 0.5,
+        width: gd.bridge.width ?? ROAD_HALF * 2,
+        cutHalf: gd.bridge.cutHalf ?? 22,
+        depth: gd.bridge.depth ?? this.gorgeDepth,
+      } : null;
     }
     this.len = def.length;
     this.noise = makeNoise2D(def.seed);
@@ -273,22 +280,30 @@ export class Route {
       const gully = Math.pow(Math.abs(this.noise(x / 21 + 9, z / 21)), 0.7) * 7;
       const fine = fbm(this.noise2, x / 9, z / 9, 3) * 2.2;
       const wallGrain = butt + gully + fine;
+      let y;
       if (sideD > 0) {
         // drop to the water: steep bank, then the river bed
         const t = smoothstep(shelf, shelf + 26, sideD + wallGrain * 0.5);
         const bed = this.riverBedAt(rc.s) - 1.2 + fbm(this.noise, x / 30, z / 30, 2) * 1.4;
-        let y = lerp(rh + crown, bed, t * t * (3 - 2 * t));
+        y = lerp(rh + crown, bed, t * t * (3 - 2 * t));
         // bedding planes: step the face so it terraces like cut rock
         if (t > 0.05 && t < 0.97) {
           const step = 3.2;
           const q = Math.floor(y / step) * step + (y % step) * 0.34;
           y = lerp(y, q, 0.55);
         }
-        return y;
+      } else {
+        const t = smoothstep(shelf, shelf + 34, -sideD + wallGrain * 0.7);
+        y = lerp(rh + crown, Math.max(nat, rh + 12) + wallGrain * 0.8, t * t * (3 - 2 * t));
       }
-      // the inland side climbs into the valley wall
-      const t = smoothstep(shelf, shelf + 34, -sideD + wallGrain * 0.7);
-      return lerp(rh + crown, Math.max(nat, rh + 12) + wallGrain * 0.8, t * t * (3 - 2 * t));
+      if (this.bridge && rc.s >= this.bridge.s0 && rc.s <= this.bridge.s1) {
+        const b = this.bridge;
+        const along = smoothstep(0, 18, rc.s - b.s0) * smoothstep(0, 18, b.s1 - rc.s);
+        const across = 1 - smoothstep(b.width * 0.5 + 1, b.cutHalf, Math.abs(rc.d));
+        const floor = this.roadHeightAt(rc.s) - b.depth + fbm(this.noise2, x / 18, z / 18, 2) * 0.9;
+        y = lerp(y, floor, along * across);
+      }
+      return y;
     }
     if (this.biome === 'canyon') {
       // canyon walls: sandy floor, then steep stepped walls up to the plateau
@@ -337,7 +352,9 @@ export class Route {
   worldAt(s, d, target = new THREE.Vector3()) {
     const f = this.frame(s, _fr);
     const x = f.x + f.rx * d, z = f.z + f.rz * d;
-    return target.set(x, this.height(x, z), z);
+    const y = this.bridge && s >= this.bridge.s0 && s <= this.bridge.s1 && Math.abs(d) <= this.bridge.width * 0.5
+      ? this.roadHeightAt(s) : this.height(x, z);
+    return target.set(x, y, z);
   }
 
   inTown(s) { return this._town && s > this._town.s0 && s < this._town.s1; }

@@ -277,6 +277,7 @@ export class Menus {
         <select id="opt-q">${['low', 'medium', 'high'].map((t) => `<option ${t === q ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <label>Aim sensitivity</label><input id="opt-sens" type="range" min="0.4" max="2" step="0.05" value="${this.g.input.sens}"/>
         <label>Invert Y</label><input id="opt-inv" type="checkbox" ${this.g.input.invertY ? 'checked' : ''}/>
+        <label>God Mode</label><input id="opt-god" type="checkbox" ${this.g.godMode ? 'checked' : ''}/>
         <label>Music</label><input id="opt-mus" type="range" min="0" max="1" step="0.05" value="${audio.volumes.music}"/>
         <label>Effects</label><input id="opt-sfx" type="range" min="0" max="1" step="0.05" value="${audio.volumes.sfx}"/>
       </div>
@@ -286,6 +287,7 @@ export class Menus {
     s('opt-q', (t) => this.g.renderer.setQuality(t.value));
     s('opt-sens', (t) => (this.g.input.sens = +t.value));
     s('opt-inv', (t) => (this.g.input.invertY = t.checked));
+    s('opt-god', (t) => (this.g.godMode = t.checked));
     s('opt-mus', (t) => audio.setVolume('music', +t.value));
     s('opt-sfx', (t) => audio.setVolume('sfx', +t.value));
   }
