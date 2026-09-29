@@ -36,7 +36,7 @@ export const ROUTES = [
       { kind: 'CowSkull', density: 0.1, minRoad: 5, scale: [1, 1] },
     ],
     grass: { density: 3.5, color: C('#c9a860'), height: 0.42 },
-    wildlife: { kinds: ['buffalo', 'buffalo', 'goat', 'goat', 'hawk'], every: 105 },
+    wildlife: { kinds: ['buffalo', 'goat', 'goat', 'bear', 'hawk'], every: 95 },
     railroad: { at: 0.62, workers: 7 },
     waves: [
       { at: 0.08, type: 'riders', count: 2, from: 'behind' },
@@ -184,7 +184,6 @@ export const ROUTES = [
     from: 'Fort Providence', to: 'Cascade',
     blurb: 'A ledge blasted into the gorge wall. The road runs under the falls — go through, or go over the side.',
     seed: 1883, length: 2700, biome: 'gorge', reward: 1800,
-    wip: true,          // the falls aren't finished — hidden from route select
 
     wind: 1.1, winding: 0.75,
     gorge: { side: 1, depth: 27, falls: { at: 0.54, drop: 34, width: 24 } },

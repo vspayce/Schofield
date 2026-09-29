@@ -310,7 +310,7 @@ export class Wildlife {
     const sideSign = Math.random() < 0.5 ? -1 : 1;
     let placed = 0;
     for (let k = 0; k < 24 && placed < want; k++) {
-      const d = sideSign * (10 + Math.random() * 26);
+      const d = sideSign * (8 + Math.random() * 20);   // near enough to see and to shoot
       const ss = s + (Math.random() - 0.5) * 16;
       const p = R.worldAt(ss, d, _v2);
       const slope = Math.hypot(R.height(p.x + 2, p.z) - p.y, R.height(p.x, p.z + 2) - p.y) / 2;
