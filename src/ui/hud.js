@@ -23,6 +23,9 @@ export class HUD {
     this.vHit = $('vignette-hit');
     this.deOverlay = $('deadeye-overlay');
     this.btnDE = $('btn-deadeye');
+    this.dynamiteCount = $('dynamite-count');
+    this.touchDynamiteCount = $('btn-dynamite-count');
+    this.btnDynamite = $('btn-dynamite');
     this.btnWhip = $('btn-whip');
     this.chevLayer = $('chevrons');
     this.chevs = [];
@@ -44,6 +47,12 @@ export class HUD {
   }
 
   show(v) { this.el.classList.toggle('hidden', !v); }
+
+  setDynamite(count) {
+    this.dynamiteCount.textContent = count;
+    this.touchDynamiteCount.textContent = count;
+    this.btnDynamite.classList.toggle('disabled', count === 0);
+  }
 
   setRoute(def) { $('town-from').textContent = def.from; $('town-to').textContent = def.to; }
 

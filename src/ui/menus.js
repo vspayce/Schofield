@@ -254,6 +254,7 @@ export class Menus {
       <p><b>Aim:</b> mouse. <b>Fire:</b> left click. <b>Reload:</b> R. <b>Swap:</b> Q. <b>Whip:</b> W / Shift. <b>Rein:</b> S.</p>`}
       <p><b>Scope:</b> ${touch ? 'the scope button' : 'F'} — long guns only. Magnifies for the men on the ridges.</p>
       <p><b>Dead Eye:</b> ${touch ? 'the eye button' : 'E or right click'}. Time slows. Sweep across outlaws to mark them, then fire to drop every one.</p>
+      <p><b>Dynamite:</b> ${touch ? 'the dynamite button' : 'G'}. Three sticks per run; throw into a group to blast riders from their horses.</p>
 
       <h3 class="how-h">Two things can kill you</h3>
       <p><b>Your health</b> — the heart, top left. It <u>heals itself</u> after four seconds without being hit.

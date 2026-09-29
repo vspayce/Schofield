@@ -122,6 +122,7 @@ export class FX {
     this.light = new THREE.PointLight(0xffb060, 0, 6, 2);
     scene.add(this.light);
     this.lightT = 0;
+    this.blasts = [];
     const L = route.def.light;
     // dust takes its colour from the ground + sun
     this.dustCol = L.ground.clone().lerp(L.sunColor, 0.35).lerp(new THREE.Color(1, 1, 1), 0.25);
@@ -183,6 +184,30 @@ export class FX {
     }
   }
 
+  explosion(pos, radius = 15) {
+    this.add.spawn({ pos: pos.clone().add(new THREE.Vector3(0, 0.7, 0)), life: 0.24, size: 6, size1: 11, color: { r: 1, g: 0.77, b: 0.38 }, alpha: 1, fadeIn: 0 });
+    this.add.spawn({ pos: pos.clone().add(new THREE.Vector3(0, 0.7, 0)), life: 0.12, size: 2.4, size1: 3.8, color: { r: 1, g: 0.97, b: 0.78 }, alpha: 1, fadeIn: 0 });
+    this.dust(pos, { amount: 30, size: 1.8, up: 8, spread: 12 });
+    for (let i = 0; i < 32; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 7 + Math.random() * 11;
+      const vel = new THREE.Vector3(Math.cos(angle) * speed, 2 + Math.random() * 9, Math.sin(angle) * speed);
+      this.add.spawn({ pos, vel, dir: vel, life: 0.28 + Math.random() * 0.3, size: 0.055, size1: 0.025, streak: 0.8, color: { r: 1, g: 0.48 + Math.random() * 0.3, b: 0.12 }, alpha: 1, drag: 1.2, grav: 14, fadeIn: 0 });
+    }
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffa447, transparent: true, opacity: 0.68, side: THREE.BackSide, depthWrite: false, fog: true }),
+    );
+    mesh.position.copy(pos).add(new THREE.Vector3(0, 0.7, 0));
+    mesh.scale.setScalar(0.5);
+    this.scene.add(mesh);
+    this.blasts.push({ mesh, age: 0, duration: 0.42, radius });
+    this.light.position.copy(pos);
+    this.light.intensity = 42;
+    this.light.distance = radius * 2.5;
+    this.lightT = 0.18;
+  }
+
   glint(pos, strength = 1) {
     this.add.spawn({ pos, life: 0.12, size: 1.6 * strength, size1: 1.6 * strength, color: { r: 1, g: 0.95, b: 0.8 }, alpha: 1, spin: 0, fadeIn: 0 });
   }
@@ -202,10 +227,29 @@ export class FX {
 
   update(dt) {
     this.smoke.update(dt); this.add.update(dt);
-    if (this.lightT > 0) { this.lightT -= dt; if (this.lightT <= 0) this.light.intensity = 0; }
+    if (this.lightT > 0) { this.lightT -= dt; if (this.lightT <= 0) { this.light.intensity = 0; this.light.distance = 6; } }
+    for (let i = this.blasts.length - 1; i >= 0; i--) {
+      const blast = this.blasts[i];
+      blast.age += dt;
+      const t = Math.min(1, blast.age / blast.duration);
+      blast.mesh.scale.setScalar(0.5 + blast.radius * t);
+      blast.mesh.material.opacity = 0.68 * (1 - t);
+      if (t >= 1) {
+        this.scene.remove(blast.mesh);
+        blast.mesh.geometry.dispose();
+        blast.mesh.material.dispose();
+        this.blasts.splice(i, 1);
+      }
+    }
   }
 
   dispose() {
     this.scene.remove(this.smoke.mesh, this.add.mesh, this.light);
+    for (const blast of this.blasts) {
+      this.scene.remove(blast.mesh);
+      blast.mesh.geometry.dispose();
+      blast.mesh.material.dispose();
+    }
+    this.blasts.length = 0;
   }
 }

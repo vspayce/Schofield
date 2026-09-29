@@ -56,7 +56,6 @@ export class GorgeBridge {
         beam(timberParts, point(s, d, -0.2), point(s, d, 1.35), 0.28);
       }
       beam(timberParts, point(s, -3.8, -0.48), point(s, 3.8, -0.48), 0.62);
-      beam(timberParts, point(s, -3.45, 1.35), point(s, 3.45, 1.35), 0.28);
     }
     for (let i = 0; i < bents.length - 1; i++) {
       const a = bents[i], b = bents[i + 1];

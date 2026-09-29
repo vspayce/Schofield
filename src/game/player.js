@@ -128,6 +128,7 @@ export class Player {
     this.fov = this.scopeT > 0.001 ? wantFov : damp(this.fov, wantFov, 6, rdt);
     if (Math.abs(this.camera.fov - this.fov) > 0.01) { this.camera.fov = this.fov; this.camera.updateProjectionMatrix(); }
     this.camera.updateMatrixWorld();
+    if (inp.dynamite) g.dynamite?.throw();
 
     // ------------------------------------------------------ body follows aim
     const seat = coach.seatGuard || coach.body;

@@ -9,7 +9,7 @@ export class Input {
     document.body.classList.toggle('touch', this.touch);
     this.dx = 0; this.dy = 0;
     this.fireHeld = false; this.firePressed = false;
-    this.reload = false; this.swap = false; this.deadeye = false; this.scope = false; this.pause = false;
+    this.reload = false; this.swap = false; this.deadeye = false; this.scope = false; this.dynamite = false; this.pause = false;
     this.whip = false; this.brake = false;
     this.enabled = false;
     this.sens = 1;
@@ -21,11 +21,11 @@ export class Input {
   consume() {
     const r = {
       dx: this.dx, dy: this.dy * (this.invertY ? -1 : 1), fire: this.fireHeld, firePressed: this.firePressed,
-      reload: this.reload, swap: this.swap, deadeye: this.deadeye, scope: this.scope, pause: this.pause,
+      reload: this.reload, swap: this.swap, deadeye: this.deadeye, scope: this.scope, dynamite: this.dynamite, pause: this.pause,
       whip: this.whip, brake: this.brake,
     };
     this.dx = this.dy = 0;
-    this.firePressed = this.reload = this.swap = this.deadeye = this.scope = this.pause = false;
+    this.firePressed = this.reload = this.swap = this.deadeye = this.scope = this.dynamite = this.pause = false;
     return r;
   }
 
@@ -55,6 +55,7 @@ export class Input {
         case 'KeyQ': case 'Digit1': case 'Digit2': case 'Tab': this.swap = true; e.preventDefault(); break;
         case 'KeyE': case 'Space': this.deadeye = true; e.preventDefault(); break;
         case 'KeyF': case 'KeyZ': this.scope = true; break;
+        case 'KeyG': if (!e.repeat) this.dynamite = true; break;
         case 'KeyW': case 'ShiftLeft': this.whip = true; break;
         case 'KeyS': case 'ControlLeft': this.brake = true; break;
         case 'Escape': case 'KeyP': this.pause = true; break;
@@ -111,6 +112,7 @@ export class Input {
     btn('btn-fire', 'fire', () => { this.fireHeld = true; this.firePressed = true; });
     btn('btn-reload', 'tap', () => { this.reload = true; });
     btn('btn-swap', 'tap', () => { this.swap = true; });
+    btn('btn-dynamite', 'tap', () => { this.dynamite = true; });
     btn('btn-deadeye', 'tap', () => { this.deadeye = true; });
     btn('btn-scope', 'tap', () => { this.scope = true; });
     btn('btn-whip', 'whip', () => { this.whip = true; });

@@ -23,6 +23,7 @@ import { Wildlife } from './game/wildlife.js';
 import { Crossing } from './game/crossing.js';
 import { createRider, createWeapon } from './game/characters.js';
 import { Combat } from './game/combat.js';
+import { Dynamite } from './game/dynamite.js';
 import { FX } from './game/fx.js';
 import { HUD } from './ui/hud.js';
 import { Menus, save } from './ui/menus.js';
@@ -107,6 +108,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
+    this.dynamite?.dispose(); this.dynamite = null;
     this.crossing?.dispose(); this.crossing = null; this.bridge?.dispose(); this.bridge = null; this.rockArches?.dispose(); this.rockArches = null; this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
@@ -178,6 +180,7 @@ class Game {
     this.coach.update(0.016, {});
     if (mode === 'ride') {
       this.player = new Player(this, this.loadout(weapon));
+      this.dynamite = new Dynamite(this);
       this.enemies.planFor(this.player);
       this.hud.setRoute(def);
     } else {
@@ -351,6 +354,7 @@ class Game {
     coach.update(dt, this.mode === 'ride' && !this.over ? inp : {});
     if (this.mode === 'ride') {
       this.player.update(dt, rdt, this.over ? { dx: 0, dy: 0 } : inp);
+      this.dynamite?.update(dt);
       this.crossing?.update(dt);        // before the enemies: some of them ride it
       this.enemies.update(dt);
       this.wildlife.update(dt);

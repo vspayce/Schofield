@@ -147,6 +147,10 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #ammo-count.low b { color: #ff6a4a; }
 #ammo-name { font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; letter-spacing: .08em; }
 #ammo.reloading #ammo-name::after { content: ' — reloading'; color: var(--brass); }
+#dynamite-stock { position: absolute; top: calc(146px + var(--sat)); right: calc(22px + var(--sar)); display: flex; align-items: center; gap: 8px; font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; }
+#dynamite-stock b { color: var(--ink); font-family: var(--font-title); font-size: 18px; margin-left: 4px; }
+.sticks { display: inline-flex; align-items: center; gap: 2px; height: 24px; transform: rotate(-18deg); }
+.sticks i { display: block; width: 6px; height: 20px; border-radius: 2px; background: linear-gradient(90deg, #76231b, #c04d31 55%, #6c1b16); box-shadow: 0 1px 2px #000; }
 
 #feed { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .feed-item { font-family: var(--font-title); font-size: 18px; color: var(--ink); text-shadow: 0 2px 4px #000, 0 0 12px rgba(0, 0, 0, .6); animation: feed 1.4s ease-out forwards; white-space: nowrap; }
@@ -187,6 +191,10 @@ body.touch #touch { display: block; }
 #btn-fire { right: calc(34px + var(--sar)); bottom: calc(36px + var(--sab)); }
 #btn-reload { right: calc(146px + var(--sar)); bottom: calc(28px + var(--sab)); width: 56px; height: 56px; opacity: .72; }
 #btn-swap { right: calc(48px + var(--sar)); bottom: calc(160px + var(--sab)); width: 52px; height: 52px; opacity: .72; }
+#btn-dynamite { right: calc(132px + var(--sar)); bottom: calc(228px + var(--sab)); width: 62px; height: 62px; border: 1px solid rgba(243, 230, 200, .48); background: radial-gradient(circle, rgba(104, 50, 29, .9), rgba(22, 14, 10, .84)); box-shadow: inset 0 0 0 2px rgba(202, 160, 102, .28), 0 2px 6px #000; }
+#btn-dynamite .sticks { position: absolute; left: 50%; top: 48%; transform: translate(-50%, -50%) rotate(-18deg); }
+#btn-dynamite > span:nth-of-type(2) { bottom: -17px; }
+#btn-dynamite .stock { position: absolute; top: -3px; right: -4px; min-width: 20px; padding: 1px 4px; border: 1px solid rgba(243, 230, 200, .55); border-radius: 10px; background: #25170e; font: 14px var(--font-title); }
 /* left thumb: Dead Eye (most important), whip, rein */
 #btn-deadeye { left: calc(28px + var(--sal)); bottom: calc(118px + var(--sab)); width: 74px; height: 74px; }
 #btn-scope { left: calc(118px + var(--sal)); bottom: calc(128px + var(--sab)); width: 54px; height: 54px; }
