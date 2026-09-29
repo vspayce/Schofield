@@ -110,6 +110,7 @@ export class Menus {
       <div class="m-row" style="margin-top:6px">
         <button class="m-btn ghost" data-act="settings">Settings</button>
         <button class="m-btn ghost" data-act="how">How to Play</button>
+        <button class="m-btn ghost" data-act="reload">Reload</button>
       </div>
       ${fullscreen.needsHomeScreen ? '<div class="m-hint">For full screen on iPhone: tap Share, then <b>Add to Home Screen</b>, and play from the new icon.</div>' : ''}`, false, 'title');
   }
@@ -198,7 +199,8 @@ export class Menus {
   pause() {
     this._show(`<div class="paper"><h2>Paused</h2>
       <div style="margin:10px 0"><button class="m-btn" data-act="resume">Resume</button></div>
-      <div><button class="m-btn ghost" data-act="settings-pause">Settings</button> <button class="m-btn ghost" data-act="restart">Restart</button> <button class="m-btn ghost" data-act="quit">Quit</button></div></div>`);
+      <div><button class="m-btn ghost" data-act="settings-pause">Settings</button> <button class="m-btn ghost" data-act="restart">Restart Run</button> <button class="m-btn ghost" data-act="quit">Quit to Title</button></div>
+      <div style="margin-top:8px"><button class="m-btn ghost sm" data-act="reload">Reload Game</button></div></div>`);
   }
 
   results(r = this.lastResults) {
@@ -312,6 +314,9 @@ export class Menus {
       case 'restart': this.hide(); g.startRide(g.routeIndex); break;
       case 'next': this.hide(); g.startRide(g.routeIndex + 1); break;
       case 'quit': g.toAttract(); this.title(); break;
+      // Fullscreen and home-screen launches have no address bar, so there is no
+      // way to reload a wedged game from outside it.
+      case 'reload': location.reload(); break;
       case 'settings': this.settings('title'); break;
       case 'settings-pause': this.settings('pause'); break;
       case 'how': this.how(); break;
