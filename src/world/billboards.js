@@ -27,10 +27,13 @@ const ADS = [
 ];
 
 function adTexture(ad) {
-  const W = 512, H = 256;
+  // drawn at 512x256 and rendered at twice that, so the lettering stays crisp
+  // on a board this size
+  const W = 512, H = 256, SS = 2;
   const c = document.createElement('canvas');
-  c.width = W; c.height = H;
+  c.width = W * SS; c.height = H * SS;
   const x = c.getContext('2d');
+  x.scale(SS, SS);
   x.fillStyle = ad.paper; x.fillRect(0, 0, W, H);
   // sun-bleached blotches and a few boards' worth of grain
   for (let i = 0; i < 90; i++) {
@@ -56,11 +59,11 @@ function adTexture(ad) {
   fit(ad.mid, 66, 'bold ', inner);
   x.fillText(ad.mid, W / 2, 150);
   x.fillStyle = ad.accent;
-  fit(ad.low, 30, '', inner);
+  fit(ad.low, 34, 'bold ', inner);
   x.fillText(ad.low, W / 2, 200);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
@@ -69,7 +72,7 @@ class Board {
     this.route = route; this.scene = scene; this.ad = ad; this.s = s;
     this.used = false;
     const f = route.frame(s, {});
-    const off = 13 + Math.random() * 5;
+    const off = 15 + Math.random() * 4;
     const x = f.x + f.rx * off * side, z = f.z + f.rz * off * side;
     const y = route.height(x, z);
     this.root = new THREE.Group();
@@ -83,16 +86,16 @@ class Board {
 
     const post = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.95 });
     const back = new THREE.MeshStandardMaterial({ color: 0x6b5336, roughness: 1 });
-    const W = 7.4, H = 3.7, base = 2.6;
-    for (const px of [-W / 2 + 0.5, W / 2 - 0.5]) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.28, base + H, 0.28), post);
+    const W = 11, H = 5.5, base = 3.2;
+    for (const px of [-W / 2 + 0.6, 0, W / 2 - 0.6]) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.34, base + H, 0.34), post);
       p.position.set(px, (base + H) / 2, 0);
       p.castShadow = true; this.root.add(p);
     }
     // bracing
     for (const sx of [-1, 1]) {
-      const br = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.2, 0.18), post);
-      br.position.set(sx * (W / 2 - 0.9), base * 0.8, -0.9);
+      const br = new THREE.Mesh(new THREE.BoxGeometry(0.22, 4.4, 0.22), post);
+      br.position.set(sx * (W / 2 - 1.1), base * 0.85, -1.2);
       br.rotation.x = 0.5; br.castShadow = true; this.root.add(br);
     }
     const panel = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.16), [
