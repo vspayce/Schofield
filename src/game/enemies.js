@@ -254,8 +254,11 @@ class Rider extends Enemy {
 }
 
 // ------------------------------------------------------------ static gunman
-class Gunman extends Enemy {
-  constructor(game, pos, face, { rifle = true, popup = false } = {}) {
+// `carrier` lets him ride something that moves (a boxcar roof): its place(out)
+// puts his feet in the world each frame, and its vel is what he's thrown off
+// with when he's hit.
+export class Gunman extends Enemy {
+  constructor(game, pos, face, { rifle = true, popup = false, carrier = null } = {}) {
     super(game);
     this.type = rifle ? 'rifleman' : 'gunman';
     this.man = createRider({ variant: 'gunman', tint: CLOTH[Math.floor(Math.random() * CLOTH.length)] });
@@ -272,6 +275,7 @@ class Gunman extends Enemy {
     this.fireT = (rifle ? 3 : 2) + Math.random() * 2;
     this.glintT = -1;
     this.popup = popup; this.pop = popup ? 0 : 1;
+    this.carrier = carrier;
     this.spheres = [{ part: 'head', c: new THREE.Vector3(), r: 0.17 }, { part: 'body', c: new THREE.Vector3(), r: 0.36 }];
     this.update(0);
   }
@@ -279,6 +283,8 @@ class Gunman extends Enemy {
   update(dt) {
     const g = this.g, coach = g.coach;
     this.man.update(dt);
+    if (this.alive && this.carrier) this.root.position.copy(this.carrier.place(this.base));
+    if (this.fall) this._falling(dt);
     if (this.alive) {
       // face the coach
       const dir = _v.subVectors(coach.pos, this.root.position);
@@ -341,9 +347,39 @@ class Gunman extends Enemy {
       if (this.man.has('DieStanding')) this.man.play('DieStanding', { once: true, fade: 0.08 });
       else this.man.play('FallOff', { once: true, fade: 0.08 });
       this.removeAt = this.g.time + 8;
+      if (this.carrier) {
+        // off the roof: he keeps the car's speed, the shot shoves him over the
+        // side, and he tumbles until the ground stops him
+        const push = _v.set(dir.x, 0, dir.z);
+        if (push.lengthSq() < 1e-4) push.set(1, 0, 0);
+        push.normalize();
+        const vel = this.carrier.vel.clone().multiplyScalar(0.85).addScaledVector(push, 2.6).add(_v2.set(0, 1.6, 0));
+        const axis = new THREE.Vector3(push.z, 0, -push.x);
+        this.fall = { vel, axis, spin: 0, landed: false, yaw: this.root.rotation.y };
+        this.removeAt = this.g.time + 12;
+      }
       return true;
     }
     return false;
+  }
+
+  _falling(dt) {
+    const f = this.fall, o = this.root, R = this.g.route;
+    if (f.landed) return;
+    f.vel.y -= 14 * dt;
+    o.position.addScaledVector(f.vel, dt);
+    // topple toward the push while he's in the air
+    f.spin = Math.min(1.3, f.spin + dt * 2.6);
+    o.quaternion.setFromAxisAngle(f.axis, -f.spin).multiply(_q.setFromAxisAngle(_v.set(0, 1, 0), f.yaw));
+    const gh = R.height(o.position.x, o.position.z);
+    if (o.position.y <= gh) {
+      o.position.y = gh;
+      f.landed = true;
+      // settle flat: the death clip lies him down from upright
+      o.quaternion.setFromAxisAngle(_v.set(0, 1, 0), Math.atan2(f.vel.x, f.vel.z) + Math.PI);
+      this.g.fx.dust(o.position, { amount: 10, size: 0.7, up: 1.5 });
+      audio.play('hit_wood_2', { position: o.position, volume: 0.6, pitch: 0.6 });
+    }
   }
 
   dispose() { this.g.scene.remove(this.root); }
