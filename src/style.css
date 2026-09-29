@@ -355,3 +355,24 @@ body.touch #btn-pause { display: block; }
   .job-card { padding: 8px 10px; gap: 2px; }
   .job-card p { display: none; }
 }
+
+.paper .how-h { font-family: var(--font-title); font-size: clamp(15px, 2.2vw, 19px); margin: 12px 0 2px; color: #6b3a0e; }
+.paper u { text-decoration-color: rgba(107, 58, 14, .5); }
+@media (max-height: 480px) { .paper .how-h { font-size: 14px; margin: 7px 0 1px; } }
+/* A long paper (How to Play) grows to its content and the wrapper scrolls.
+   body sets touch-action:none for the aim drag, so menus must opt back in or
+   the overflow is unreachable on a phone. */
+#menu.tall .paper { max-height: none; flex-shrink: 0; }
+.m-wrap { touch-action: pan-y; }
+#menu .paper { touch-action: pan-y; }
+
+.coach-cond { font-family: var(--font-sc); font-size: 15px; margin: 8px 0 2px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; display: flex; align-items: center; gap: 8px; justify-content: center; }
+.coach-cond b { font-family: var(--font-title); color: var(--ink); }
+.coach-cond.bad b { color: #ff7a5a; }
+
+/* the heart kicks when you take a hit; harder for a rifle round */
+#hp-meter.flash .bar { box-shadow: 0 0 12px #ff4a3a; border-color: #ff6a55; }
+#hp-meter.flash img { animation: hpkick .38s ease-out; }
+#hp-meter.heavy .bar { box-shadow: 0 0 22px #ff2a18; border-color: #ff3b2f; }
+#hp-meter.heavy img { animation: hpkick .62s ease-out; }
+@keyframes hpkick { 0% { transform: scale(1.55); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }

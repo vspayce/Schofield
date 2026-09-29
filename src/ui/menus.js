@@ -46,6 +46,28 @@ export const save = {
   // the job you're hauling
   get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'mail'; },
   set mission(v) { this.data.mission = v; persist(this.data); },
+
+  // ---------------------------------------------------------- the coach
+  // Damage carries between runs. The driver patches what he can for nothing
+  // between towns; anything better costs money at the livery.
+  FREE_PATCH: 18,
+  REPAIR_RATE: 5,          // dollars per point of condition
+  get coachHp() { return this.data.coachHp === undefined ? 100 : this.data.coachHp; },
+  set coachHp(v) { this.data.coachHp = Math.max(0, Math.min(100, Math.round(v))); persist(this.data); },
+  // called when a run ends: bank the wear, then the free patch
+  wearCoach(endHp) { this.coachHp = Math.min(100, Math.max(0, endHp) + this.FREE_PATCH); },
+  repairCost(to = 100) { return Math.max(0, Math.ceil((to - this.coachHp) * this.REPAIR_RATE)); },
+  repair() {
+    const cost = this.repairCost();
+    if (cost <= 0) return 'full';
+    const afford = Math.min(cost, this.cash);
+    if (afford < this.REPAIR_RATE) return 'poor';
+    const points = Math.floor(afford / this.REPAIR_RATE);
+    this.data.cash -= points * this.REPAIR_RATE;
+    this.coachHp = this.coachHp + points;
+    persist(this.data);
+    return points;
+  },
 };
 
 function click() { audio.play('ui_click', { volume: 0.6 }); }
@@ -145,6 +167,8 @@ export class Menus {
     this._show(`<h2 class="m-title">${ROUTES[i].name}</h2>
       <div class="m-tag" style="margin:-6px 0 12px">Tap the gun to start with in hand. Swap any time on the coach.</div>
       <div class="m-row">${slot('side', 'Sidearm', SIDEARMS)}${slot('long', 'Long gun', LONG_GUNS)}</div>
+      <div class="coach-cond ${save.coachHp < 55 ? 'bad' : ''}">Coach condition <b>${save.coachHp}%</b>${
+        save.coachHp < 100 ? ` · <button class="m-btn ghost sm" data-act="repair">Repair $${save.repairCost()}</button>` : ' · sound'}</div>
       <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="jobs">${MISSIONS[save.mission].name} ▸</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn" data-act="go">All Aboard</button></div>`, true, 'tall');
   }
 
@@ -212,16 +236,28 @@ export class Menus {
 
   how() {
     const touch = this.g.input.touch;
-    this._show(`<div class="paper" style="text-align:left;max-width:640px">
+    this._show(`<div class="paper" style="text-align:left;max-width:700px">
       <h2 style="text-align:center">How to Ride Shotgun</h2>
       ${touch ? `
       <p><b>Aim:</b> drag anywhere on the right. Dragging from the FIRE button aims while you shoot.</p>
-      <p><b>Fire / Reload / Swap:</b> buttons at bottom right. Swap between the Schofield and the coach gun any time.</p>
+      <p><b>Fire / Reload / Swap:</b> buttons at bottom right. Swap between your sidearm and long gun any time.</p>
       <p><b>Whip / Rein:</b> buttons at left. The team tires if you whip too long.</p>` : `
       <p><b>Aim:</b> mouse. <b>Fire:</b> left click. <b>Reload:</b> R. <b>Swap:</b> Q. <b>Whip:</b> W / Shift. <b>Rein:</b> S.</p>`}
+      <p><b>Scope:</b> ${touch ? 'the scope button' : 'F'} — long guns only. Magnifies for the men on the ridges.</p>
       <p><b>Dead Eye:</b> ${touch ? 'the eye button' : 'E or right click'}. Time slows. Sweep across outlaws to mark them, then fire to drop every one.</p>
-      <p><b>Riflemen</b> flash a glint before they shoot. Drop them first. Riders who reach the team will hurt the coach.</p>
-      <div style="text-align:center"><button class="m-btn" data-act="title">Got It</button></div></div>`);
+
+      <h3 class="how-h">Two things can kill you</h3>
+      <p><b>Your health</b> — the heart, top left. It <u>heals itself</u> after four seconds without being hit.
+      Shoot a buffalo, bear or goat and the meat restores more: a buffalo is worth 25.</p>
+      <p><b>The coach</b> — the wagon meter under it. This one does <u>not</u> heal on its own, and if it reaches
+      zero the run is over even at full health. It only gets patched up <b>+10 each time you clear a wave</b>,
+      so leaving enemies alive is what bleeds it dry. Riders who reach the team hurt it badly, and so does
+      running into anything on the road — rein in for the buffalo.</p>
+
+      <h3 class="how-h">Watch for</h3>
+      <p><b>Riflemen</b> on the ridges flash a glint before they shoot and hit far harder than riders. Drop them first.</p>
+      <p><b>The bracket</b> around a shooter shows his range; it flashes red when he's about to fire.</p>
+      <div style="text-align:center"><button class="m-btn" data-act="title">Got It</button></div></div>`, true, 'tall');
   }
 
   settings(back = 'title') {
@@ -258,6 +294,12 @@ export class Menus {
         const owned = (slot === 'side' ? SIDEARMS : LONG_GUNS).filter((w) => save.owns(w.id));
         const k = owned.indexOf(WEAPONS[save.equipped(slot)]);
         save.equip(owned[(k + +step + owned.length) % owned.length].id);
+        this.loadout(this.routeIndex); break;
+      }
+      case 'repair': {
+        const r = save.repair();
+        if (r === 'poor') g.hud.feedMsg?.('Not enough for the livery', false);
+        else audio.play('ui_click', { volume: 0.7, pitch: 0.8 });
         this.loadout(this.routeIndex); break;
       }
       case 'shop': this.gunsmith(arg); break;
