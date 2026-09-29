@@ -74,8 +74,11 @@ class Board {
     const y = route.height(x, z);
     this.root = new THREE.Group();
     this.root.position.set(x, y, z);
-    // face the road
-    this.root.rotation.y = Math.atan2(-f.rx * side, -f.rz * side);
+    // Face the coming coach, not straight across the road: square-on to the
+    // road the board is edge-on the whole way in and only reads as you pass.
+    // Aim at the road a good way back, which angles it like a real roadside sign.
+    const toward = route.frame(Math.max(0, s - 45), {});
+    this.root.rotation.y = Math.atan2(toward.x - x, toward.z - z);
     scene.add(this.root);
 
     const post = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.95 });

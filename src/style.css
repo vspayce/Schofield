@@ -34,7 +34,7 @@ html, body {
 }
 #deadeye-overlay {
   position: absolute; inset: 0; opacity: 0; transition: opacity .35s;
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(90, 10, 0, .55) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(70, 50, 15, .5) 100%); /* umber, never red: red is damage */
   mix-blend-mode: multiply;
 }
 #deadeye-overlay.on { opacity: 1; }

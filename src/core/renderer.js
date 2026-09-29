@@ -101,17 +101,20 @@ const FinalShader = {
       l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat);
 
-      // Dead Eye: sepia/orange wash, crushed blues, red edges
+      // Dead Eye: an old gold sepia, like a tintype. Deliberately no red —
+      // red at the edges means you're hurt, and the two must never be confused.
       if (de > 0.001) {
-        vec3 sep = vec3(l * 1.25, l * 0.92, l * 0.62);
-        col = mix(col, sep, 0.72 * de);
-        col = mix(col, col * vec3(1.15, 0.9, 0.75), de);
+        vec3 sep = vec3(l * 1.18, l * 1.04, l * 0.66);
+        col = mix(col, sep, 0.78 * de);
+        col = mix(col, col * vec3(1.08, 1.0, 0.78), de);
       }
 
       // vignette (stronger in Dead Eye / when hit)
       vec2 vc = cc * vec2(uAspect, 1.0) / uAspect * 1.9;
       float v = smoothstep(0.35, 1.25, length(vc));
-      col *= 1.0 - v * (uVignette + 0.35 * de + 0.3 * uHit);
+      col *= 1.0 - v * (uVignette + 0.3 * uHit);
+      // Dead Eye edges burn to dark umber, not red
+      col = mix(col, col * vec3(0.55, 0.45, 0.25), v * de * 0.8);
       col = mix(col, col * vec3(1.35, 0.35, 0.3), v * uHit * 0.9);
 
       // film grain
