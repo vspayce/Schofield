@@ -166,10 +166,22 @@ Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index
   twos and threes on the boardwalks and turn to watch the stage come in. The
   ghost town stays deserted. Rider meshes have frustum culling off, so folk are
   hidden and unanimated beyond 150 m.
-- `src/world/railroad.js` — a line under construction crossing the road: graded
-  ballast, ties, rail up to a railhead just past the crossing, a water tower from
-  the town kit, material stacks and a gang swinging sledges. No trains. The coach
-  bangs over the rails. Per-route as `railroad: { at, workers }`.
+- `src/world/railroad.js` — a line crossing the road: graded ballast, ties, rail,
+  a water tower from the town kit, material stacks and a gang swinging sledges.
+  The coach bangs over the rails. Per-route as `railroad: { at, workers, train }`.
+  Without `train` the line is under construction and stops at a railhead just past
+  the crossing. With one, it is finished and runs out each way until the ground
+  would need a cutting (so no train drives into a mesa), and the site is chosen
+  for a long clear run.
+- `src/game/train.js` — a 4-4-0 locomotive, tender and boxcars, built from
+  primitives in code (no GLB) and baked to a few meshes per car. Timed like the
+  herd: across the road just as a coach at cruise would get there, so reining in
+  is the answer. With the train on the crossing, reining brings the team to a
+  full stand (`Coach.hold`); drive onto it and the coach is thrown back, damaged,
+  and the driver holds the team until it's by (`Coach.halt`). Gunmen ride the
+  boxcar roofs — the ordinary `Gunman` from `enemies.js`, carried by their car —
+  and the cars stop bullets. Whistle and exhaust are synthesised on the WebAudio
+  graph. Route def: `train: { cars, gunmen, speed, early }`.
 
 ## Code layout
 ```

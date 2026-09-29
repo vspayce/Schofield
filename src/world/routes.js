@@ -38,7 +38,7 @@ export const ROUTES = [
     grass: { density: 3.5, color: C('#c9a860'), height: 0.42 },
     wildlife: { kinds: ['buffalo', 'goat', 'goat', 'bear', 'hawk'], every: 95 },
     billboards: { count: 3 },
-    railroad: { at: 0.62, workers: 7 },
+    railroad: { at: 0.62, workers: 7, train: { cars: 4, gunmen: 5 } },
     waves: [
       { at: 0.08, type: 'riders', count: 2, from: 'behind' },
       { at: 0.2, type: 'riders', count: 3, from: 'flank' },
@@ -102,7 +102,7 @@ export const ROUTES = [
     seed: 1877, length: 2400, biome: 'desert', reward: 900,
     wildlife: { kinds: ['goat', 'goat', 'hawk'], every: 130 },
     billboards: { count: 3 },
-    railroad: { at: 0.34, workers: 5 },
+    railroad: { at: 0.34, workers: 5, train: { cars: 3, gunmen: 4 } },
     wind: 1.0, winding: 0.25,
     ghostTown: { start: 0.38, length: 420 },
     light: {

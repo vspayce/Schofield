@@ -18,6 +18,7 @@ import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
 import { Wildlife } from './game/wildlife.js';
+import { Train } from './game/train.js';
 import { createRider, createWeapon } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
@@ -98,7 +99,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
+    this.enemies?.dispose(); this.wildlife?.dispose(); this.train?.dispose(); this.train = null; this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -155,6 +156,8 @@ class Game {
     this.combat = new Combat(this);
     this.enemies = new Enemies(this);
     this.wildlife = new Wildlife(this);
+    // only on a ride: the title cinematic has nobody on the reins
+    this.train = mode === 'ride' && this.rail?.train ? new Train(this, this.rail, this.rail.train) : null;
     this.mode = mode;
     this.over = false; this.arrived = false;
     this.bounty = 0; this.hud.setBounty(0);
@@ -325,6 +328,7 @@ class Game {
     coach.update(dt, this.mode === 'ride' && !this.over ? inp : {});
     if (this.mode === 'ride') {
       this.player.update(dt, rdt, this.over ? { dx: 0, dy: 0 } : inp);
+      this.train?.update(dt);          // before the enemies, so roof men ride with their car
       this.enemies.update(dt);
       this.wildlife.update(dt);
       if (!this.over && coach.s >= this.route.len - 40) this.arrive();

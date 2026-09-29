@@ -33,6 +33,11 @@ export class Combat {
       const p = _ray.intersectBox(box, _v);
       if (p) { const t = p.distanceTo(origin); if (t > 1.5 && t < occT) { occT = t; occKind = 'wood'; } }
     }
+    // the cars of a passing train
+    if (g.train) {
+      const t = g.train.raycast(origin, dir, occT);
+      if (t > 1.5 && t < occT) { occT = t; occKind = 'wood'; }
+    }
     if (hit && (guaranteed || hit.t < occT)) {
       const e = hit.enemy, part = hit.part;
       const fall = 1 - smoothstep(W.falloff[0], W.falloff[1], hit.t) * (1 - W.floor);

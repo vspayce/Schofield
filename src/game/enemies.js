@@ -254,8 +254,10 @@ class Rider extends Enemy {
 }
 
 // ------------------------------------------------------------ static gunman
-class Gunman extends Enemy {
-  constructor(game, pos, face, { rifle = true, popup = false } = {}) {
+// `carrier` + `seat`: stand on something that moves (a boxcar roof — see
+// train.js), at `seat` in its local frame, rather than on fixed ground.
+export class Gunman extends Enemy {
+  constructor(game, pos, face, { rifle = true, popup = false, carrier = null, seat = null } = {}) {
     super(game);
     this.type = rifle ? 'rifleman' : 'gunman';
     this.man = createRider({ variant: 'gunman', tint: CLOTH[Math.floor(Math.random() * CLOTH.length)] });
@@ -272,6 +274,7 @@ class Gunman extends Enemy {
     this.fireT = (rifle ? 3 : 2) + Math.random() * 2;
     this.glintT = -1;
     this.popup = popup; this.pop = popup ? 0 : 1;
+    this.carrier = carrier; this.seat = seat;
     this.spheres = [{ part: 'head', c: new THREE.Vector3(), r: 0.17 }, { part: 'body', c: new THREE.Vector3(), r: 0.36 }];
     this.update(0);
   }
@@ -279,6 +282,8 @@ class Gunman extends Enemy {
   update(dt) {
     const g = this.g, coach = g.coach;
     this.man.update(dt);
+    // riding along, dead or alive
+    if (this.carrier) this.carrier.localToWorld(this.root.position.copy(this.seat));
     if (this.alive) {
       // face the coach
       const dir = _v.subVectors(coach.pos, this.root.position);

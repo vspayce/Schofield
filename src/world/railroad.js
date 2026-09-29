@@ -1,6 +1,9 @@
-// A railroad crossing being built: graded ballast, ties, rail, a water tower and
-// a gang of workers still laying track. Rail runs through the crossing and stops
-// at the railhead just past it, where the gang is working. No trains yet.
+// A railroad crossing: graded ballast, ties, rail, a water tower and a gang of
+// workers. Without a train the line is still being built — rail runs through
+// the crossing and stops at the railhead just past it, where the gang is
+// working. With one (`train` in the route's railroad def, run by
+// game/train.js) the line is finished end to end and the gang stands clear,
+// tamping ballast by the tower.
 //
 // All of it is procedural except the water tower, which is the town kit's, and
 // the workers, who are rider models posed with a sledge.
@@ -11,9 +14,24 @@ import { mulberry32 } from '../core/noise.js';
 
 const _v = new THREE.Vector3();
 
-// how far the line runs either side of the road before it fades out
-const REACH = 150;
+// how far the line runs either side of the road before it fades out; a line
+// with a train on it runs further, so the train is seen coming a long way off
+const REACH = 150, REACH_TRAIN = 320;
 const TIE_GAP = 0.62;
+// a line with a train runs out only as far as the ground allows: it stops (and
+// fades out) where it would have to be cut more than this deep into a hill,
+// since there's no cutting to show and a train can't run through a mesa
+const MAX_CUT = 1.0;
+
+// how far the graded line from (x, z, y0) runs along `dir` (sgn = +/-1) before
+// the ground rises more than MAX_CUT above it
+function clearRun(R, x, z, y0, dir, grade, sgn) {
+  for (let d = 5; d <= REACH_TRAIN; d += 5) {
+    const u = d * sgn;
+    if (R.height(x + dir.x * u, z + dir.z * u) - (y0 + grade * u) > MAX_CUT) return d - 5;
+  }
+  return REACH_TRAIN;
+}
 
 export class Railroad {
   constructor(route, scene, def) {
@@ -21,6 +39,7 @@ export class Railroad {
     this.group = new THREE.Group(); scene.add(this.group);
     this.workers = [];
     this.solids = [];
+    this.train = def.train || null;
     const rnd = mulberry32(route.def.seed + 17);
     // A railroad is graded, not draped over hills, so it wants flat ground.
     // Search near the requested point for the corridor with the least fall.
@@ -33,10 +52,14 @@ export class Railroad {
     // Grade: level through the crossing so the road meets it flush, then a
     // gentle ruling gradient away. Real track never exceeds a couple of percent.
     this.grade = THREE.MathUtils.clamp(pick.slope, -0.018, 0.018);
+    // how far the line runs each way from the road: behind (-u) and ahead (+u)
+    this.ends = this.train ? { neg: pick.neg, pos: pick.pos } : { neg: REACH, pos: REACH };
+    this.reach = Math.max(this.ends.neg, this.ends.pos);
 
     // Track is laid from one side, through the crossing, and the gang is still
     // working at the railhead just past the road. Beyond that, only graded bed.
     this.built = 24 + rnd() * 18;
+    if (this.train) this.built = this.ends.pos;
     this._ballast(rnd);
     this._ties(rnd);
     this._rails();
@@ -45,14 +68,18 @@ export class Railroad {
 
   // Score candidate crossings within +/-8% of the route for how flat the rail
   // corridor is, and take the best. Returns its s, direction and best-fit slope.
+  // A line that carries a train also wants a long clear run each side of the
+  // road, so the train is seen coming, and gets more tries and a wider swing
+  // of direction to find one.
   _site(want, rnd) {
     const R = this.route;
     const span = Math.min(0.08 * R.len, 260);
     let best = null;
-    for (let k = 0; k < 26; k++) {
+    const tries = this.train ? 70 : 26, swing = this.train ? 1.1 : 0.45;
+    for (let k = 0; k < tries; k++) {
       const s = Math.round(THREE.MathUtils.clamp(want + (rnd() - 0.5) * 2 * span, 140, R.len - 200));
       const f = R.frame(s, {});
-      const ang = Math.atan2(f.rx, f.rz) + (rnd() - 0.5) * 0.45;
+      const ang = Math.atan2(f.rx, f.rz) + (rnd() - 0.5) * swing;
       const dir = new THREE.Vector3(Math.sin(ang), 0, Math.cos(ang));
       // sample terrain along the corridor and fit a line through it
       const us = [], ys = [];
@@ -67,8 +94,18 @@ export class Railroad {
       // residual off that best-fit line = how much cut and fill the line needs
       let resid = 0;
       for (let i = 0; i < n; i++) resid += Math.abs(ys[i] - (my + slope * us[i]));
-      const score = -resid / n - Math.abs(slope) * 40;
-      if (!best || score > best.score) best = { s, dir, slope, score };
+      let score = -resid / n - Math.abs(slope) * 40;
+      let neg = REACH, pos = REACH;
+      if (this.train) {
+        const y0 = R.roadHeightAt(s), grade = THREE.MathUtils.clamp(slope, -0.018, 0.018);
+        neg = clearRun(R, f.x, f.z, y0, dir, grade, -1);
+        pos = clearRun(R, f.x, f.z, y0, dir, grade, 1);
+        // the train needs one long side to come in from; the other can be shorter
+        score += Math.max(neg, pos) * 0.03 + Math.min(neg, pos) * 0.015;
+        // and the side it leaves by must hold the whole train clear of the road
+        if (Math.min(neg, pos) < 120) score -= 20;
+      }
+      if (!best || score > best.score) best = { s, dir, slope, score, neg, pos };
     }
     return best;
   }
@@ -90,7 +127,8 @@ export class Railroad {
   // rather than draped over the landscape.
   _ballast(rnd) {
     const R = this.route;
-    const segs = Math.floor((REACH * 2) / 3);
+    const lo = -this.ends.neg, hi = this.ends.pos;
+    const segs = Math.floor((hi - lo) / 3);
     const pos = [], idx = [], uvs = [];
     const side = new THREE.Vector3(this.dir.z, 0, -this.dir.x);
     const TOP = 2.5;          // half-width of the ballast top
@@ -101,9 +139,9 @@ export class Railroad {
       return [x, y === undefined ? R.height(x, z) : y, z];
     };
     for (let i = 0; i <= segs; i++) {
-      const u = -REACH + (i / segs) * REACH * 2;
+      const u = lo + (i / segs) * (hi - lo);
       const gy = this._gradeY(u);
-      const fade = Math.min(1, (REACH - Math.abs(u)) / 30);
+      const fade = Math.max(0, Math.min(1, (u - lo) / 30, (hi - u) / 30));
       // how far the bed stands proud of the ground here
       const gnd = R.height(this.centre.x + this.dir.x * u, this.centre.z + this.dir.z * u);
       const fill = Math.max(0, (gy - gnd)) * fade;
@@ -137,7 +175,7 @@ export class Railroad {
 
   // sleepers, laid from the far side through the crossing to the railhead
   _ties(rnd) {
-    const n = Math.floor((REACH + this.built) / TIE_GAP);
+    const n = Math.floor((this.ends.neg + this.built) / TIE_GAP);
     if (n <= 0) return;
     const geo = new THREE.BoxGeometry(0.22, 0.14, 2.4);
     const mat = new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.95 });
@@ -147,12 +185,12 @@ export class Railroad {
     const yaw = Math.atan2(this.dir.x, this.dir.z);
     let k = 0;
     for (let i = 0; i < n; i++) {
-      const u = -REACH + i * TIE_GAP;
+      const u = -this.ends.neg + i * TIE_GAP;
       if (u > this.built) break;
       const p = this._at(u, _v.clone());
       p.y += 0.2;
       // the last few are dropped in loose and crooked
-      const near = u > this.built - 9;
+      const near = !this.train && u > this.built - 9;
       q.setFromEuler(new THREE.Euler(0, yaw + (near ? (rnd() - 0.5) * 0.35 : (rnd() - 0.5) * 0.03), near ? (rnd() - 0.5) * 0.12 : 0, 'YXZ'));
       mtx.compose(p, q, sc);
       im.setMatrixAt(k++, mtx);
@@ -168,7 +206,7 @@ export class Railroad {
     const side = new THREE.Vector3(this.dir.z, 0, -this.dir.x);
     for (const k of [-0.717, 0.717]) {          // standard gauge, near enough
       const pts = [];
-      for (let u = -REACH; u <= this.built; u += 3) {
+      for (let u = -this.ends.neg; u <= this.built; u += 3) {
         const c = this._at(u, _v.clone());
         pts.push(new THREE.Vector3(c.x + side.x * k, c.y + 0.31, c.z + side.z * k));
       }
@@ -185,6 +223,10 @@ export class Railroad {
   _camp(rnd, def) {
     const side = new THREE.Vector3(this.dir.z, 0, -this.dir.x);
     const t = assets.models.town, pr = assets.models.props;
+    // where the gang and their stacks are: the railhead, or on a finished line
+    // a stretch past the crossing, and then well clear of the cars going by
+    const work = this.train ? Math.max(14, Math.min(34 + rnd() * 10, this.ends.pos - 10)) : this.built;
+    const clear = this.train ? 2.2 : 0;
 
     // water tower, set back from the line on the far side of the road
     const tower = t && findNode(t.scene, 'WaterTower');
@@ -204,7 +246,7 @@ export class Railroad {
     const tieGeo = new THREE.BoxGeometry(0.22, 0.14, 2.4);
     const tieMat = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.95 });
     for (let st = 0; st < 3; st++) {
-      const base = this._at(this.built - 6 - st * 5, new THREE.Vector3()).addScaledVector(side, (rnd() < 0.5 ? -1 : 1) * (3.6 + rnd() * 1.6));
+      const base = this._at(work - 6 - st * 5, new THREE.Vector3()).addScaledVector(side, (rnd() < 0.5 ? -1 : 1) * (3.6 + clear + rnd() * 1.6));
       base.y = this.route.height(base.x, base.z);
       const rows = 3 + Math.floor(rnd() * 3);
       for (let r = 0; r < rows; r++) {
@@ -224,8 +266,8 @@ export class Railroad {
         if (!src) continue;
         for (let i = 0; i < count; i++) {
           const o = src.clone(true);
-          const p = this._at(this.built - 2 - rnd() * 18, new THREE.Vector3())
-            .addScaledVector(side, (rnd() < 0.5 ? -1 : 1) * (3 + rnd() * 5));
+          const p = this._at(work - 2 - rnd() * 18, new THREE.Vector3())
+            .addScaledVector(side, (rnd() < 0.5 ? -1 : 1) * (3 + clear + rnd() * 5));
           p.y = this.route.height(p.x, p.z);
           o.position.copy(p);
           o.rotation.y = rnd() * 6.3;
@@ -239,8 +281,8 @@ export class Railroad {
     const n = def.workers ?? 6;
     for (let i = 0; i < n; i++) {
       const w = createRider({ variant: i % 3 === 0 ? 'driver' : 'gunman' });
-      const u = this.built - 1 - rnd() * 12;
-      const p = this._at(u, new THREE.Vector3()).addScaledVector(side, (i % 2 ? 1 : -1) * (1.4 + rnd() * 2.6));
+      const u = work - 1 - rnd() * 12;
+      const p = this._at(u, new THREE.Vector3()).addScaledVector(side, (i % 2 ? 1 : -1) * (1.4 + clear + rnd() * 2.6));
       p.y = this.route.height(p.x, p.z);
       w.root.position.copy(p);
       // face the rails
