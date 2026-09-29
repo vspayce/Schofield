@@ -55,6 +55,12 @@ good silhouettes do the heavy lifting, not polygon counts.
 3. **Perdition** — through a ghost town at dusk: gunmen in windows and rooftops, riders in
    the main street.
 4. **Devil's Gulch** — red canyon at sunset, everything at once.
+5. **Thunder Gorge** — Fort Providence → Cascade. A ledge road above a river gorge; a
+   stream pours off a stone arch (`src/world/fallsrock.js`, merged procedural
+   boulders) straight across the road, and the coach drives through the curtain.
+   Going through: a splash and the coach rocks, the falls' synthesized roar opens
+   up, and water sheets then beads down the lens for a few seconds (`uWet` /
+   `uSheet` in the renderer's final pass, driven by `Water._burst`).
 
 ## World conventions (ALL assets must follow)
 - Units: **metres**. Y-up in three.js. glTF 2.0 binary (`.glb`).

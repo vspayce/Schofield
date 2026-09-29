@@ -14,6 +14,8 @@ const FinalShader = {
     uExposure: { value: 1.0 },
     uDeadeye: { value: 0 },
     uHit: { value: 0 },
+    uWet: { value: 0 },
+    uSheet: { value: 0 },
     uVignette: { value: 0.55 },
     uGrain: { value: 0.035 },
     uSat: { value: 1.08 },
@@ -28,7 +30,7 @@ const FinalShader = {
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
-    uniform float uTime, uExposure, uDeadeye, uHit, uVignette, uGrain, uSat, uContrast, uAspect;
+    uniform float uTime, uExposure, uDeadeye, uHit, uVignette, uGrain, uSat, uContrast, uAspect, uWet, uSheet;
     uniform vec3 uLift, uGain, uTintShadow;
     varying vec2 vUv;
 
@@ -39,9 +41,41 @@ const FinalShader = {
     }
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
+    // Water on the lens: one layer of beads on a grid, each cell's bead sliding
+    // down at its own pace. Returns the refraction offset; w = bead coverage.
+    vec2 beads(vec2 uv, float scale, float speed, float fill, out float w) {
+      vec2 p = uv * vec2(uAspect, 1.0) * scale;
+      float col = floor(p.x);
+      p.y += uTime * speed * (0.35 + hash(vec2(col, 3.1)));
+      vec2 id = floor(p), f = fract(p) - 0.5;
+      float h = hash(id);
+      if (fract(h * 31.3) > fill) { w = 0.0; return vec2(0.0); }
+      vec2 c = vec2(h - 0.5, fract(h * 7.1) - 0.5) * 0.55;
+      float r = mix(0.12, 0.3, fract(h * 13.7));
+      vec2 q = (f - c) * vec2(1.0, 1.25);
+      float d = length(q);
+      w = smoothstep(r, r * 0.55, d);
+      // a short wet trail above each bead, where it has run from
+      float trail = smoothstep(0.05, 0.0, abs(f.x - c.x)) * step(c.y, f.y) * smoothstep(0.5, 0.0, f.y - c.y) * 0.35;
+      w = max(w, trail);
+      return q / max(r, 0.001) * w;
+    }
+
     void main() {
       vec2 uv = vUv;
       vec2 cc = uv - 0.5;
+      // fresh out of the falls: water sheeting then beading on the lens
+      float wetLit = 0.0;
+      if (uWet > 0.001 || uSheet > 0.001) {
+        float w1, w2, w3;
+        vec2 o = beads(uv, 7.0, 0.05, 0.55, w1) * 0.045
+               + beads(uv + 0.37, 13.0, 0.09, 0.45, w2) * 0.026
+               + beads(uv + 0.71, 24.0, 0.0, 0.5, w3) * 0.012;
+        uv += o * uWet;
+        wetLit = (w1 + w2 * 0.7 + w3 * 0.5) * uWet;
+        // inside the sheet itself: the whole view runs and ripples
+        uv += vec2(sin(uv.y * 38.0 + uTime * 9.0), sin(uv.x * 23.0 - uTime * 14.0)) * 0.012 * uSheet;
+      }
       // Dead Eye: slight barrel + chromatic split toward the edges
       float de = uDeadeye;
       vec3 hdr;
@@ -54,6 +88,8 @@ const FinalShader = {
       } else {
         hdr = texture2D(tDiffuse, uv).rgb;
       }
+      if (wetLit > 0.0) hdr = mix(hdr, hdr * 1.2 + 0.05, clamp(wetLit, 0.0, 1.0));
+      if (uWet > 0.001) hdr = mix(hdr, vec3(dot(hdr, vec3(0.33))) * vec3(0.95, 1.0, 1.04), 0.18 * uWet);
       vec3 col = aces(hdr * uExposure);
       col = pow(col, vec3(1.0 / 2.2)); // to display gamma
 

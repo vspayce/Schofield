@@ -141,9 +141,11 @@ class Game {
         // falls, so from the road you see the broad face of a slanted banner
         // rather than a wall of water to drive through. Keep it near vertical
         // where it crosses the roadway.
-        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop, lean: 7, ref: 'road', top: 11 }] : [],
+        falls: F ? [{ s: F.s, d: 0, width: F.width, drop: F.drop, lean: 7, ref: 'road', top: 11, arch: true }] : [],
       });
     }
+    // punching through the curtain rocks the coach
+    if (this.water) this.water.onBurst = (k) => { this.shake += 0.4 * k; };
     this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
     this.boards = new Billboards(this.route, this.scene, def.billboards || {});
     if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };

@@ -11,3 +11,9 @@ tools/blender/_build/
 reference/
 references/
 __pycache__/
+
+# secrets
+.env
+.env.*
+!.env.example
+.claude/worktrees/

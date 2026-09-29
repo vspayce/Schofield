@@ -27,6 +27,9 @@
 import * as THREE from 'three';
 import { makeNoise2D, fbm, clamp, lerp, smoothstep } from '../core/noise.js';
 import { tex, smokePuff, softDot } from './textures.js';
+import { buildFallsArch } from './fallsrock.js';
+import { audio } from '../core/audio.js';
+import { ROAD_HALF } from './route.js';
 
 const LSTEP = 2;            // river level / rapids sampling step, metres
 
@@ -496,7 +499,11 @@ export class Water {
     this.mist = new SprayPool(scene, Q === 2 ? 320 : Q === 1 ? 200 : 90, smokePuff(), false);
     this.drops = Q ? new SprayPool(scene, Q === 2 ? 180 : 110, softDot(), true) : null;
     this._prewarmMist();
-    this._emitAcc = 0; this._rapidAcc = 0; this._coachAcc = 0;
+    this._emitAcc = 0; this._rapidAcc = 0; this._coachAcc = 0; this._roadAcc = 0; this._dripAcc = 0;
+    // lens water after the camera goes through a curtain (renderer's final pass)
+    this.post = renderer?.final?.uniforms || null;
+    this.wet = 0; this._coachIn = false;
+    this.onBurst = null;           // (strength) when the coach punches into a curtain
   }
 
   // ------------------------------------------------------------- water level
@@ -663,6 +670,11 @@ export class Water {
     for (const raw of list) {
       const f = this._resolveFall(raw);
       this.falls.push(f);
+      // a stone arch for the stream to pour off, so the curtain has a lip
+      if (raw.arch) {
+        f.arch = buildFallsArch(route, f, { q: Q === 2 ? 1 : 0, seed: route.def.seed || 1, tint: route.def.terrain?.rockTint });
+        this.group.add(f.arch.mesh);
+      }
       const base = cPos.length / 3;
 
       for (let k = 0; k < SHELLS; k++) {
@@ -694,8 +706,10 @@ export class Water {
             // ragged sheet: break the flatness up along both axes
             const nA = this.noise(u * 5.5 + k * 13, Math.max(0, phi) * 5 + 2.1);
             const nB = this.noise(u * 2.1 - k * 7, Math.max(0, phi) * 2.4 - 5.7);
-            const yy = y + nA * 0.55 * Math.max(0, phi) - e * e * 0.6 * Math.max(0, phi);
-            const aa = along + nOff + nB * 1.2 * Math.max(0, phi) + e * e * 1.6 * Math.max(0, phi);
+            // the lip itself is worn stone, not a ruler: let it dip and bulge
+            const nL = this.noise(u * 4.3 + 17.1, 3.3), nL2 = this.noise(u * 9.1 - 4.2, 8.8);
+            const yy = y + nA * 0.55 * Math.max(0, phi) - e * e * 0.6 * Math.max(0, phi) + nL * 0.9 + nL2 * 0.35;
+            const aa = along + nOff + nB * 1.2 * Math.max(0, phi) + e * e * 1.6 * Math.max(0, phi) + nL * 0.9;
             const ll = lat + lean;
             cPos.push(f.cx + f.ax * ll + f.nx * aa, yy, f.cz + f.az * ll + f.nz * aa);
             cFall.push(lat, fallM, phi, e);   // UV lateral stays local so the streaks don't shear
@@ -866,6 +880,38 @@ export class Water {
           });
         }
       }
+      // where the sheet slams onto the roadway: a line of white bursting back up
+      if (dist < 160) {
+        this._roadAcc += dt * (Q === 2 ? 26 : Q === 1 ? 16 : 7) * (0.4 + near);
+        while (this._roadAcc >= 1) {
+          this._roadAcc -= 1;
+          f.at(f.phiRoad, _v3);
+          const a = (Math.random() - 0.5) * (ROAD_HALF * 2 + 3);
+          _v3.x += f.ax * a + f.nx * (Math.random() - 0.3) * 1.5;
+          _v3.z += f.az * a + f.nz * (Math.random() - 0.3) * 1.5;
+          _v3.y = this.route.roadHeightAt(f.s) + 0.15;
+          this.mist.spawn({
+            pos: _v3,
+            vel: new THREE.Vector3(f.nx * (1 + Math.random() * 2) + (Math.random() - 0.5) * 2, 1.5 + Math.random() * 3, f.nz * (1 + Math.random() * 2) + (Math.random() - 0.5) * 2),
+            life: 0.8 + Math.random() * 0.8, size: 0.6, size1: 3.2,
+            color: this.foamCol, alpha: 0.5, drag: 1.8, grav: 3.5, fadeIn: 0.05,
+          });
+        }
+        // water dripping off the arch onto the road
+        if (this.drops && f.arch?.drips.length) {
+          this._dripAcc += dt * 22 * near;
+          while (this._dripAcc >= 1) {
+            this._dripAcc -= 1;
+            const d0 = f.arch.drips[(Math.random() * f.arch.drips.length) | 0];
+            this.drops.spawn({
+              pos: _v3.copy(d0).add(new THREE.Vector3((Math.random() - 0.5) * 1.5, 0, (Math.random() - 0.5) * 1.5)),
+              vel: new THREE.Vector3(0, -1 - Math.random(), 0),
+              life: 1.1, size: 0.07, size1: 0.1,
+              color: this.foamCol, alpha: 0.55, drag: 0.1, grav: 9.8, fadeIn: 0,
+            });
+          }
+        }
+      }
       // wisps tearing off the sheet on the way down, thickest where it crosses
       // the road — that is what the coach rides into
       if (Q && Math.random() < dt * 14 * (0.2 + near)) {
@@ -937,9 +983,107 @@ export class Water {
         }
       }
     }
+    this._burst(dt, cam, coachPos);
+    this._roar(cam);
     this._emitRapids(dt, cam);
     this.mist.update(dt);
     this.drops?.update(dt);
+  }
+
+  // The moment of going through: the coach hitting the sheet (sound, and a
+  // callback so the game can shake and spook the team), then the camera
+  // following it in and coming out with water running down the lens.
+  _burst(dt, cam, coachPos) {
+    if (!this.falls.length) return;
+    if (coachPos) {
+      const t = this.throughFalls(coachPos);
+      if (t > 0.3 && !this._coachIn) {
+        this._coachIn = true;
+        this._splash(1);
+        this.onBurst?.(1);
+      } else if (t < 0.02) this._coachIn = false;
+    }
+    const inCam = this.throughFalls(cam);
+    // drizzle from the spray on the approach, then soaked going through
+    let spray = 0;
+    for (const f of this.falls) {
+      f.at(f.phiRoad, _v3);
+      const dd = Math.hypot(cam.x - _v3.x, cam.z - _v3.z);
+      spray = Math.max(spray, 0.22 * (1 - smoothstep(4, 22, dd)));
+    }
+    const want = Math.max(inCam, spray);
+    if (want > this.wet) this.wet = Math.min(1, this.wet + dt * 6 * (want - this.wet) + dt * 0.5 * want);
+    else this.wet = Math.max(want, this.wet - dt * 0.2);
+    if (this.post?.uWet) {
+      this.post.uWet.value = this.wet;
+      this.post.uSheet.value = inCam;
+    }
+  }
+
+  // A crash of white noise: the coach hitting a wall of water.
+  _splash(k) {
+    const ctx = audio.ctx;
+    if (!ctx || !audio.muffle) return;
+    const buf = this._noise();
+    const now = ctx.currentTime;
+    for (const [type, freq, peak, len] of [['bandpass', 1400, 1.1 * k, 1.4], ['lowpass', 380, 1.3 * k, 0.9]]) {
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const flt = ctx.createBiquadFilter(); flt.type = type; flt.frequency.value = freq; flt.Q.value = 0.6;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(peak, now + 0.03);
+      g.gain.setTargetAtTime(0, now + 0.12, len / 4);
+      src.connect(flt).connect(g).connect(audio.muffle);
+      src.start(now, Math.random() * 2);
+      src.stop(now + len + 0.5);
+    }
+    audio.play('horse_neigh', { volume: 0.6, pitch: 1.05 });
+  }
+
+  // two seconds of stereo noise, mostly brown with a little hiss, shared by
+  // the roar and the splash
+  _noise() {
+    if (this._noiseBuf) return this._noiseBuf;
+    const ctx = audio.ctx, n = ctx.sampleRate * 3;
+    const b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = b.getChannelData(ch);
+      let last = 0;
+      for (let i = 0; i < n; i++) {
+        const w = Math.random() * 2 - 1;
+        last = (last + 0.02 * w) / 1.02;
+        d[i] = last * 3.2 + w * 0.09;
+      }
+      // cross-fade the ends so the loop has no click
+      const X = 2048;
+      for (let i = 0; i < X; i++) { const t = i / X; d[n - X + i] = d[n - X + i] * (1 - t) + d[i] * t; }
+    }
+    return (this._noiseBuf = b);
+  }
+
+  // The falls' roar: filtered noise that swells and opens up as you close in,
+  // and goes full-band while you're inside the sheet. Registered as an audio
+  // loop so the game's stopAll() takes it down with everything else.
+  _roar(cam) {
+    const ctx = audio.ctx;
+    if (!ctx || !audio.muffle || !this.falls.length) return;
+    let dist = Infinity;
+    for (const f of this.falls) { f.at(f.phiRoad, _v3); dist = Math.min(dist, Math.hypot(cam.x - _v3.x, cam.y - _v3.y, cam.z - _v3.z)); }
+    let L = audio.loops.falls_roar;
+    if (!L) {
+      if (dist > 450) return;
+      const src = ctx.createBufferSource(); src.buffer = this._noise(); src.loop = true;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 0.3;
+      const g = ctx.createGain(); g.gain.value = 0;
+      src.connect(lp).connect(g).connect(audio.muffle);
+      src.start();
+      L = audio.loops.falls_roar = { src, g, lp, baseRate: 1 };
+    }
+    const near = Math.pow(clamp(1 - dist / 380, 0, 1), 2);
+    const inside = this.throughFalls(cam);
+    const vol = Math.min(1.1, near * 0.8 + inside * 0.5);
+    L.g.gain.setTargetAtTime(vol, ctx.currentTime, 0.12);
+    L.lp?.frequency.setTargetAtTime(300 + 2400 * near + 7000 * inside, ctx.currentTime, 0.1);
   }
 
   // How far inside a falls curtain a point is, 0..1. Used for the screen effect
@@ -966,7 +1110,10 @@ export class Water {
 
   dispose() {
     this.scene.remove(this.group);
+    audio.stopLoop('falls_roar', 0.5);
+    if (this.post?.uWet) { this.post.uWet.value = 0; this.post.uSheet.value = 0; }
     for (const c of this.chunks) c.mesh.geometry.dispose();
+    for (const f of this.falls) if (f.arch) { f.arch.mesh.geometry.dispose(); f.arch.mesh.material.dispose(); }
     this.fallsMesh?.geometry.dispose();
     this.poolMesh?.geometry.dispose();
     this.riverMat.dispose(); this.fallsMat.dispose(); this.poolMat.dispose();
