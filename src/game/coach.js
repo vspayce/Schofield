@@ -149,6 +149,8 @@ export class Coach {
     const rate = this.stopping ? 0.9 : (ctl.brake ? 1.5 : 0.7);
     this.speed = damp(this.speed, target, rate, dt);
     this.s = Math.min(R.len, this.s + this.speed * dt);
+    // something across the road (a train on the crossing): the team stops short
+    if (this.limitS != null && this.s > this.limitS) { this.s = Math.max(this.limitS, this.s - this.speed * dt); this.speed = 0; }
 
     // position/orientation from road
     const fr = R.frame(this.s, this._fr);

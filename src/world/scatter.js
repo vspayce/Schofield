@@ -166,6 +166,7 @@ export class Scatter {
   _placeAlongRoad() {
     const r = this.route, rnd = mulberry32(r.def.seed + 99);
     const push = (kind, x, z, rotY, s = 1) => {
+      if (r.railDist(x, z) < 6) return;          // nothing planted on the railroad
       const key = `${Math.floor(x / TILE)},${Math.floor(z / TILE)}`;
       if (!this._globalByTile.has(key)) this._globalByTile.set(key, []);
       this._globalByTile.get(key).push({ kind, x, z, rotY, s });
@@ -214,6 +215,7 @@ export class Scatter {
         }
         r.roadCoords(x, z, rc);
         if (rc.s >= 0 && Math.abs(rc.d) < (rule.minRoad ?? 6)) continue;
+        if (r.railDist(x, z) < 7) continue;
         const town = r.inTown(rc.s) || (r.townRange && rc.s > r.townRange.s0 - 30 && rc.s < r.townRange.s1 + 30) || rc.s < 130 || rc.s > r.len - 150;
         if (rc.s >= 0 && town && Math.abs(rc.d) < (rule.far ? 32 : 40)) continue;
         const h = r.height(x, z);
@@ -388,6 +390,7 @@ export class Scatter {
       if (rnd() > patch * 1.3) continue;
       r.roadCoords(x, z, rc);
       if (rc.s >= 0 && Math.abs(rc.d) < ROAD_HALF + 0.6 + rnd() * 1.5) continue;
+      if (r.railDist(x, z) < 3.4 + rnd() * 1.2) continue;   // ballast, not grass
       const h = r.height(x, z);
       const hx = r.height(x + 1, z) - h, hz = r.height(x, z + 1) - h;
       if (Math.hypot(hx, hz) > 0.5) continue;

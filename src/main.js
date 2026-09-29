@@ -18,6 +18,7 @@ import { Coach } from './game/coach.js';
 import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
 import { Wildlife } from './game/wildlife.js';
+import { Crossing } from './game/crossing.js';
 import { createRider, createWeapon } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { FX } from './game/fx.js';
@@ -82,7 +83,12 @@ class Game {
     fill.style.width = '100%';
     document.getElementById('loading').classList.remove('show');
     const qs = new URLSearchParams(location.search);
-    if (qs.has('route')) this.startRide(+qs.get('route') || 0, qs.get('weapon'));
+    if (qs.has('route')) {
+      this.startRide(+qs.get('route') || 0, qs.get('weapon')).then(() => {
+        // debug: ?train=170 puts the coach that far short of the crossing with the train dispatched
+        if (qs.has('train') && this.crossing) this.trainJump(+qs.get('train') || 170);
+      });
+    }
     else this.menus.title();
     const unlock = () => { audio.resume(); if (this.input.touch) fullscreen.enter(); if (this.mode === 'attract') audio.loop('music_menu', { bus: 'music', volume: 1 }); };
     addEventListener('pointerdown', unlock, { capture: true }); // capture: HUD buttons stop propagation
@@ -98,7 +104,7 @@ class Game {
   // ------------------------------------------------------------- world
   disposeWorld() {
     if (!this.route) return;
-    this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
+    this.crossing?.dispose(); this.crossing = null; this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
     this.player = null; this.attractGuard = null;
@@ -124,6 +130,9 @@ class Game {
     this.diff = applyMission(DIFF[i] || DIFF[DIFF.length - 1], this.mission);
     this.route = new Route(def);
     this.sky = new Sky(this.scene, this.renderer, this.route);
+    // the railroad first: it grades the land along its line, which the terrain
+    // and the scatter have to see
+    this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
     this.terrain = new Terrain(this.route, this.scene, this.renderer.tier);
     this.scatter = new Scatter(this.route, this.scene, this.renderer.tier);
     this.terrain.onTile = (t, c) => this.scatter.onTile(t, c);
@@ -146,7 +155,6 @@ class Game {
     }
     // punching through the curtain rocks the coach
     if (this.water) this.water.onBurst = (k) => { this.shake += 0.4 * k; };
-    this.rail = def.railroad ? new Railroad(this.route, this.scene, def.railroad) : null;
     this.boards = new Billboards(this.route, this.scene, def.billboards || {});
     if (this.rail) this.rail.onJolt = (k) => { this.shake += 0.16 * k; audio.play('hit_wood_1', { volume: 0.5 * k, pitch: 0.7 }); };
     if (this.rail) this.towns.solids.push(...this.rail.solids);
@@ -157,6 +165,8 @@ class Game {
     this.combat = new Combat(this);
     this.enemies = new Enemies(this);
     this.wildlife = new Wildlife(this);
+    // a train on the line, with gunmen on the roofs
+    this.crossing = mode === 'ride' && this.rail?.hasTrain ? new Crossing(this, this.rail, def.railroad.train) : null;
     this.mode = mode;
     this.over = false; this.arrived = false;
     this.bounty = 0; this.hud.setBounty(0);
@@ -224,6 +234,13 @@ class Game {
     audio.loop('wind_loop', { volume: 0.25 * def.wind });
     audio.loop('music_ride_loop', { bus: 'music', volume: 0.8 });
     this._inTownMusic = false;
+  }
+
+  // debug (?train=): jump to just short of the crossing and send the train
+  trainJump(before) {
+    this.crossing.debugJump(before);
+    this.coach.update(0.016, {});
+    this.terrain.prime(this.coach.pos.x, this.coach.pos.z);
   }
 
   hitStop(t) { this.hitStopT = Math.max(this.hitStopT, t); }
@@ -327,6 +344,7 @@ class Game {
     coach.update(dt, this.mode === 'ride' && !this.over ? inp : {});
     if (this.mode === 'ride') {
       this.player.update(dt, rdt, this.over ? { dx: 0, dy: 0 } : inp);
+      this.crossing?.update(dt);        // before the enemies: some of them ride it
       this.enemies.update(dt);
       this.wildlife.update(dt);
       if (!this.over && coach.s >= this.route.len - 40) this.arrive();

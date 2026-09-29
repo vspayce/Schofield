@@ -172,10 +172,40 @@ Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index
   twos and threes on the boardwalks and turn to watch the stage come in. The
   ghost town stays deserted. Rider meshes have frustum culling off, so folk are
   hidden and unanimated beyond 150 m.
-- `src/world/railroad.js` — a line under construction crossing the road: graded
-  ballast, ties, rail up to a railhead just past the crossing, a water tower from
-  the town kit, material stacks and a gang swinging sledges. No trains. The coach
-  bangs over the rails. Per-route as `railroad: { at, workers }`.
+- `src/world/railroad.js` — a line crossing the road: the land along it is cut
+  and filled to grade (`Route.setRail`, so terrain and scatter respect it),
+  ballast, ties, a flat-bottomed rail, planks at the crossing with the road
+  ramped up to them, a water tower from the town kit, material stacks and a
+  section gang. Without a train the line is still under construction (rail stops
+  at a railhead just past the road, the gang swinging sledges). The coach bangs
+  over the rails. Per-route as `railroad: { at, workers, train }`.
+- **The train** — `railroad.train: { cars, gunmen, speed, lead, caboose, from }`
+  (plains and desert routes). With a train the line is finished end to end
+  (±360 m, so it comes and goes in the haze) and the camp stands >3.5 m clear of
+  the rails.
+  - `src/world/train.js` builds it entirely in code: an 1870s 4-4-0 "American"
+    (Russia-iron boiler with brass bands, balloon stack, brass steam dome, bell,
+    whistle, green headlamp with glowing lens, slatted pilot, red spoked
+    drivers with counterweights, working main and side rods and crossheads,
+    varnished wood cab with a crew of two), a green tender with flared coping and
+    cordwood, three board-and-batten boxcars (roof walks, brake wheels, ladders,
+    sliding doors, truss rods, arch-bar trucks, link-and-pin couplers) and a
+    caboose with a cupola. Parts are merged per car per material; wheelsets are
+    two InstancedMeshes; lettering, lining and board grain are one 2048x1024
+    canvas atlas. ~50 draw calls / ~75k tris for the whole train incl. crew.
+    Smoke, cylinder-cock steam and ballast dust are one particle pool; the train
+    is hidden and idle except while it runs.
+  - `src/game/crossing.js` runs it: dispatched when the coach is `lead` (330 m)
+    out, paced so the middle of the train is on the crossing when a coach at
+    cruise gets there (like the herd). A warning banner and the long-long-short-
+    long whistle come ~10 s out, then the bell. Gunmen (`Gunman` with a
+    `carrier`, mixed rifles/pistols) ride the boxcar roofs as ordinary Enemies
+    and topple off when shot. A slow coach (<4.5 m/s) is held at the edge while
+    the train is across; one that drives in is hit: 16-55 coach damage by speed,
+    stopped dead and knocked clear. The cars stop bullets (wood splinters, the
+    engine sparks). Train sounds are synthesised at runtime (`src/core/synth.js`).
+  - Debug: `?route=0&train=170` starts 170 m short of the crossing with the
+    train dispatched.
 
 ## Code layout
 ```

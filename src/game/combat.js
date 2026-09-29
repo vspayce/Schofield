@@ -33,6 +33,9 @@ export class Combat {
       const p = _ray.intersectBox(box, _v);
       if (p) { const t = p.distanceTo(origin); if (t > 1.5 && t < occT) { occT = t; occKind = 'wood'; } }
     }
+    // a passing train stops bullets: boxcar boards splinter, the engine rings
+    const car = g.crossing?.train.rayHit(origin, dir, occT);
+    if (car && car.t < occT) { occT = car.t; occKind = car.kind; }
     if (hit && (guaranteed || hit.t < occT)) {
       const e = hit.enemy, part = hit.part;
       const fall = 1 - smoothstep(W.falloff[0], W.falloff[1], hit.t) * (1 - W.floor);
@@ -52,6 +55,7 @@ export class Combat {
     g.fx.tracer(muzzle, end);
     if (occT < W.range) {
       if (occKind === 'wood') { g.fx.splinters(end, dir); audio.play('hit_wood_' + (1 + (Math.random() * 2 | 0)), { position: end, volume: 0.9 }); }
+      else if (occKind === 'iron') { g.fx.sparks(end); audio.play('ricochet_' + (1 + (Math.random() * 3 | 0)), { position: end, volume: 0.8 }); }
       else {
         g.fx.dust(end, { amount: 5, size: 0.35, up: 1.2 });
         if (Math.random() < 0.3) audio.play('ricochet_' + (1 + (Math.random() * 3 | 0)), { position: end, volume: 0.6 });
