@@ -184,7 +184,6 @@ export const ROUTES = [
     from: 'Fort Providence', to: 'Cascade',
     blurb: 'A ledge blasted into the gorge wall. The road runs under the falls — go through, or go over the side.',
     seed: 1883, length: 2700, biome: 'gorge', reward: 1800,
-    wip: true,          // the falls aren't finished — hidden from route select
 
     wind: 1.1, winding: 0.75,
     gorge: { side: 1, depth: 27, falls: { at: 0.54, drop: 34, width: 24 } },
