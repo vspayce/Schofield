@@ -148,6 +148,7 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #ammo-name { font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; letter-spacing: .08em; }
 #ammo.reloading #ammo-name::after { content: ' — reloading'; color: var(--brass); }
 #dynamite-stock { position: absolute; top: calc(146px + var(--sat)); right: calc(22px + var(--sar)); display: flex; align-items: center; gap: 8px; font-family: var(--font-sc); font-size: 13px; color: var(--ink-dim); text-shadow: 0 1px 3px #000; }
+body.touch #dynamite-stock { display: none; }
 #dynamite-stock b { color: var(--ink); font-family: var(--font-title); font-size: 18px; margin-left: 4px; }
 .sticks { display: inline-flex; align-items: center; gap: 2px; height: 24px; transform: rotate(-18deg); }
 .sticks i { display: block; width: 6px; height: 20px; border-radius: 2px; background: linear-gradient(90deg, #76231b, #c04d31 55%, #6c1b16); box-shadow: 0 1px 2px #000; }

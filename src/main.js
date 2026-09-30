@@ -37,6 +37,7 @@ const DIFF = [
   { riderAcc: 0.37, rifleAcc: 0.48, fireMult: 1.0, dmgMult: 1.0, countMult: 1.1 },
   { riderAcc: 0.4, rifleAcc: 0.5, fireMult: 0.92, dmgMult: 1.05, countMult: 1.2 },
 ];
+const COACH_DAMAGE_MULT = 0.7;
 
 class Game {
   constructor() {
@@ -262,7 +263,7 @@ class Game {
   }
 
   damageCoach(amount) {
-    if (!this.godMode) this.coach.hp -= amount;
+    if (!this.godMode) this.coach.hp -= amount * COACH_DAMAGE_MULT;
   }
 
   onCoachDamage() {
