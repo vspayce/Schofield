@@ -72,13 +72,13 @@ export class Dynamite {
   }
 
   _explode(position) {
-    const g = this.g, radius = 15;
+    const g = this.g, radius = 20;
     g.fx.explosion(position, radius);
     g.shake += 1.8;
     g.hitStop(0.12);
     audio.play('shotgun_shot', { position, volume: 2.1, pitch: 0.58, maxDist: 900 });
     audio.play('hit_wood_1', { position, volume: 0.8, pitch: 0.6, delay: 0.04, maxDist: 700 });
-    let knockedOut = 0;
+    let riders = 0, animals = 0;
     for (const enemy of g.enemies.list) {
       if (!enemy.alive) continue;
       const distance = enemy.pos.distanceTo(position);
@@ -88,10 +88,28 @@ export class Dynamite {
       else away.normalize();
       if (enemy.damage(999, 'horse', away)) {
         g.combat._onKill(enemy, 'horse', position);
-        knockedOut++;
+        riders++;
       }
     }
-    g.hud.banner('DYNAMITE!', `${knockedOut} rider${knockedOut === 1 ? '' : 's'} knocked out`, 1.7);
+    for (const animal of g.wildlife.list) {
+      if (!animal.alive || animal.pos.distanceTo(position) > radius) continue;
+      const away = animal.pos.clone().sub(position);
+      if (away.lengthSq() < 0.001) away.set(0, 0, 1);
+      else away.normalize();
+      if (!animal.damage(999, away)) continue;
+      const bounty = animal.cfg.hide;
+      if (bounty) g.addBounty(bounty, `${animal.kind[0].toUpperCase()}${animal.kind.slice(1)} hide +$${bounty}`, false);
+      if (animal.cfg.meat && g.player.hp < 100) {
+        g.player.hp = Math.min(100, g.player.hp + animal.cfg.meat);
+        g.hud.feedMsg(`Fresh meat +${animal.cfg.meat} health`, true);
+      }
+      animals++;
+    }
+    const result = [
+      riders && `${riders} rider${riders === 1 ? '' : 's'} knocked out`,
+      animals && `${animals} animal${animals === 1 ? '' : 's'} down`,
+    ].filter(Boolean).join(', ') || 'No one caught in the blast';
+    g.hud.banner('DYNAMITE!', result, 1.7);
   }
 
   dispose() {

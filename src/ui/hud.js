@@ -166,6 +166,18 @@ export class HUD {
       const px = Math.max(30, Math.min(140, (1.9 / dist) * perM));
       list.push({ x: _p.x, y: _p.y, px, glint: e.glintT > 0, dist });
     }
+    const animals = game.wildlife.list
+      .filter((animal) => animal.alive)
+      .map((animal) => ({ animal, dist: animal.pos.distanceTo(game.player.camPos) }))
+      .filter(({ dist }) => dist <= 260)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 5);
+    for (const { animal, dist } of animals) {
+      _p.copy(animal.hitPoint()).project(game.camera);
+      if (_p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
+      const px = Math.max(22, Math.min(100, (animal.cfg.tall / Math.max(1, dist)) * perM));
+      list.push({ x: _p.x, y: _p.y, px, dist, kind: animal.kind });
+    }
     while (this.shooterEls.length < list.length) {
       const d = document.createElement('div');
       d.className = 'shooter';
@@ -175,12 +187,12 @@ export class HUD {
     while (this.shooterEls.length > list.length) this.shooterEls.pop().remove();
     list.forEach((m, i) => {
       const el = this.shooterEls[i];
-      el.className = 'shooter' + (m.glint ? ' glint' : '') + (m.px < 40 ? ' far' : '');
+      el.className = 'shooter' + (m.glint ? ' glint' : '') + (m.kind ? ' wildlife' : '') + (m.px < 40 ? ' far' : '');
       el.style.left = (m.x * 0.5 + 0.5) * 100 + '%';
       el.style.top = (-m.y * 0.5 + 0.5) * 100 + '%';
       el.style.width = m.px + 'px';
       el.style.height = m.px * 1.15 + 'px';
-      el.lastChild.textContent = Math.round(m.dist) + 'm';
+      el.lastChild.textContent = (m.kind ? m.kind.toUpperCase() + ' ' : '') + Math.round(m.dist) + 'm';
     });
   }
 
@@ -240,6 +252,7 @@ export class HUD {
   }
 
   crosshairEnemy(on) { if (this._last.ce !== on) { this._last.ce = on; this.cross.classList.toggle('enemy', on); } }
+  crosshairWildlife(on) { if (this._last.cw !== on) { this._last.cw = on; this.cross.classList.toggle('wildlife', on); } }
 
   hitmarker(hit, kill, head) {
     if (!hit) return;

@@ -250,8 +250,8 @@ export class Menus {
       ${touch ? `
       <p><b>Aim:</b> drag anywhere on the right. Dragging from the FIRE button aims while you shoot.</p>
       <p><b>Fire / Reload / Swap:</b> buttons at bottom right. Swap between your sidearm and long gun any time.</p>
-      <p><b>Whip / Rein:</b> buttons at left. The team tires if you whip too long.</p>` : `
-      <p><b>Aim:</b> mouse. <b>Fire:</b> left click. <b>Reload:</b> R. <b>Swap:</b> Q. <b>Whip:</b> W / Shift. <b>Rein:</b> S.</p>`}
+      <p><b>Whip / Rein:</b> buttons at left. Hold Rein to stop; whip to pull away. The team tires if you whip too long.</p>` : `
+      <p><b>Aim:</b> mouse. <b>Fire:</b> left click. <b>Reload:</b> R. <b>Swap:</b> Q. <b>Whip:</b> W / Shift. Hold <b>Rein:</b> S to stop; whip to pull away.</p>`}
       <p><b>Scope:</b> ${touch ? 'the scope button' : 'F'} — long guns only. Magnifies for the men on the ridges.</p>
       <p><b>Dead Eye:</b> ${touch ? 'the eye button' : 'E or right click'}. Time slows. Sweep across outlaws to mark them, then fire to drop every one.</p>
       <p><b>Dynamite:</b> ${touch ? 'the dynamite button' : 'G'}. Three sticks per run; throw into a group to blast riders from their horses.</p>
@@ -330,7 +330,7 @@ export class Menus {
       case 'go': this.hide(); g.startRide(this.routeIndex); break;
       case 'resume': this.hide(); g.resume(); break;
       case 'pause': this.pause(); break;
-      case 'restart': this.hide(); g.startRide(g.routeIndex); break;
+      case 'restart': save.coachHp = 100; this.hide(); g.startRide(g.routeIndex); break;
       case 'next': this.hide(); g.startRide(g.routeIndex + 1); break;
       case 'quit': g.toAttract(); this.title(); break;
       // Fullscreen and home-screen launches have no address bar, so there is no

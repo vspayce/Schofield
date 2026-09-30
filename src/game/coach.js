@@ -95,6 +95,9 @@ export class Coach {
     this.s = 0;
     this.speed = 0;
     this.cruise = 15;
+    this.reinHold = 0;
+    this.reinStopPending = false;
+    this.reinStopped = false;
     this.stamina = 1;
     this.hp = 100;
     this.sway = { roll: 0, rollV: 0, pitch: 0, pitchV: 0, bounce: 0, bounceV: 0 };
@@ -142,12 +145,28 @@ export class Coach {
     // A real hand on the reins can haul the team down to a walk.
     if (ctl.whip && this.stamina > 0.02) { target = this.cruise + 11; this.stamina = Math.max(0, this.stamina - dt * 0.22); }
     else this.stamina = Math.min(1, this.stamina + dt * 0.07);
-    if (ctl.brake) target = 2.5;
+    if (ctl.brake) {
+      this.reinHold += dt;
+      if (this.reinHold >= 2) this.reinStopPending = true;
+      if (!this.reinStopPending) target = 2.5;
+    } else if (!this.reinStopPending && !this.reinStopped) this.reinHold = 0;
+    if (this.reinStopPending || this.reinStopped) target = 0;
+    if (this.reinStopped && ctl.whip && !ctl.brake && this.stamina > 0.02) {
+      this.reinStopped = false;
+      this.reinStopPending = false;
+      this.reinHold = 0;
+      target = this.cruise + 11;
+    }
     if (this.stopping) target = 0;
     if (this.s < 30 && !this.stopping) target = Math.min(target, 4 + this.s * 0.5);
     // brake harder than you accelerate, so reining in actually arrests you
-    const rate = this.stopping ? 0.9 : (ctl.brake ? 1.5 : 0.7);
+    const rate = this.stopping ? 0.9 : (ctl.brake || this.reinStopPending || this.reinStopped ? 2.5 : 0.7);
     this.speed = damp(this.speed, target, rate, dt);
+    if (this.reinStopPending && this.speed < 0.15) {
+      this.speed = 0;
+      this.reinStopPending = false;
+      this.reinStopped = true;
+    }
     this.s = Math.min(R.len, this.s + this.speed * dt);
     // something across the road (a train on the crossing): the team stops short
     if (this.limitS != null && this.s > this.limitS) { this.s = Math.max(this.limitS, this.s - this.speed * dt); this.speed = 0; }

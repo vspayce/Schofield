@@ -49,6 +49,7 @@ export class Player {
     this.aimDir = new THREE.Vector3(0, 0, 1);
     this.fov = 60;
     this.hover = null;
+    this.wildlifeHover = null;
   }
 
   _showGun() {
@@ -77,6 +78,7 @@ export class Player {
 
   update(dt, rdt, inp) {
     const g = this.g;
+    const targetHover = this.hover || this.wildlifeHover;
     // ---------------------------------------------------------------- aim
     if (inp.scope) this.setScope(!this.scoped);
     this.scopeT = damp(this.scopeT, this.scoped ? 1 : 0, 10, rdt);
@@ -84,11 +86,11 @@ export class Player {
     const sens = (this.deadeyeOn ? 0.75 : 1) / this.zoom;
     let dx = inp.dx * sens, dy = inp.dy * sens;
     // touch aim assist: slow down over targets + gentle pull
-    if (g.input.touch && this.hover) { dx *= 0.55; dy *= 0.55; }
+    if (g.input.touch && targetHover) { dx *= 0.55; dy *= 0.55; }
     this.yaw -= dx; this.pitch = clamp(this.pitch - dy, -1.05, 0.5);
     this.settle = Math.abs(inp.dx) + Math.abs(inp.dy) < 0.0025 ? this.settle + rdt : 0;
-    if (g.input.touch && this.hover && (Math.abs(inp.dx) + Math.abs(inp.dy)) > 0) {
-      const want = this._anglesTo(this.hover.aimPoint);
+    if (g.input.touch && targetHover && (Math.abs(inp.dx) + Math.abs(inp.dy)) > 0) {
+      const want = this._anglesTo(targetHover.aimPoint);
       this.yaw += angDiff(want.yaw, this.yaw) * Math.min(1, rdt * 3.5);
       this.pitch += (want.pitch - this.pitch) * Math.min(1, rdt * 3.5);
     }
@@ -150,7 +152,9 @@ export class Player {
 
     // ---------------------------------------------------------- targeting
     this.hover = g.enemies.pick(this.camPos, this.aimDir, (g.input.touch ? 0.05 : 0.02) / this.zoom);
+    this.wildlifeHover = this.hover ? null : g.wildlife.pick(this.camPos, this.aimDir, (g.input.touch ? 0.05 : 0.02) / this.zoom);
     g.hud.crosshairEnemy(!!this.hover);
+    g.hud.crosshairWildlife(!!this.wildlifeHover);
 
     // ------------------------------------------------------------ weapons
     const W = this.weapon;
@@ -246,8 +250,10 @@ export class Player {
     if (forced) aimPoint = forced;
     else {
       // assist only nudges near-misses onto the body/horse surface; headshots must be earned
-      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, (g.input.touch ? 0.035 : 0.01) / this.zoom, g.input.touch ? 1.1 : 0.4);
-      aimPoint = hit ? hit.point : _v2.copy(this.camPos).addScaledVector(this.aimDir, 120).clone();
+      const tolerance = (g.input.touch ? 0.035 : 0.01) / this.zoom;
+      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, tolerance, g.input.touch ? 1.1 : 0.4);
+      const animal = !hit ? g.wildlife.pick(this.camPos, this.aimDir, tolerance) : null;
+      aimPoint = hit ? hit.point : animal && animal.dist < W.range ? animal.aimPoint : _v2.copy(this.camPos).addScaledVector(this.aimDir, 120).clone();
     }
     const baseDir = new THREE.Vector3().subVectors(aimPoint, this.camPos).normalize();
     let anyHit = false, killed = false, head = false, pelletHits = 0;

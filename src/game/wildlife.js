@@ -18,7 +18,7 @@ export const SPECIES = {
   buffalo: { node: 'Buffalo', hp: 260, r: 1.1, headR: 0.42, long: 2.8, tall: 1.7, meat: 25, hide: 20, mass: 1, walk: 2.4 },
   bear: { node: 'Bear', hp: 200, r: 0.8, headR: 0.34, long: 2.0, tall: 1.1, meat: 18, hide: 30, mass: 0.7, walk: 1.8 },
   goat: { node: 'Goat', hp: 70, r: 0.45, headR: 0.22, long: 1.2, tall: 0.9, meat: 10, hide: 12, mass: 0.15, walk: 2.0 },
-  hawk: { node: 'Hawk', hp: 25, r: 0.35, headR: 0, long: 1.1, tall: 0.3, meat: 0, hide: 25, mass: 0, walk: 0 },
+  hawk: { node: 'Hawk', hp: 25, r: 0.35, headR: 0, long: 1.1, tall: 0.3, meat: 5, hide: 25, mass: 0, walk: 0 },
 };
 
 let _id = 0;
@@ -246,10 +246,10 @@ export class Wildlife {
     const H = this.herdActive;
     if (!H || this._warned) return;
     const away = H.s - this.g.coach.s;
-    if (away > 170 || away < 0) return;
+    if (away > 380 || away < 0) return;
     this._warned = true;
-    this.g.hud.banner('Buffalo on the road!', 'Rein them in', 2.2);
-    audio.play('horse_neigh', { volume: 0.7, pitch: 0.8 });
+    this.g.hud.banner('BUFFALO HERD AHEAD', 'Rein in now — they are crossing the road', 4.2);
+    audio.play('horse_neigh', { volume: 1, pitch: 0.78 });
   }
 
   // anything of size standing on the road when the coach arrives is a crash
@@ -321,6 +321,23 @@ export class Wildlife {
   }
 
   // ------------------------------------------------------------- hits
+  pick(origin, dir, tolerance) {
+    let best = null, bestAngle = tolerance;
+    for (const animal of this.list) {
+      if (!animal.alive) continue;
+      const sphere = animal.spheres[0];
+      const to = _v.subVectors(sphere.c, origin);
+      const dist = to.length();
+      if (dist > 260 || dist < 0.001) continue;
+      const angle = Math.acos(clamp(to.dot(dir) / dist, -1, 1)) - Math.atan(sphere.r / dist);
+      if (angle < bestAngle) {
+        bestAngle = angle;
+        best = { animal, aimPoint: sphere.c, dist };
+      }
+    }
+    return best;
+  }
+
   rayHit(origin, dir, range) {
     let best = null, bestT = range;
     for (const a of this.list) {
