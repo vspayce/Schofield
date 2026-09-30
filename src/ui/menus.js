@@ -44,7 +44,7 @@ export const save = {
   get start() { return this.data.start === 'long' ? 'long' : 'side'; },
   set start(v) { this.data.start = v; persist(this.data); },
   // the job you're hauling
-  get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'mail'; },
+  get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'bank'; },
   set mission(v) { this.data.mission = v; persist(this.data); },
 
   // ---------------------------------------------------------- the coach
@@ -112,7 +112,7 @@ export class Menus {
   title() {
     this._show(`
       ${logo()}
-      <div class="m-tag">Ride shotgun on the Overland Mail. Keep the strongbox. Keep your scalp.</div>
+      <div class="m-tag">Ride shotgun on a Territorial Bank transfer. Keep the strongbox. Keep your scalp.</div>
       <button class="m-btn" data-act="routes">Ride Out</button>
       <div class="m-row" style="margin-top:6px">
         <button class="m-btn ghost" data-act="settings">Settings</button>
@@ -224,7 +224,7 @@ export class Menus {
       <div class="line"><span>Accuracy</span><span>${r.accuracy}%</span></div>
       <div class="line"><span>Coach condition</span><span>${r.coach}%</span></div>
       <div class="line"><span>Bounties</span><span>$${r.bounty}</span></div>
-      <div class="line"><span>Mail contract</span><span>$${r.reward}</span></div>
+      <div class="line"><span>${r.mission || 'Contract'} payout</span><span>$${r.reward}</span></div>
       </div>
       <div class="total">Total $${r.total}</div>
       <div class="purse-line">Purse $${save.cash}</div>
@@ -307,7 +307,13 @@ export class Menus {
       case 'title': this.title(); break;
       case 'routes': g.toAttract(); this.routes(); break;
       case 'pick': this.jobs(+arg); break;
-      case 'job': save.mission = arg; this.loadout(this.routeIndex); break;
+      case 'job': {
+        const changed = save.mission !== arg;
+        save.mission = arg;
+        if (changed) g.refreshAttractPreview();
+        this.loadout(this.routeIndex);
+        break;
+      }
       case 'jobs': this.jobs(this.routeIndex); break;
       case 'start': save.start = arg; this.loadout(this.routeIndex); break;
       case 'cycle': {

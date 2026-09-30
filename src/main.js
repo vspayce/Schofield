@@ -132,7 +132,7 @@ class Game {
     this.disposeWorld();
     this.routeIndex = i;
     const def = ROUTES[i];
-    this.mission = MISSIONS[save.mission] || MISSIONS.mail;
+    this.mission = MISSIONS[save.mission] || MISSIONS.bank;
     this.diff = applyMission(DIFF[i] || DIFF[DIFF.length - 1], this.mission);
     this.route = new Route(def);
     this.bridge = this.route.bridge ? new GorgeBridge(this.route, this.scene) : null;
@@ -185,21 +185,36 @@ class Game {
       this.enemies.planFor(this.player);
       this.hud.setRoute(def);
     } else {
-      // a guard riding shotgun for the title cinematic
-      const guard = createRider({ variant: 'player' });
-      (this.coach.seatGuard || this.coach.body).add(guard.root);
-      guard.root.rotation.y = 0.5;
-      // he's the shotgun messenger — give him the coach gun and the aiming pose,
-      // rather than bobbing along empty-handed
-      const cg = createWeapon('CoachGun');
-      guard.hand.add(cg.root);
-      guard.play(guard.has('RideAim') ? 'RideAim' : 'Ride');
-      this.attractGuard = guard;
+      this.attractGuard = this._addAttractGuard();
     }
     this.terrain.prime(this.coach.pos.x, this.coach.pos.z);
     this.camera.position.copy(this.coach.pos).add(new THREE.Vector3(0, 4, -8));
     this.camera.lookAt(this.coach.pos);
     this.renderer.r.compile(this.scene, this.camera);
+  }
+
+  _addAttractGuard() {
+    const guard = createRider({ variant: 'player' });
+    (this.coach.seatGuard || this.coach.body).add(guard.root);
+    guard.root.rotation.y = 0.5;
+    const shotgun = createWeapon('CoachGun');
+    guard.hand.add(shotgun.root);
+    guard.play(guard.has('RideAim') ? 'RideAim' : 'Ride');
+    return guard;
+  }
+
+  refreshAttractPreview() {
+    if (this.mode !== 'attract' || !this.coach) return;
+    const s = this.coach.s, speed = this.coach.speed;
+    this.attractGuard?.root.removeFromParent();
+    this.coach.dispose();
+    this.mission = MISSIONS[save.mission] || MISSIONS.bank;
+    this.coach = new Coach(this.route, this.scene, this.mission.coach);
+    this.coach.setLivery(this.mission.livery);
+    this.coach.s = s;
+    this.coach.speed = speed;
+    this.coach.update(0.016, {});
+    this.attractGuard = this._addAttractGuard();
   }
 
   toAttract() {
