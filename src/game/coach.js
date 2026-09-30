@@ -40,7 +40,7 @@ function fallbackCoach() {
 export class Coach {
   // `model` picks the GLB: the Concord mail coach, or the armoured
   // Abbott-Downing used for bullion and prisoner work.
-  constructor(route, scene, model = 'stagecoach') {
+  constructor(route, scene, model = 'stagecoach_treasure') {
     this.route = route; this.scene = scene;
     this.root = new THREE.Group();
     const g = assets.models[model] || assets.models.stagecoach;

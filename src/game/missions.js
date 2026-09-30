@@ -4,13 +4,13 @@
 // pay      multiplier on the route's mail contract
 // diff     multiplied into the route's difficulty (see DIFF in main.js)
 // bands    extra marauder waves, as fractions along the route
-// coach    which GLB to drive
+// coach    which GLB to drive (every job rides the armoured Abbott-Downing)
 // livery   extra ironwork on top of it (see Coach.setLivery)
 
 export const MISSIONS = {
   mail: {
     id: 'mail', name: 'Mail Contract', cargo: 'Overland mail and a light strongbox',
-    pay: 1, coach: 'stagecoach', livery: 'concord', bands: [],
+    pay: 1, coach: 'stagecoach_treasure', livery: 'concord', bands: [],
     diff: { countMult: 1, fireMult: 1, dmgMult: 1, riderAcc: 1, rifleAcc: 1 },
     blurb: 'Letters, parcels and a modest box. The road knows it, and mostly leaves you be.',
     risk: 0.25,

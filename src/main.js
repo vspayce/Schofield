@@ -132,7 +132,7 @@ class Game {
     this.disposeWorld();
     this.routeIndex = i;
     const def = ROUTES[i];
-    this.mission = MISSIONS[save.mission] || MISSIONS.bank;
+    this.mission = MISSIONS[save.mission] || MISSIONS.mail;
     this.diff = applyMission(DIFF[i] || DIFF[DIFF.length - 1], this.mission);
     this.route = new Route(def);
     this.bridge = this.route.bridge ? new GorgeBridge(this.route, this.scene) : null;
@@ -208,7 +208,7 @@ class Game {
     const s = this.coach.s, speed = this.coach.speed;
     this.attractGuard?.root.removeFromParent();
     this.coach.dispose();
-    this.mission = MISSIONS[save.mission] || MISSIONS.bank;
+    this.mission = MISSIONS[save.mission] || MISSIONS.mail;
     this.coach = new Coach(this.route, this.scene, this.mission.coach);
     this.coach.setLivery(this.mission.livery);
     this.coach.s = s;

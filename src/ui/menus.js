@@ -44,7 +44,7 @@ export const save = {
   get start() { return this.data.start === 'long' ? 'long' : 'side'; },
   set start(v) { this.data.start = v; persist(this.data); },
   // the job you're hauling
-  get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'bank'; },
+  get mission() { return MISSIONS[this.data.mission] ? this.data.mission : 'mail'; },
   set mission(v) { this.data.mission = v; persist(this.data); },
 
   // ---------------------------------------------------------- the coach
@@ -112,7 +112,7 @@ export class Menus {
   title() {
     this._show(`
       ${logo()}
-      <div class="m-tag">Ride shotgun on a Territorial Bank transfer. Keep the strongbox. Keep your scalp.</div>
+      <div class="m-tag">Ride shotgun on the Overland Mail. Keep the strongbox. Keep your scalp.</div>
       <button class="m-btn" data-act="routes">Ride Out</button>
       <div class="m-row" style="margin-top:6px">
         <button class="m-btn ghost" data-act="settings">Settings</button>
