@@ -67,8 +67,9 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 #shooters { position: absolute; inset: 0; }
 /* corner-bracket target box, sized in JS to the man's apparent height */
 .shooter { position: absolute; transform: translate(-50%, -50%); --c: #ffb347; }
-.shooter.wildlife { --c: #b9dc78; }
-.shooter.wildlife b { color: #d8efaa; }
+.shooter.wildlife { --c: #d8efaa; width: 14px !important; height: 10px !important; transform: translate(-50%, calc(-100% - 6px)); }
+.shooter.wildlife i, .shooter.wildlife b, .shooter.wildlife::before { display: none; }
+.shooter.wildlife::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid var(--c); filter: drop-shadow(0 1px 2px #000); }
 .shooter i { position: absolute; width: 30%; height: 30%; border: 2.5px solid var(--c); filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 6px rgba(0,0,0,.7)); }
 .shooter::before { content: ''; position: absolute; inset: -22%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--c) 26%, transparent) 0%, transparent 68%); }
 .shooter i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }

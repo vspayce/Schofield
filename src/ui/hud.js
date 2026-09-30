@@ -173,7 +173,9 @@ export class HUD {
       .sort((a, b) => a.dist - b.dist)
       .slice(0, 5);
     for (const { animal, dist } of animals) {
-      _p.copy(animal.hitPoint()).project(game.camera);
+      _p.copy(animal.pos);
+      _p.y += animal.cfg.tall * animal.scale + 0.3;
+      _p.project(game.camera);
       if (_p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
       const px = Math.max(22, Math.min(100, (animal.cfg.tall / Math.max(1, dist)) * perM));
       list.push({ x: _p.x, y: _p.y, px, dist, kind: animal.kind });
