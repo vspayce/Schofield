@@ -26,6 +26,13 @@ html, body {
 
 /* ------------------------------------------------------------------ HUD */
 #hud { position: absolute; inset: 0; pointer-events: none; }
+#hud {
+  --ink: #f5dddd;
+  --ink-dim: #cb9090;
+  --brass: #d64a4a;
+  --blood: #f04a4a;
+  position: absolute; inset: 0; pointer-events: none;
+}
 #hud * { pointer-events: none; }
 
 #vignette-hit {
@@ -41,6 +48,7 @@ html, body {
 
 #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transition: opacity .15s; }
 #crosshair i { position: absolute; background: rgba(255, 245, 225, .92); box-shadow: 0 0 2px #000, 0 0 1px #000; }
+#crosshair i { position: absolute; background: rgba(255, 218, 218, .94); box-shadow: 0 0 2px #000, 0 0 1px #000; }
 #crosshair i:nth-child(1), #crosshair i:nth-child(2) { width: 2px; height: 8px; left: -1px; }
 #crosshair i:nth-child(3), #crosshair i:nth-child(4) { height: 2px; width: 8px; top: -1px; }
 #crosshair i:nth-child(1) { top: -13px; } #crosshair i:nth-child(2) { top: 5px; }
@@ -49,9 +57,11 @@ body.touch #crosshair i:nth-child(1), body.touch #crosshair i:nth-child(2) { hei
 body.touch #crosshair i:nth-child(3), body.touch #crosshair i:nth-child(4) { width: 10px; }
 body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth-child(3) { left: -16px; }
 #crosshair u { position: absolute; display: none; border: 1.5px solid rgba(255, 245, 225, .75); border-radius: 50%; box-shadow: 0 0 2px #000, inset 0 0 2px #000; }
+#crosshair u { position: absolute; display: none; border: 1.5px solid rgba(255, 195, 195, .85); border-radius: 50%; box-shadow: 0 0 2px #000, inset 0 0 2px #000; }
 #crosshair.shotgun u { display: block; }
 #crosshair.shotgun i { opacity: .55; }
 #crosshair b { position: absolute; width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: rgba(255, 245, 225, .95); box-shadow: 0 0 2px #000; }
+#crosshair b { position: absolute; width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: rgba(255, 218, 218, .96); box-shadow: 0 0 2px #000; }
 #crosshair.enemy i, #crosshair.enemy b { background: #ff3b2f; }
 #crosshair.wildlife i, #crosshair.wildlife b { background: #c7e88b; }
 #crosshair.shotgun b { display: none; }
@@ -84,9 +94,8 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 .shooter.glint b { color: #ff8e7a; }
 #hitmarker {
   position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; opacity: 0;
-  background:
-    linear-gradient(45deg, transparent 46%, #fff 46%, #fff 54%, transparent 54%),
-    linear-gradient(-45deg, transparent 46%, #fff 46%, #fff 54%, transparent 54%);
+    background: linear-gradient(45deg, transparent 46%, #ffd2d2 46%, #ffd2d2 54%, transparent 54%),
+      linear-gradient(-45deg, transparent 46%, #ffd2d2 46%, #ffd2d2 54%, transparent 54%);
   -webkit-mask: radial-gradient(circle, transparent 6px, #000 7px); mask: radial-gradient(circle, transparent 6px, #000 7px);
   filter: drop-shadow(0 0 2px #000);
 }
@@ -128,8 +137,11 @@ body.touch #crosshair i:nth-child(1) { top: -16px; } body.touch #crosshair i:nth
 .meter .fill { height: 100%; width: 100%; transition: width .2s; }
 #hp-meter .fill { background: linear-gradient(90deg, #7d1a14, #d8453a); }
 #coach-meter .fill { background: linear-gradient(90deg, #6b4a24, #caa066); }
+#coach-meter .fill { background: linear-gradient(90deg, #641f24, #d35a5e); }
 #de-meter .fill { background: linear-gradient(90deg, #6e0f0a, #ffb35a); }
+#de-meter .fill { background: linear-gradient(90deg, #6e0f0a, #ec7777); }
 #de-meter.ready .bar { box-shadow: 0 0 8px #ffb35a; border-color: #ffb35a; }
+#de-meter.ready .bar { box-shadow: 0 0 8px #ed7777; border-color: #ed7777; }
 .meter.low .bar { animation: pulse .6s infinite alternate; }
 @keyframes pulse { to { box-shadow: 0 0 10px #f33; } }
 
