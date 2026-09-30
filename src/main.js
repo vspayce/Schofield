@@ -399,7 +399,7 @@ class Game {
     // dust from wheels and team
     const back = new THREE.Vector3().copy(coach.pos).addScaledVector(coach.fwd, -1.6);
     this.fx.trail(back, coach.speed > 4 ? coach.speed * 0.9 : 0, dt, 1.0);
-    const team = new THREE.Vector3().copy(coach.pos).addScaledVector(coach.fwd, 5);
+    const team = new THREE.Vector3().copy(coach.pos).addScaledVector(coach.fwd, coach.teamFront * 0.55);
     this.fx.trail(team, coach.speed > 4 ? coach.speed * 0.5 : 0, dt, 0.8);
     this.fx.update(dt);
     this.shake = damp(this.shake, 0, 6, rdt);

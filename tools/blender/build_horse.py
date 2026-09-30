@@ -2,7 +2,13 @@
 
 Run:
   /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup \
-      --python tools/blender/build_horse.py
+      --python tools/blender/build_horse.py [-- --breed clydesdale|clevelandbay|thoroughbred]
+
+With --breed it builds horse_<breed>.glb for the coach team instead (see BREEDS):
+the same rig, clips and node names, warped to the breed, with its own coat and
+markings, a draught harness (collar + hames, blinkered bridle, pad, crupper,
+traces; breeching on the wheelers) and hitch empties Trace_/Terret_/HameTerret_/
+Bit_/HeadRing_ L/R and PoleStrap that src/game/hitch.js hangs the gear on.
 
 Blender space: horse faces -Y, Z up, origin on the ground under the barrel.
 ~2.4 m nose->buttock (+tail), 1.6 m at the withers.
@@ -241,8 +247,8 @@ def top_z(bodyf, y, x=0.0):
     return float(zs[i])
 
 
-def saddle_prims(bodyf, seat):
-    """seat: z of the back surface at the seat."""
+def saddle_prims(bodyf, seat, wx=1.0):
+    """seat: z of the back surface at the seat. wx widens fenders/stirrups for a broader barrel."""
     E, K = C.ell, C.cone
 
     def rbox(p, c, h, r):
@@ -274,8 +280,8 @@ def saddle_prims(bodyf, seat):
         a = math.radians(-9 * s)
         rot = np.array([[math.cos(a), 0, -math.sin(a)], [0, 1, 0], [math.sin(a), 0, math.cos(a)]])
         P += [
-            C.box((0.325 * s, -0.24, 1.20), (0.013, 0.075, 0.19), 0.01, "leather", bs, k=0.0, rot=rot),  # fender
-            C.box((0.345 * s, -0.33, 0.965), (0.055, 0.045, 0.038), 0.014, "stirrup", bs, k=0.0),
+            C.box((0.325 * s * wx, -0.24, 1.20), (0.013, 0.075, 0.19), 0.01, "leather", bs, k=0.0, rot=rot),  # fender
+            C.box((0.345 * s * wx, -0.33, 0.965), (0.055, 0.045, 0.038), 0.014, "stirrup", bs, k=0.0),
         ]
     return P
 
@@ -754,7 +760,7 @@ def fall_clip(A):
     return fk_frames(A, 90, [0.0, 0.33, 0.72, 1.12, 1.5], [k0, k1, k2, k3, k4], root_fn)
 
 
-def rear_clip(A, n=120):
+def rear_clip(A, n=120, pivot=(0.62, 0.55)):
     """Rear up on the hind legs (hind hooves planted by IK), paw the air, come down."""
     front_rest = (0, 0, 0, 0, 0)
     keys_t = [0.0, 0.35, 0.8, 1.15, 1.45, 2.0]
@@ -762,7 +768,7 @@ def rear_clip(A, n=120):
     tuck = [0, 0.1, 1.0, 1.0, 0.9, 0]
     neck = [0, 8, -14, -10, -12, 0]
     frames = []
-    pivot = np.array([0.62, 0.55])  # y,z pivot near the hocks
+    pivot = np.array(pivot)  # y,z pivot near the hocks
     for fi in range(n + 1):
         t = fi / C.FPS
 
@@ -813,6 +819,872 @@ def rear_clip(A, n=120):
         D, Hh = A.rig.solve(local=loc, world=world, root_t=rt)
         frames.append(A.rig.to_basis(D, rt))
     return frames
+
+
+# ============================================================================
+# breeds (the coach team): `-- --breed clydesdale|clevelandbay|thoroughbred`
+# The base horse above stays as it is for horse.glb (enemy riders). A breed
+# warps its skeleton and prims to the historian's proportions, then adds its
+# own detail: feather, head profile, markings and a draught harness.
+# ============================================================================
+ZB0, ZW0, LEN0, HEAD0 = 0.86, 1.61, 1.67, 0.68  # base: belly line, withers, shoulder->buttock, poll->muzzle
+CHAIN = ("neck1", "neck2", "head", "tail1", "tail2", "tail3", "tail4")
+LOWER = ("fcannon", "fpastern", "hcannon", "hpastern")
+BLABELS = LABELS + ["feather"]
+
+# H: withers (m); leg: girth->ground / H; length: shoulder->buttock (m); wide/hip: barrel/hip width vs
+# base; head (m); head_w: lateral; neck: length factor; nthick: (lateral, depth); nang: neck1/neck2/head
+# angle change (deg, - = more upright); arm/bone/hoof: forearm, cannon, hoof size vs base (base cannon
+# capsule 8 cm, hoof 12.6 cm); mane: (lateral, depth); roman/dish: head profile; tuck: belly tuck.
+BREEDS = {
+    "clydesdale": dict(
+        H=1.672, leg=0.48, length=1.87, wide=1.25, hip=1.34, head=0.70, head_w=1.10, neck=1.04,
+        nthick=(1.26, 1.28), nang=(-7, -4, 2), arm=1.45, bone=1.19, hoof=1.50, ear=1.0, eye=1.12, muzzle=1.14,
+        tail=0.82, tthick=1.35, mane=(1.3, 1.12), roman=1.6, dish=0.0, tuck=0.0, feather=True, crest=0.04, withers=0.0,
+        breeching=True, rough=0.74, tris=10500, vox=0.0085,
+        # short, round and high: long stance, high knee, bouncy
+        gait=dict(duty=(0.34, 0.36), sweep=0.9, fwd=0.42, sc=13.0, bob=1.4),
+        swing={"F": {"carpus": 130, "elbow": -50, "fetlock": 72, "shoulder": 6}, "H": {"stifle": 36, "hock": -80, "fetlock": 64}},
+        pal=dict(coat="5E3520", points="1B1512", mane="15100D", white="ECE6DA", feather="EEE4D0", dirt="A89679",
+                 roan="8C7466", skin="C9A09A", hoof="C4B08E")),
+    "clevelandbay": dict(
+        H=1.625, leg=0.52, length=1.73, wide=1.03, hip=1.11, head=0.62, head_w=1.02, neck=1.05,
+        nthick=(1.06, 1.05), nang=(-2, 0, 0), arm=1.06, bone=0.94, hoof=1.19, ear=1.0, eye=1.0, muzzle=1.0,
+        tail=1.05, tthick=1.12, mane=(1.3, 1.1), roman=0.35, dish=0.0, tuck=0.0, feather=False, crest=0.0, withers=0.0,
+        breeching=False, rough=0.66, tris=9200, vox=0.0095,
+        gait=dict(duty=(0.28, 0.30), sweep=1.0, fwd=0.42, sc=11.0, bob=1.0),
+        swing={"F": {"carpus": 100, "elbow": -40, "fetlock": 50}, "H": {"stifle": 30, "hock": -62, "fetlock": 55}},
+        pal=dict(coat="6E3B1F", points="17120F", mane="14100D", hoof="26221F")),
+    "thoroughbred": dict(
+        H=1.595, leg=0.56, length=1.62, wide=0.87, hip=0.93, head=0.55, head_w=0.94, neck=1.28,
+        nthick=(0.84, 0.88), nang=(8, 4, -4), arm=0.86, bone=0.78, hoof=1.0, ear=0.82, eye=1.16, muzzle=0.84,
+        tail=1.0, tthick=0.78, mane=(0.7, 0.8), roman=0.0, dish=1.0, tuck=1.0, feather=False, crest=0.0, withers=0.05,
+        breeching=False, rough=0.52, tris=9200, vox=0.0095,
+        # long, low and reaching: short stance, long sweep, flat knee
+        gait=dict(duty=(0.24, 0.26), sweep=1.15, fwd=0.50, sc=9.0, bob=0.8),
+        swing={"F": {"carpus": 76, "elbow": -32, "fetlock": 52, "shoulder": 12}, "H": {"stifle": 28, "hock": -54, "fetlock": 48}},
+        # a matched chestnut pair: self-coloured legs, flaxen-tinged mane
+        pal=dict(coat="9A4E22", points="7A3A1A", mane="A5602E", white="EEE8DE", skin="C49A92", hoof="3A3028")),
+}
+
+
+def hexc(h):
+    return np.array([int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)])
+
+
+def ss(x):
+    x = np.clip(x, 0.0, 1.0)
+    return x * x * (3 - 2 * x)
+
+
+def seg_d(p, a, b):
+    ab = b - a
+    t = min(max(float((p - a) @ ab) / max(float(ab @ ab), 1e-12), 0.0), 1.0)
+    return float(np.linalg.norm(p - (a + t * ab)))
+
+
+class Warp:
+    """Base-horse space -> breed space. Trunk and legs by a piecewise warp (leg
+    length, body depth/length/width); neck, head and tail by their bone chains."""
+
+    def __init__(self, B):
+        self.B = B
+        self.lz = B["leg"] * B["H"]
+        self.legf = self.lz / ZB0
+        self.dep = (B["H"] - self.lz) / (ZW0 - ZB0)
+        self.sy = B["length"] / LEN0
+        self.sh = B["head"] / HEAD0
+        base = bone_list()
+        self.b0 = {n: (np.array(h, float), np.array(t, float)) for n, h, t, _, _ in base}
+        self.b1 = {n: (self.warp(h), self.warp(t)) for n, h, t, _, _ in base if n not in CHAIN}
+        self._chain(("neck1", "neck2", "head"), self.b1["chest"][1], (B["neck"], B["neck"], self.sh), B["nang"])
+        self._chain(("tail1", "tail2", "tail3", "tail4"), self.warp(self.b0["tail1"][0]), (B["tail"],) * 4, (-15, -8, -4, 0))
+        self.bones = [(n, tuple(self.b1[n][0]), tuple(self.b1[n][1]), par, con) for n, _, _, par, con in base]
+
+    def wz(self, z):
+        return z * self.legf if z < ZB0 else self.lz + (z - ZB0) * self.dep
+
+    def fx(self, y):  # lateral scale, barrel -> hips
+        return self.B["wide"] + (self.B["hip"] - self.B["wide"]) * C.smoothstep((y + 0.1) / 0.5)
+
+    def wy(self, y, z):  # legs keep their own proportions below the belly line
+        ya = -0.56 if y < 0.05 else 0.64
+        t = C.smoothstep((ZB0 + 0.1 - z) / 0.25)
+        return (1 - t) * self.sy * y + t * (self.sy * ya + (y - ya) * self.legf)
+
+    def warp(self, p):
+        x, y, z = (float(v) for v in p)
+        return np.array([x * self.fx(y), self.wy(y, z), self.wz(z)])
+
+    def _chain(self, names, start, scales, angs):
+        p = np.array(start, float)
+        for n, s, da in zip(names, scales, angs):
+            h0, t0 = self.b0[n]
+            d = t0 - h0
+            a = math.atan2(d[2], d[1]) + math.radians(da)
+            L = math.hypot(d[1], d[2]) * s
+            t = p + np.array([0.0, L * math.cos(a), L * math.sin(a)])
+            self.b1[n] = (p.copy(), t)
+            p = t
+
+    def chain_params(self, n):
+        if n.startswith("neck"):
+            return self.B["nthick"][1], self.B["nthick"][0]
+        if n == "head":
+            return self.sh, self.sh * self.B["head_w"]
+        return self.B["tthick"], self.B["tthick"]
+
+    @staticmethod
+    def _frame(h, t):
+        d = (t - h)[1:]
+        L = float(np.hypot(*d))
+        u = d / L
+        return L, u, np.array([-u[1], u[0]])
+
+    def map_chain(self, p, n):
+        sp, lat = self.chain_params(n)
+        h0, t0 = self.b0[n]
+        h1, t1 = self.b1[n]
+        L0, u0, v0 = self._frame(h0, t0)
+        L1, u1, v1 = self._frame(h1, t1)
+        q = (np.asarray(p, float) - h0)[1:]
+        yz = h1[1:] + (q @ u0) * (L1 / L0) * u1 + (q @ v0) * sp * v1
+        return np.array([float(p[0]) * lat, yz[0], yz[1]])
+
+    def map_pt(self, p, bones=None):
+        p = np.asarray(p, float)
+        cand = [b for b in (bones or self.b0) if b in self.b0] or list(self.b0)
+        best = min(cand, key=lambda b: seg_d(p, *self.b0[b]))
+        return self.map_chain(p, best) if best in CHAIN else self.warp(p)
+
+    def map_body(self, p):  # harness points: trunk, neck and head only
+        return self.map_pt(p, ["root", "pelvis", "spine", "chest", "neck1", "neck2", "head", "tail1"])
+
+    def factors(self, pr, c):
+        """Per-axis radius scale (x, y, z) for a base prim."""
+        B = self.B
+        if pr.label == "mane":
+            return B["mane"][0], B["mane"][1], B["mane"][1]
+        if pr.label == "tail":
+            return (B["tthick"],) * 3
+        b = (pr.bones[0] if pr.bones else "root").split(".")[0]
+        if b.startswith("neck"):
+            lat, per = B["nthick"]
+            return lat, per, per
+        if b == "head":
+            f = {"ear": B["ear"], "eye": B["eye"], "muzzle": B["muzzle"], "nostril": B["muzzle"]}.get(pr.label, 1.0)
+            return self.sh * B["head_w"] * f, self.sh * f, self.sh * f
+        if b in ("radius", "tibia"):
+            return B["arm"], B["arm"], self.legf
+        if b in LOWER:
+            return B["bone"], B["bone"], self.legf
+        if b in ("fhoof", "hhoof"):
+            return B["hoof"], B["hoof"], self.legf
+        return self.fx(c[1]), self.sy, self.dep
+
+
+def map_prim(W, pr):
+    fx, fy, fz = W.factors(pr, pr.center)
+    if pr.kind == "ell":
+        return C.ell(W.map_pt(pr.c, pr.bones), pr.r * np.array([fx, fy, fz]), pr.label, pr.bones, k=pr.k,
+                     scale=pr.scale, rot=pr.rot)
+    d = pr.b - pr.a
+    d = np.abs(d / (np.linalg.norm(d) + 1e-9))
+    f2 = (d[2] * fy + d[1] * fz) / max(d[1] + d[2], 1e-6)  # radius scale across the axis, in the sagittal plane
+    sc = (np.ones(3) if pr.scale is None else pr.scale) * np.array([fx / f2, 1.0, 1.0])
+    a, b = W.map_pt(pr.a, pr.bones), W.map_pt(pr.b, pr.bones)
+    if pr.label == "ear":  # ear length follows the breed too
+        b = a + (b - a) * W.B["ear"]
+    return C.cone(a, b, pr.ra * f2, pr.rb * f2, pr.label, pr.bones, k=pr.k, scale=sc)
+
+
+def head_frame(W):
+    """Head bone (poll->muzzle) axis u, face-front direction f, length."""
+    h, t = W.b1["head"]
+    d = t - h
+    L = float(np.linalg.norm(d))
+    u = d / L
+    f = np.array([0.0, u[2], -u[1]])  # forward-up: the nasal line
+    return h, u, f, L
+
+
+def frame_rot(u, f):
+    return np.array([[1.0, 0, 0], u, f])
+
+
+def feather_prims(W):
+    """1870s feather: silky hair down the back of the cannon, belling over the
+    fetlock and falling in locks over the coronet; the toe stays clear."""
+    P = []
+    rc = 0.04 * W.B["bone"]
+    rh = 0.063 * W.B["hoof"]
+    rng = np.random.RandomState(5)
+    for sfx in (".L", ".R"):
+        for can, pas, hf in (("fcannon", "fpastern", "fhoof"), ("hcannon", "hpastern", "hhoof")):
+            K0 = W.b1[can + sfx][0]
+            F = W.b1[pas + sfx][0]
+            Co = W.b1[hf + sfx][0]
+            bk = np.array([0.0, 1.0, 0.0])
+            hind = can[0] == "h"
+            P.append(C.cone(K0 + bk * rc * 0.5 + [0, 0, -0.05 if hind else -0.07], F + bk * rc * 1.1 + [0, 0, 0.03],
+                            rc * 0.7, rc * 1.3, "feather", [can + sfx], k=0.04, scale=(1.25, 1, 1)))
+            P.append(C.ell(F + bk * rc * 0.5, (rc * 1.2, rc * 1.3, rc * 1.4), "feather", [pas + sfx, can + sfx], k=0.04))
+            # one continuous skirt flaring from the fetlock to just above the ground
+            sk = np.array([Co[0], Co[1] + rh * 0.55, 0.02])  # set back so the toe shows
+            P.append(C.cone(F + bk * rc * 0.5, sk, rc * 1.2, rh * 1.1, "feather", [pas + sfx, hf + sfx], k=0.04,
+                            scale=(1.05, 1, 1)))
+            # a row of locks widening as they fall, fanning over the heel and quarters; the toe stays clear
+            for thd in range(-160, 161, 40):
+                if abs(thd) < 62:
+                    continue
+                th = math.radians(thd + 8 * (rng.rand() - 0.5))
+                dv = np.array([math.sin(th), -math.cos(th), 0.0])  # th=0 -> toe
+                top = F + dv * rc * 1.0 + [0, 0, -0.01]
+                bot = np.array([Co[0], Co[1], 0.02 + 0.02 * rng.rand()]) + dv * rh * (1.12 + 0.06 * rng.rand())
+                P.append(C.cone(top, bot, 0.012, 0.022, "feather", [pas + sfx, hf + sfx], k=0.03))
+    return P
+
+
+def breed_prims(W):
+    B = W.B
+    base = body_prims()
+    body = [p for p in base if not p.sub]
+    cut = [p for p in base if p.sub]
+    out = [map_prim(W, p) for p in body]
+    h, u, f, L = head_frame(W)
+    R = frame_rot(u, f)
+    # fill the throatlatch where the rescaled head meets the neck
+    extra = [C.ell(W.map_pt((0, -1.02, 1.80), ["neck2"]) * 0.5 + W.map_pt((0, -1.1, 1.80), ["head"]) * 0.5,
+                   (0.075 * B["nthick"][0], 0.08, 0.085 * B["nthick"][1]), "coat", ["neck2", "head"], k=0.07)]
+    if B["roman"]:  # slightly convex nasal line
+        s = W.sh * B["roman"]
+        extra.append(C.ell(h + u * 0.56 * L + f * 0.092 * W.sh, (0.052 * W.sh, 0.15 * W.sh, 0.045 * s), "coat", ["head"],
+                           k=0.05, rot=R))
+    # head bone structure (head frame: x lateral, u poll->muzzle, f nasal line)
+    sh = W.sh
+    X = np.array([1.0, 0, 0])
+    MH = lambda p: W.map_pt(p, ["head"])
+    cuts = []
+    for s_ in (1, -1):
+        eye = MH((0.095 * s_, -1.215, 1.93))
+        extra.append(C.ell(h + u * 0.30 * L - f * 0.045 * sh + X * s_ * 0.07 * sh, (0.035 * sh, 0.09 * sh, 0.075 * sh),
+                           "coat", ["head"], k=0.03, rot=R))  # masseter
+        extra.append(C.cone(eye - f * 0.035 * sh - u * 0.01, h + u * 0.45 * L - f * 0.03 * sh + X * s_ * 0.078 * sh,
+                            0.012 * sh, 0.009 * sh, "coat", ["head"], k=0.02))  # facial crest
+        extra.append(C.ell(eye + f * 0.03 * sh - X * s_ * 0.012, (0.025 * sh,) * 3, "coat", ["head"], k=0.02))  # brow
+        cuts.append(C.ell(eye + f * 0.055 * sh - u * 0.05 * sh + X * s_ * 0.004, (0.022 * sh, 0.03 * sh, 0.02 * sh), "cut", [],
+                          sub=True, k=0.02, rot=R))  # hollow above the eye
+        nos = MH((0.042 * s_, -1.505, 1.605))
+        for du in (-0.014, 0.012):  # flared rims
+            extra.append(C.ell(nos + u * du * sh + f * 0.006 + X * s_ * 0.006, (0.012 * sh, 0.014 * sh, 0.024 * sh) ,
+                               "muzzle", ["head"], k=0.012, rot=R))
+        cuts.append(C.ell(nos + X * s_ * 0.016 * sh + u * 0.004, (0.012 * sh, 0.009 * sh, 0.017 * sh), "cut", [],
+                          sub=True, k=0.006, rot=R))  # the opening
+        cuts.append(C.ell(W.map_pt((0.085 * s_ * B["nthick"][0], -1.07, 1.77), ["neck2"]), (0.025, 0.035, 0.07), "cut", [],
+                          sub=True, k=0.03))  # groove behind the jaw
+    if B["crest"]:  # arched crest along the top of the neck
+        for n_, t_ in (("neck1", 0.55), ("neck2", 0.35)):
+            hh, tt = W.b1[n_]
+            d = tt - hh
+            up = np.array([0.0, -d[2], d[1]]) / np.linalg.norm(d)
+            if up[2] < 0:
+                up = -up
+            c = hh + d * t_ + up * (0.10 * B["nthick"][1] + B["crest"] * 0.5)
+            extra.append(C.ell(c, (0.06 * B["nthick"][0], 0.2, 0.06 + B["crest"]), "coat", ["neck1", "neck2"], k=0.07))
+    if B["withers"]:  # higher, sharper withers
+        ch = W.b1["chest"][0]
+        extra.append(C.ell((0, ch[1] - 0.09, W.wz(1.52) + B["withers"] * 0.6), (0.07, 0.22, 0.10), "coat", ["chest", "spine"], k=0.08))
+    if B["feather"]:
+        extra += feather_prims(W)
+    dish, tuck = cuts, []
+    if B["dish"]:  # a slight dish below the eyes
+        dish.append(C.ell(h + u * 0.62 * L + f * (0.108 * W.sh + 0.03), (0.07, 0.11, 0.035), "cut", [], sub=True,
+                          k=0.03, rot=R))
+    if B["tuck"]:  # tucked-up belly toward the stifle
+        tuck.append(C.ell((0, W.wy(0.34, 0.9), W.wz(0.8)), (0.22, 0.30, 0.14), "cut", [], sub=True, k=0.12))
+    # the first 17 prims of body_prims() are the trunk: the tuck cuts only those
+    return out[:17] + tuck + out[17:] + extra + dish + cut
+
+
+# ----------------------------------------------------------------------------
+# breed colour: coat, points, markings
+# ----------------------------------------------------------------------------
+def breed_color(prims, W, name):
+    B = W.B
+    pal = {k: hexc(v) for k, v in B["pal"].items()}
+    kz = W.b1["fcannon.L"][0][2]
+    hz = W.b1["hcannon.L"][0][2]
+    fz = W.b1["fpastern.L"][0][2]
+    ylegs = 0.5 * (W.b1["fcannon.L"][0][1] + W.b1["hcannon.L"][0][1])
+    h, u, f, L = head_frame(W)
+    nonsub = [p for p in prims if not p.sub]
+    star_c = surf_pt(lambda p: C.eval_sdf([q for q in prims if not q.sub], p), h + u * 0.22 * L + f * 0.2)
+    nuts = []
+    for sfx, s in ((".L", 1), (".R", -1)):
+        k = W.b1["fcannon" + sfx][0]
+        nuts.append(np.array([k[0] - s * 0.045 * B["arm"], k[1], k[2] + 0.1 * W.legf]))
+        k = W.b1["hcannon" + sfx][0]
+        nuts.append(np.array([k[0] - s * 0.04 * B["bone"], k[1] - 0.02, k[2] - 0.05 * W.legf]))
+
+    def mix(c, col, w):
+        w = np.clip(w, 0, 1)[:, None]
+        return c * (1 - w) + np.asarray(col) * w
+
+    def fn(P, N, ex):
+        lw = C.label_weights(prims, P, BLABELS, tau=0.01)
+        n1 = C.fbm(P * np.array([1.0, 0.22, 1.0]), 24.0, 3, seed=3)  # hair grain along the body
+        n2 = C.fbm(P, 5.0, 3, seed=7)
+        n3 = C.fbm(P, 14.0, 2, seed=17)
+        z = P[:, 2]
+        c = np.tile(pal["coat"], (len(P), 1))
+        c *= (0.9 + 0.16 * n2)[:, None] * (0.95 + 0.1 * n1)[:, None]
+        # bays: sun-faded topline, darker lower barrel, a lighter soft belly and flank
+        top = np.clip(N[:, 2], 0, 1)
+        c *= (1.0 + 0.10 * top * (z > W.lz))[:, None]
+        c *= (1.0 - 0.08 * np.clip(-N[:, 2], 0, 1) * (z > W.lz * 0.95))[:, None]
+        # black points: lower legs to above knee/hock
+        front = P[:, 1] < ylegs
+        jz = np.where(front, kz, hz)
+        pts = ss((jz + 0.10 + 0.05 * (n3 - 0.5) - z) / 0.16)
+        pcol = pal["points"] * (0.85 + 0.3 * n1)[:, None]
+        c = mix(c, pcol, pts)
+        # ear rims and muzzle go dark on a bay
+        et = lw["ear"] * ss((P @ np.array([0, 0.0, 1.0]) - (W.b1["head"][0][2] + 0.10 * W.sh)) / 0.08)
+        c = mix(c, pal["points"], et)
+        c = mix(c, pal["points"] * 1.5, lw["muzzle"] * 0.8)
+        # chestnuts: small horny patches inside the forearm above the knee, and inside the hock
+        for cp in nuts:
+            dn = np.linalg.norm((P - cp) * np.array([1.0, 1.3, 0.75]), axis=1)
+            c = mix(c, np.array([0.13, 0.11, 0.09]) * (0.8 + 0.4 * n3)[:, None], ss((0.02 - dn) / 0.006))
+        # ---- face frame (for blaze, star, snip)
+        q = P - h
+        t = (q @ u) / L
+        fr = N @ f
+        radial = np.linalg.norm(q - np.outer(q @ u, u), axis=1)
+        onface = ss(((q @ f) + 0.01 * W.sh) / 0.02) * ss((0.2 * W.sh - radial) / 0.04)  # front of the head only
+        white = np.zeros(len(P))
+        if name == "clydesdale":
+            # wide blaze spilling over the nose into a bald-ish muzzle
+            w = (0.035 + 0.062 * np.clip(t, 0, 1.2)) * W.sh * (0.85 + 0.35 * n3)
+            face = ss((fr + 0.25) / 0.3) * ss((t - 0.02) / 0.06) * onface
+            bald = ss((t - 0.92) / 0.1) * ss((fr + 0.75) / 0.3) * ss((t - 0.5) / 0.1) * (lw["muzzle"] + lw["nostril"] + onface > 0.3)
+            white = np.maximum(white, ss((w - np.abs(P[:, 0])) / 0.012) * face)
+            white = np.maximum(white, bald * ss((0.10 * W.sh - np.abs(P[:, 0])) / 0.03))
+            # four high stockings: chrome white past the knee and hock
+            st = ss((jz + np.where(front, 0.12, 0.10) * W.legf + 0.09 * (n3 - 0.5) + 0.03 * (n2 - 0.5) - z) / 0.035)
+            white = np.maximum(white, st * (z < W.lz))
+            # roan splashing on the belly and lower flank
+            under = ss((-N[:, 2] - 0.05) / 0.4) * ss((W.lz + 0.28 - z) / 0.1) * (z > W.lz - 0.05)
+            under *= ss((np.abs(P[:, 1] - W.wy(-0.1, 1.0)) < 0.55) * 1.0)
+            flk = ss((C.value_noise3(P * np.array([1.0, 0.5, 1.0]), 220.0, seed=21) - 0.5) / 0.15) * (0.6 + 0.4 * n3)
+            patch = ss((C.fbm(P, 7.0, 2, seed=23) - 0.35) / 0.3)
+            c = mix(c, pal["roan"] * (0.85 + 0.25 * n1)[:, None], under * (0.35 + 0.45 * patch))
+            c = mix(c, pal["white"] * 0.9, under * patch * flk * 0.55)
+        elif name == "thoroughbred":
+            # star, a snip between the nostrils and one near-hind sock
+            star = ss((0.03 - np.linalg.norm((P - star_c) * np.array([1.0, 0.8, 0.8]), axis=1) * (0.85 + 0.3 * n3)) / 0.008)
+            snip = ss((t - 0.9) / 0.03) * ss((1.12 - t) / 0.03) * ss((0.02 - np.abs(P[:, 0])) / 0.006) * ss((fr + 0.5) / 0.3) * onface
+            sock = (P[:, 0] > 0) & (~front)
+            sk = ss((fz + 0.07 * W.legf + 0.02 * (n2 - 0.5) - z) / 0.02) * sock
+            white = np.maximum(np.maximum(star, snip), sk)
+        wcol = pal.get("white", np.ones(3)) * (0.94 + 0.08 * n1)[:, None]
+        c = mix(c, wcol, white * (lw["mane"] + lw["tail"] < 0.5))
+        # pink-grey skin shows through white on the muzzle
+        if "skin" in pal:
+            mz = lw["muzzle"] + lw["nostril"] * 0.5
+            mott = (C.value_noise3(P, 90.0, seed=9) > 0.62) * 0.5
+            c = mix(c, pal["skin"] * (1 - mott)[:, None] + pal["points"] * mott[:, None], mz * white * 0.85)
+        # feather: silky, whiter at the top, dirtier at the ground, streaked
+        if "feather" in pal:
+            fv = lw["feather"]
+            streak = C.fbm(P * np.array([4.0, 4.0, 0.5]), 60.0, 2, seed=31)
+            fcol = pal["feather"] * (1 - ss((0.10 - z) / 0.10))[:, None] + pal["dirt"] * ss((0.10 - z) / 0.10)[:, None]
+            fcol = fcol * (0.82 + 0.3 * streak)[:, None]
+            c = mix(c, fcol, fv)
+        # mane and tail
+        hair = np.clip(lw["mane"] + lw["tail"], 0, 1)
+        streak = C.fbm(P * np.array([6.0, 1.0, 0.35]), 30.0, 2, seed=11)
+        c = mix(c, pal["mane"] * (0.75 + 0.55 * streak)[:, None], hair)
+        # hooves: horn with growth lines; pale under a white leg
+        hv = lw["hoof"]
+        rings = 0.96 + 0.04 * np.sin(z * 420.0 + 3 * n2)
+        hc = pal["hoof"] * rings[:, None] * (0.9 + 0.2 * C.fbm(P * np.array([6, 6, 1.0]), 40.0, 2, seed=41))[:, None]
+        if name == "thoroughbred":
+            pale = ((P[:, 0] > 0) & (~front)).astype(float)
+            hc = hc * (1 - pale[:, None]) + hexc("B8A07C") * rings[:, None] * pale[:, None]
+        c = mix(c, hc, hv)
+        c = mix(c, np.array([0.035, 0.022, 0.016]), lw["eye"])
+        c = mix(c, np.array([0.05, 0.035, 0.03]), lw["nostril"] * 0.9)
+        # shading baked from the fine SDF: contact AO, broad AO, and muscle definition
+        ao = C.sdf_ao(nonsub, P, N, steps=5, dist=0.026)
+        ao2 = C.sdf_ao(nonsub, P, N, steps=3, dist=0.07, strength=0.6)
+        e = 0.018
+        d0 = C.eval_sdf(nonsub, P)
+        lap = sum(C.eval_sdf(nonsub, P + np.eye(3)[i] * e) + C.eval_sdf(nonsub, P - np.eye(3)[i] * e) for i in range(3))
+        lap = (lap - 6 * d0) / (e * e)
+        cv = np.clip((lap - 9.0) / 25.0, -1, 1) * (z > W.lz * 0.9)
+        c *= (1.0 + 0.07 * cv)[:, None]
+        shade = (0.45 + 0.55 * ao ** 1.2) * (0.8 + 0.2 * ao2)
+        fw = np.clip(lw["feather"], 0, 1)  # silky white hair: soft occlusion only
+        shade = shade * (1 - fw) + (0.72 + 0.28 * ao) * fw
+        c *= shade[:, None]
+        return c
+
+    return fn
+
+
+# ----------------------------------------------------------------------------
+# draught harness: collar + hames, blinkered bridle, pad, crupper, traces,
+# and on the wheelers breeching. Solid parts are one SDF mesh with a baked
+# texture; straps and hardware use flat swatches in the same texture.
+# ----------------------------------------------------------------------------
+SW = {"leather": 0.125, "patent": 0.375, "brass": 0.625, "steel": 0.875}  # swatch rows (v) at u 0.94..1
+HCOL = dict(leather="221C17", patent="121110", brass="9C7A3A", steel="3A3A3C", pad="C9B68F", hame="2A2A2A")
+
+
+def swatch(ob, kind):
+    me = ob.data
+    if not me.uv_layers:
+        me.uv_layers.new(name="UVMap")
+    uv = np.tile(np.array([0.97, SW[kind]], dtype=np.float32), len(me.loops))
+    me.uv_layers.active.data.foreach_set("uv", uv)
+    return ob
+
+
+def basis(axis):
+    a = np.asarray(axis, float)
+    a /= np.linalg.norm(a)
+    t = np.array([0, 0, 1.0]) if abs(a[2]) < 0.9 else np.array([1.0, 0, 0])
+    b1 = np.cross(a, t)
+    b1 /= np.linalg.norm(b1)
+    return a, b1, np.cross(a, b1)
+
+
+def ring(name, c, axis, r, tube=0.005, n=8):
+    a, b1, b2 = basis(axis)
+    pts = [tuple(np.asarray(c) + r * (math.cos(t) * b1 + math.sin(t) * b2)) for t in np.linspace(0, 2 * math.pi, n + 1)]
+    return C.tube_along(name, pts, tube, sides=4)
+
+
+def disc(name, c, axis, r, t, n=10):
+    a, b1, b2 = basis(axis)
+    c = np.asarray(c, float)
+    V = [tuple(c), tuple(c + a * t)]
+    F = []
+    for i in range(n):
+        th = 2 * math.pi * i / n
+        o = r * (math.cos(th) * b1 + math.sin(th) * b2)
+        V += [tuple(c + o), tuple(c + o + a * t)]
+    for i in range(n):
+        j = (i + 1) % n
+        p0, p1, q0, q1 = 2 + 2 * i, 3 + 2 * i, 2 + 2 * j, 3 + 2 * j
+        F += [(p0, q0, q1, p1), (0, q0, p0), (1, p1, q1)]
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(V, [], F)
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def plate(name, c, a1, a2, w, hgt, t, rr=0.028, n=4):
+    """Rounded-rectangle plate (blinker) centred at c, spanning a1 x a2."""
+    c, a1, a2 = (np.asarray(v, float) for v in (c, a1, a2))
+    nrm = np.cross(a1, a2)
+    nrm /= np.linalg.norm(nrm)
+    out = []
+    for cx, cy, a0 in ((1, 1, 0), (-1, 1, 90), (-1, -1, 180), (1, -1, 270)):
+        for k in range(n + 1):
+            th = math.radians(a0 + 90 * k / n)
+            out.append((cx * (w / 2 - rr) + rr * math.cos(th), cy * (hgt / 2 - rr) + rr * math.sin(th)))
+    m = len(out)
+    V = [tuple(c + a1 * x + a2 * y - nrm * t / 2) for x, y in out] + [tuple(c + a1 * x + a2 * y + nrm * t / 2) for x, y in out]
+    F = [tuple(range(m))[::-1], tuple(range(m, 2 * m))]
+    F += [(i, (i + 1) % m, m + (i + 1) % m, m + i) for i in range(m)]
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(V, [], F)
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+def surf_pt(bodyf, p, off=0.0):
+    """Project p onto the body surface (+off along the normal)."""
+    P = np.array([p], float)
+    for _ in range(8):
+        d = bodyf(P)
+        e = 1e-3
+        g = np.stack([(bodyf(P + np.eye(3)[i] * e) - d) / e for i in range(3)], axis=1)
+        g /= np.maximum(np.linalg.norm(g, axis=1, keepdims=True), 1e-9)
+        P = P - g * (d - off)[:, None]
+    return P[0]
+
+
+def collar_loop(bodyf, cen, e1, off, n=40):
+    """Points where the body (no mane) is `off` away, round the neck in the plane (e1, x)."""
+    ex = np.array([1.0, 0, 0])
+    phis = np.linspace(0, 2 * math.pi, n, endpoint=False)
+    pts = []
+    for ph in phis:
+        d = math.cos(ph) * e1 + math.sin(ph) * ex
+        lo, hi = 0.0, 0.7
+        for _ in range(28):
+            m = 0.5 * (lo + hi)
+            if bodyf(np.array([cen + d * m]))[0] < off:
+                lo = m
+            else:
+                hi = m
+        pts.append(cen + d * lo)
+    return phis, np.array(pts)
+
+
+def dstrap(name, bodyf, pts, n_sub=2, **kw):
+    return strap(name, bodyf, pts, n_sub=n_sub, **kw)
+
+
+def build_draft_harness(W, prims, bodyf, breeching):
+    """Returns (Harness object, {empty name: (pos, bone)})."""
+    B = W.B
+    E, K = C.ell, C.cone
+    nomane = [p for p in prims if not p.sub and p.label not in ("mane",)]
+    neckf = lambda p: C.eval_sdf(nomane, p)
+    M = W.map_body
+    emp = {}
+    # ---- collar: a stuffed roll round the neck base with the body of the collar behind it
+    top, bot = M((0, -0.57, 1.645)), M((0, -0.87, 1.29))
+    e1 = top - bot
+    e1[0] = 0
+    e1 /= np.linalg.norm(e1)
+    n = np.cross(np.array([1.0, 0, 0]), e1)  # forward (toward the head)
+    if n[1] > 0:
+        n = -n
+    cen = 0.5 * (top + bot)
+    cs = B["nthick"][0] ** 0.6
+    phis, roll = collar_loop(neckf, cen + n * 0.012, e1, 0.04 * cs)
+    _, back = collar_loop(neckf, cen - n * 0.035, e1, 0.05 * cs)
+    _, hame = collar_loop(neckf, cen + n * 0.045 * cs, e1, 0.058 * cs)
+    sol = []
+    nL = len(phis)
+    for i in range(nL):
+        j = (i + 1) % nL
+        cs = B["nthick"][0] ** 0.6
+        cr = lambda ph, a, b: cs * (a + b * math.sin(0.5 * ph) ** 2 * (1.25 - 0.5 * math.sin(0.5 * ph) ** 4))
+        sol.append(K(roll[i], roll[j], cr(phis[i], 0.036, 0.024), cr(phis[j], 0.036, 0.024), "collar", [], k=0.01))
+        sol.append(K(back[i], back[j], cr(phis[i], 0.03, 0.02), cr(phis[j], 0.03, 0.02), "collar", [], k=0.025))
+    # hames: japanned bars in the collar's front groove, brass balls on top; traces hook on at the tugs
+    tz = W.wz(1.13)
+    side = {}
+    for s, sfx in ((1, "_L"), (-1, "_R")):
+        idx = [i for i in range(nL) if 0.3 < (phis[i] if s > 0 else 2 * math.pi - phis[i]) < 2.55]
+        idx.sort(key=lambda i: phis[i] if s > 0 else 2 * math.pi - phis[i])
+        hp = [hame[i] for i in idx]
+        for a, b in zip(hp[:-1], hp[1:]):
+            sol.append(K(a, b, 0.015, 0.015, "hame", [], k=0.004))
+        t0 = hp[0]
+        tip = t0 + e1 * 0.10 - np.array([0.012 * s, 0, 0]) + n * 0.01
+        sol.append(K(t0, tip, 0.015, 0.013, "hame", [], k=0.004))
+        sol.append(E(tip + e1 * 0.012, (0.024, 0.024, 0.024), "brass", [], k=0.006))
+        tug = min(hp, key=lambda p: abs(p[2] - tz))
+        rad = np.array([s * 1.0, 0, 0])
+        sol.append(E(tug + rad * 0.012, (0.02, 0.035, 0.025), "brass", [], k=0.006))
+        ter = hp[max(1, len(hp) // 7)]
+        side[sfx] = dict(tug=tug + rad * 0.02, ter=ter, low=hp[-1])
+    # pad (harness saddle) with a raised tree; the girth sits a hand behind the elbow
+    py = W.wy(-0.22, 1.5)
+    pz = top_z(bodyf, py)
+
+    def rbox(p, c, hh, r):
+        qq = np.abs(p - np.asarray(c)) - (np.asarray(hh) - r)
+        return np.linalg.norm(np.maximum(qq, 0), axis=1) + np.minimum(qq.max(axis=1), 0) - r
+
+    zl = W.wz(1.33)
+
+    def pad(p):
+        b = bodyf(p)
+        shell = np.maximum(b - 0.03, -b - 0.004)
+        hy = (0.055 + 0.04 * np.clip((p[:, 2] - zl) / max(pz - zl, 0.1), 0, 1)) * W.sy
+        box = np.maximum(np.abs(p[:, 1] - py) - hy, zl - p[:, 2])
+        return np.maximum(shell, box)
+
+    sol.append(C.fnprim(pad, (-0.62, py - 0.2, zl - 0.05), (0.62, py + 0.2, pz + 0.08), "leather", [], k=0.0))
+    sol.append(E((0, py, pz + 0.035), (0.10, 0.075, 0.035), "leather", [], k=0.02))
+    for s in (1, -1):
+        sol.append(E((0.085 * s, py, pz + 0.045), (0.02, 0.03, 0.02), "brass", [], k=0.01))  # terret base
+    lo = np.array([-0.62, min(py - 0.25, float(roll[:, 1].min()) - 0.15), min(zl, float(roll[:, 2].min())) - 0.1])
+    hi = np.array([0.62, py + 0.25, float(max(roll[:, 2].max(), hame[:, 2].max())) + 0.18])
+    solid = C.build_sdf_mesh("HarnessSolid", sol, 0.0075, 1150, lo=lo, hi=hi, smooth_iters=1)
+    C.smart_uv(solid)
+    uv = np.empty(len(solid.data.loops) * 2, dtype=np.float32)
+    solid.data.uv_layers.active.data.foreach_get("uv", uv)
+    uv[0::2] *= 0.92
+    solid.data.uv_layers.active.data.foreach_set("uv", uv)
+
+    parts = {"rigid_chest": [], "rigid_spine": [], "skin": []}
+    pc = {k: hexc(v) for k, v in HCOL.items()}
+    solf = lambda p: C.eval_sdf([q for q in sol if q.kind != "fn"], p)
+
+    def solid_color(P, N, ex):
+        lw = C.label_weights(sol, P, ["collar", "hame", "brass", "leather"], tau=0.004)
+        nz = C.fbm(P, 40.0, 3, seed=51)
+        leather = pc["leather"] * (0.85 + 0.35 * nz)[:, None]
+        # collar: black leather over a pale sweat-pad where it bears on the horse; stitched seam lines
+        con = ss((0.016 - bodyf(P)) / 0.012)
+        dplane = (P - cen) @ n
+        seam = (np.abs(np.sin(dplane * 110.0)) < 0.12) * 0.35
+        col = leather * (1 + seam)[:, None]
+        col = col * (1 - con[:, None]) + pc["pad"] * (0.85 + 0.25 * nz)[:, None] * con[:, None]
+        hm = pc["hame"] * (0.85 + 0.3 * nz)[:, None]
+        br = pc["brass"] * (0.75 + 0.5 * C.fbm(P, 90.0, 2, seed=53))[:, None]
+        # pad: quilted panel lines
+        quilt = (np.abs(np.sin(P[:, 1] * 160.0)) < 0.1) * 0.25
+        pd = leather * (1 + quilt)[:, None]
+        c = lw["collar"][:, None] * col + lw["hame"][:, None] * hm + lw["brass"][:, None] * br + lw["leather"][:, None] * pd
+        ao = C.sdf_ao([q for q in sol if q.kind != "fn"], P, N, steps=3, dist=0.012)
+        c *= (0.6 + 0.4 * ao)[:, None]
+        # scuffed, lighter on edges
+        return c
+
+    parts["solid"] = solid
+    # ---- traces from the tugs along the side to behind the stifle (JS carries them on to the bars)
+    for s, sfx in ((1, "_L"), (-1, "_R")):
+        pts = [side[sfx]["tug"]] + [M((0.32 * s, y, z)) for y, z in ((-0.50, 1.10), (-0.25, 1.05), (0.02, 1.03), (0.28, 1.03), (0.50, 1.02))]
+        tr = dstrap("trace", bodyf, pts, width=0.042, thick=0.011, off=0.02)
+        parts["skin"].append(swatch(tr, "leather"))
+        end = surf_pt(bodyf, M((0.30 * s, 0.62, 1.02)), 0.03)
+        emp["Trace" + sfx] = (end, "pelvis")
+        emp["Hame" + sfx] = (side[sfx]["tug"], "chest")
+        # hame terret for the lines
+        tc = side[sfx]["ter"] + np.array([0.02 * s, 0, 0]) + e1 * 0.028
+        parts["rigid_chest"].append(swatch(ring("hterret", tc, n, 0.026, 0.0055), "brass"))
+        emp["HameTerret" + sfx] = (tc, "chest")
+        # pad terret
+        pt = np.array([0.085 * s, py, pz + 0.085])
+        parts["rigid_spine"].append(swatch(ring("pterret", pt, (0, 1, 0), 0.028, 0.0055), "brass"))
+        emp["Terret" + sfx] = (pt, "spine")
+    # hame straps top and bottom; the pole strap hangs from the bottom one
+    lowc = 0.5 * (side["_L"]["low"] + side["_R"]["low"]) + n * 0.01 - e1 * 0.03
+    parts["rigid_chest"].append(swatch(C.tube_along("hstrap", [side["_L"]["low"], lowc, side["_R"]["low"]], 0.0, sides=4, flat=(0.012, 0.006)), "leather"))
+    t_l = side["_L"]["ter"]
+    t_r = side["_R"]["ter"]
+    parts["rigid_chest"].append(swatch(C.tube_along("hstrap2", [t_l + e1 * 0.07, 0.5 * (t_l + t_r) + e1 * 0.085, t_r + e1 * 0.07], 0.0, sides=4, flat=(0.012, 0.005)), "leather"))
+    emp["PoleStrap"] = (lowc, "chest")
+    # ---- girth (bellyband), backstrap, crupper, loin strap with trace carriers
+    zc = W.wz(1.22)
+    girth = [(0.5 * math.cos(a), py + 0.02, zc + 0.5 * math.sin(a)) for a in np.linspace(math.radians(-5), math.radians(-175), 11)]
+    parts["skin"].append(swatch(dstrap("girth", bodyf, girth, width=0.065, thick=0.009, off=0.015), "leather"))
+    back_pts = [(0, py + 0.09, 1.9)] + [M((0, y, 1.62)) for y in (0.0, 0.2, 0.4, 0.58, 0.72)]
+    back_pts[0] = np.array([0, py + 0.085 * W.sy + 0.01, pz + 0.01])
+    dock = W.b1["tail1"][0]
+    back_pts.append(dock + np.array([0, 0.02, 0.05]))
+    parts["skin"].append(swatch(dstrap("backstrap", bodyf, back_pts, width=0.034, thick=0.008, off=0.013), "leather"))
+    td = W.b1["tail1"][1] - W.b1["tail1"][0]
+    parts["skin"].append(swatch(ring("crupper", dock + td * 0.35, td, 0.065 * W.B["tthick"] + 0.012, 0.012, n=12), "leather"))
+    ly = 0.30
+    loin = [M((0.40 * s, ly, 1.02)) if abs(s) > 0.9 else M((0.4 * s, ly, 1.3 + 0.2 * (1 - abs(s)))) for s in (1, 0.5, 0, -0.5, -1)]
+    loin[2] = np.array([0, W.wy(ly, 1.5), 1.9])
+    parts["skin"].append(swatch(dstrap("loin", bodyf, loin, width=0.036, thick=0.008, off=0.022), "leather"))
+    if breeching:
+        # breeching round the quarters on hip straps, hold-backs forward to the hame bottoms
+        br = [M((0.33 * s, y, 1.10)) for s, y in ((1, 0.46), (0.9, 0.66))] + [M((0.0, 0.95, 1.12))] + \
+             [M((0.33 * s, y, 1.10)) for s, y in ((-0.9, 0.66), (-1, 0.46))]
+        br[2] = np.array([0, W.wy(1.2, 1.2), W.wz(1.12)])
+        parts["skin"].append(swatch(dstrap("breeching", bodyf, br, width=0.08, thick=0.012, off=0.010), "leather"))
+        for yy in (0.46, 0.68):
+            hs = [M((0.33, yy + 0.05, 1.12)), M((0.29, yy + 0.02, 1.27)), M((0.22, yy, 1.4)), np.array([0, W.wy(yy, 1.5), 1.9]),
+                  M((-0.22, yy, 1.4)), M((-0.29, yy + 0.02, 1.27)), M((-0.33, yy + 0.05, 1.12))]
+            parts["skin"].append(swatch(dstrap("hipstrap", bodyf, hs, width=0.034, thick=0.008, off=0.010), "leather"))
+        for s, sfx in ((1, "_L"), (-1, "_R")):
+            hb = [M((0.33 * s, 0.44, 1.08)), M((0.34 * s, 0.1, 0.99)), M((0.33 * s, -0.3, 0.98)), M((0.26 * s, -0.62, 1.04)),
+                  side[sfx]["low"] + np.array([0.02 * s, 0, -0.01])]
+            parts["skin"].append(swatch(dstrap("holdback", bodyf, hb, width=0.034, thick=0.009, off=0.017), "leather"))
+    # ---- blinkered bridle
+    hb = ["head"]
+    h, u, f, L = head_frame(W)
+    MH = lambda p: W.map_pt(p, hb)
+    for s, sfx in ((1, "_L"), (-1, "_R")):
+        ch = [MH(p) for p in ((0.075 * s, -1.41, 1.60), (0.095 * s, -1.31, 1.72), (0.10 * s, -1.20, 1.85), (0.085 * s, -1.10, 1.98), (0.03 * s, -1.06, 2.05))]
+        parts["skin"].append(swatch(dstrap("cheek", bodyf, ch, width=0.026, thick=0.007), "leather"))
+        tl = [MH(p) for p in ((0.085 * s, -1.11, 1.99), (0.095 * s, -1.06, 1.87), (0.06 * s, -1.02, 1.77), (0.0, -1.005, 1.74))]
+        parts["skin"].append(swatch(dstrap("throat", bodyf, tl, width=0.018, thick=0.006), "leather"))
+        bc = MH((0.085 * s, -1.41, 1.59))
+        bc[0] = s * (abs(surf_pt(bodyf, bc, 0.0)[0]) + 0.012)
+        parts["skin"].append(swatch(ring("bit", bc, (1, 0, 0), 0.026, 0.0055), "steel"))
+        emp["Bit" + sfx] = (bc, "head")
+        # blinker: square patent-leather plate standing off the eye, toed in at the front
+        eye = MH((0.095 * s, -1.215, 1.93))
+        ex = abs(surf_pt(bodyf, eye, 0.0)[0])
+        cen_b = np.array([s * (ex + 0.03), eye[1], eye[2]]) - u * 0.012 + f * 0.006
+        a1 = u - np.array([s * 0.28, 0, 0])
+        a1 /= np.linalg.norm(a1)
+        a2 = f
+        parts["skin"].append(swatch(plate("blinker", cen_b, a1, a2, 0.105, 0.095, 0.008), "patent"))
+        st = [cen_b + a2 * 0.047 - a1 * 0.01, MH((0.05 * s, -1.12, 2.02)), MH((0.0, -1.10, 2.05))]
+        parts["skin"].append(swatch(dstrap("bstay", bodyf, st, width=0.016, thick=0.005, off=0.01, n_sub=2), "leather"))
+        ro = MH((0.092 * s, -1.125, 1.985))
+        ro = surf_pt(bodyf, ro, 0.008)
+        parts["skin"].append(swatch(disc("rosette", ro, (s, 0, 0.25), 0.022, 0.008), "brass"))
+        hr = surf_pt(bodyf, MH((0.06 * s, -1.075, 2.03)), 0.02)
+        parts["skin"].append(swatch(ring("reindrop", hr + np.array([0.01 * s, 0, 0.01]), (0, 1, 0), 0.018, 0.004, n=8), "brass"))
+        emp["HeadRing" + sfx] = (hr + np.array([0.01 * s, 0, 0.01]), "head")
+    parts["skin"].append(swatch(dstrap("crown", bodyf, [MH((0.03, -1.06, 2.05)), MH((0.0, -1.055, 2.07)), MH((-0.03, -1.06, 2.05))], width=0.026, n_sub=2), "leather"))
+    parts["skin"].append(swatch(dstrap("brow", bodyf, [MH(p) for p in ((0.085, -1.12, 1.98), (0, -1.155, 2.02), (-0.085, -1.12, 1.98))], width=0.024), "leather"))
+    nc = h + u * 0.64 * L
+    ringn = [nc + 0.2 * (math.cos(a) * f + math.sin(a) * np.array([1.0, 0, 0])) for a in np.linspace(0, 2 * math.pi, 15)]
+    parts["skin"].append(swatch(dstrap("nose", bodyf, ringn, width=0.028, off=0.011), "leather"))
+    return parts, solid_color, emp
+
+
+def bake_swatched(ob, size, color_fn, name):
+    """bake_texture plus flat swatch cells at u 0.94..1 for straps and hardware."""
+    r = C.rasterise(ob, size)
+    m = r["mask"]
+    img = np.zeros((size, size, 3))
+    img[m] = np.clip(color_fn(r["P"][m], r["N"][m], {}), 0, 1)
+    img = C.dilate(img, m, 10)
+    x0 = int(0.94 * size)
+    for kind, v in SW.items():
+        col = hexc(HCOL[kind])
+        y0, y1 = int((v - 0.125) * size), int((v + 0.125) * size)
+        yy = np.arange(y0, y1)[:, None]
+        xx = np.arange(x0, size)[None, :]
+        grain = 0.9 + 0.1 * np.sin(yy * 1.7 + xx * 0.9)
+        img[y0:y1, x0:] = col * grain[..., None]
+    return C.make_image(name, img)
+
+
+def breed_gait(name, W, A):
+    B = W.B
+    G = B["gait"]
+    s = W.legf * G["sweep"]
+    sw = B["swing"]
+    dF, dH = G["duty"]
+
+    def bouncy(fn):  # scale the body's bob and pitch per breed
+        def f(phi):
+            loc, rt, cp, pp = fn(phi)
+            return loc, (rt[0], rt[1], rt[2] * G["bob"]), cp, pp
+        return f
+
+    gal = gait_clip(
+        A, "Gallop", 32,
+        onsets={"H.L": 0.0, "H.R": 0.11, "F.L": 0.30, "F.R": 0.41},
+        duty={"F": dF, "H": dH},
+        sweep={"F": 1.00 * s, "H": 0.98 * s},
+        fwd={"F": G["fwd"] * s, "H": 0.52 * s},
+        body_fn=bouncy(gallop_body), sc_amp=G["sc"], swing=sw,
+    )
+    can = gait_clip(
+        A, "Canter", 42,
+        onsets={"H.L": 0.0, "H.R": 0.27, "F.L": 0.31, "F.R": 0.54},
+        duty={"F": dF + 0.04, "H": dH + 0.04},
+        sweep={"F": 0.88 * s, "H": 0.86 * s},
+        fwd={"F": G["fwd"] * 0.9 * s, "H": 0.45 * s},
+        body_fn=bouncy(canter_body), sc_amp=G["sc"] * 0.82,
+        swing={k: {kk: vv * 0.92 for kk, vv in v.items()} for k, v in sw.items()},
+    )
+    return gal, can
+
+
+def main_breed(name):
+    B = BREEDS[name]
+    W = Warp(B)
+    out = os.path.join(C.MODELS, f"horse_{name}.glb")
+    C.reset_scene()
+    prims = breed_prims(W)
+    body = C.build_sdf_mesh("Horse", prims, B["vox"], B["tris"])
+    bodyf = body_sdf_fn(prims)
+    skinf = body_sdf_fn([p for p in prims if p.label not in ("mane", "tail")])  # harness lies on this
+    C.set_active(body)
+    wn = body.modifiers.new("wn", "WEIGHTED_NORMAL")  # face-area normals: no facets on the decimated flats
+    wn.weight = 65
+    bpy.ops.object.modifier_apply(modifier=wn.name)
+    sy = W.wy(-0.15, 1.5)
+    seat_back = top_z(bodyf, sy)
+    mount = Vector((0, sy, seat_back + 0.085))
+    for z in (1.0, 1.2, 1.35, 1.5):
+        xs = np.linspace(0.7, 0, 700)
+        zz = W.wz(z)
+        P = np.stack([xs, np.full_like(xs, W.wy(-0.05, 1.2)), np.full_like(xs, zz)], axis=1)
+        print(f"[{name}] barrel half-width z={zz:.2f}: {xs[int(np.argmax(bodyf(P) < 0))]:.3f}")
+    wy_ = W.b1["chest"][0][1] - 0.03  # behind the crest, which overlaps the withers from the front
+    print(f"[{name}] withers {top_z(skinf, wy_):.3f} back {seat_back:.3f} belly {W.lz:.3f}")
+
+    # riding saddle kept for the node contract (hidden on the team)
+    sp = saddle_prims(bodyf, seat_back, wx=B["wide"])
+    saddle = C.build_sdf_mesh("Saddle", sp, 0.009, 700, lo=(-0.5, -0.62, 0.85), hi=(0.5, 0.25, seat_back + 0.35), smooth_iters=1)
+    parts, solid_color, emp = build_draft_harness(W, prims, skinf, B["breeching"])
+
+    # --- textures
+    C.smart_uv(body)
+    img = C.bake_texture(body, 1024, breed_color(prims, W, name), "Horse_tex")
+    C.assign_material(body, C.image_material("Horse_mat", img, roughness=B["rough"]))
+    C.smart_uv(saddle)
+    img = C.bake_texture(saddle, 256, saddle_color(sp), "Saddle_tex")
+    C.assign_material(saddle, C.image_material("Saddle_mat", img, roughness=0.65))
+    solid = parts["solid"]
+    himg = bake_swatched(solid, 512, solid_color, "Harness_tex")
+
+    # --- rig
+    arm = C.build_armature("HorseRig", W.bones)
+    rig = C.Rig(arm)
+    segs = {b: (np.array(rig.head[b]), np.array(rig.tail[b])) for b in rig.order}
+    C.compute_weights(body, prims, segs, tau=0.018, smooth_iters=4)
+    C.rigid_weights(saddle, "spine")
+    # collar and hames ride the shoulders; the pad the back; straps follow the skin
+    C.transfer_weights(body, solid, k=3)
+    ycut = float(W.wy(-0.45, 1.5))
+    sp_i = solid.vertex_groups.find("spine")
+    ch_g = solid.vertex_groups["chest"]
+    sp_g = solid.vertex_groups["spine"]
+    co = C.verts_np(solid)
+    front = np.nonzero(co[:, 1] < ycut)[0].tolist()
+    rear = np.nonzero(co[:, 1] >= ycut)[0].tolist()
+    for g in list(solid.vertex_groups):
+        g.remove(front)
+        g.remove(rear)
+    ch_g.add(front, 1.0, "REPLACE")
+    sp_g.add(rear, 1.0, "REPLACE")
+    for ob in parts["skin"]:
+        C.transfer_weights(body, ob, k=3)
+    for ob in parts["rigid_chest"]:
+        C.rigid_weights(ob, "chest")
+    for ob in parts["rigid_spine"]:
+        C.rigid_weights(ob, "spine")
+    harness = C.join([solid] + parts["skin"] + parts["rigid_chest"] + parts["rigid_spine"], "Harness")
+    C.shade_smooth(harness)
+    C.assign_material(harness, C.image_material("Harness_mat", himg, roughness=0.62))
+    for ob in (body, saddle, harness):
+        C.bind(ob, arm)
+
+    empties = [("Mount", mount, "spine")] + [(k, Vector(tuple(p)), b) for k, (p, b) in sorted(emp.items())]
+    eobs = []
+    for nm, pos, bone in empties:
+        m = bpy.data.objects.new(nm, None)
+        m.empty_display_type = "ARROWS"
+        m.empty_display_size = 0.05 if nm != "Mount" else 0.2
+        bpy.context.scene.collection.objects.link(m)
+        m.parent = arm
+        m.parent_type = "BONE"
+        m.parent_bone = bone
+        bpy.context.view_layer.update()
+        m.matrix_world = Matrix.Translation(pos)
+        eobs.append(m)
+
+    # --- animation
+    A = HorseAnim(rig)
+    gal, can = breed_gait(name, W, A)
+    C.write_action(arm, "Gallop", gal, loop=True)
+    C.write_action(arm, "Canter", can, loop=True)
+    C.write_action(arm, "Idle", idle_clip(A), loop=True)
+    C.write_action(arm, "Fall", fall_clip(A))
+    C.write_action(arm, "Rear", rear_clip(A, pivot=(W.wy(0.62, 0.55), W.wz(0.55))))
+    arm.animation_data.action = bpy.data.actions["Gallop"]
+
+    for ob in (body, saddle, harness):
+        print(f"[{name}] {ob.name}: {C.tri_count(ob)} tris")
+    C.export_glb(out, [arm, body, saddle, harness] + eobs)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(C.PREVIEWS, f"horse_{name}_build.blend"))
 
 
 # ----------------------------------------------------------------------------
@@ -905,4 +1777,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    breed = argv[argv.index("--breed") + 1] if "--breed" in argv else "horse"
+    if breed == "horse":
+        main()
+    else:
+        main_breed(breed)

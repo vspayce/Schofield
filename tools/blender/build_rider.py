@@ -11,10 +11,13 @@ DieStanding) lift the root so the FEET are at the origin -> place the rider at
 ground level for those.
 
 Meshes (toggle in code): Body, Duster, Poncho, Hat_Wide, Hat_Bowler, Bandana
+        Driver only: Body_Driver (replaces Body), Coat_Driver, Hat_Driver,
+        Moustache_Walrus, Neckerchief_Driver, Watch_Driver
 Weapons: hand.R bone head sits in the palm; its local frame (as three.js sees it)
         has +Z along the hand/barrel and +Y up, so a gun added as a child of hand.R
         with identity transform aims correctly.  Grip_R is an equivalent empty.
-Clips:  Ride, RideAim, Shoot, FallOff, StandIdle, StandShoot, DieStanding
+Clips:  Ride, RideAim, Shoot, FallOff, StandIdle, StandShoot, DieStanding,
+        Drive (on the coach box: feet on the footboard, hands on the lines)
 """
 import math
 import os
@@ -358,6 +361,498 @@ def finish_lathe(ob):
 
 
 # ----------------------------------------------------------------------------
+# the coach driver, after a period photograph: a heavy-set older man with a
+# grey walrus moustache, a pale high-crowned hat, a loose pale neckerchief, a
+# long dark coat worn open over a checked wool vest and watch chain, and pale
+# canvas trousers over dark boots.  Body_Driver stands in for Body (same rig,
+# same clips); the rest are driver-only overlays.
+# ----------------------------------------------------------------------------
+def driver_body_prims():
+    E, K = C.ell, C.cone
+    P = [
+        # head: broad and fleshy, heavy brow, jowls and a double chin
+        E((0, 0.004, 0.838), (0.083, 0.097, 0.106), "skin", ["head"], k=0.02),
+        E((0, -0.018, 0.768), (0.071, 0.07, 0.058), "skin", ["head"], k=0.045),  # jaw
+        E((0, -0.07, 0.737), (0.028, 0.018, 0.02), "skin", ["head"], k=0.02),  # chin
+        E((0, -0.042, 0.742), (0.052, 0.046, 0.03), "skin", ["neck", "head"], k=0.035),  # double chin
+        E((0, -0.079, 0.866), (0.066, 0.022, 0.017), "skin", ["head"], k=0.02),  # brow ridge
+        K((0, -0.092, 0.855), (0, -0.108, 0.812), 0.012, 0.016, "skin", ["head"], k=0.015),  # nose
+        E((0, -0.112, 0.806), (0.019, 0.017, 0.016), "skin", ["head"], k=0.012),  # nose tip
+        E((0, -0.084, 0.772), (0.026, 0.012, 0.009), "skin", ["head"], k=0.01),  # lower lip
+        E((0, 0.018, 0.866), (0.087, 0.096, 0.086), "hair", ["head"], k=0.015),
+        K((0, 0.025, 0.60), (0, 0.004, 0.77), 0.068, 0.06, "skin", ["neck", "head"], k=0.03),  # neck
+        # torso: broad chest over a big belly (vest painted on), trousers below
+        E((0, 0.035, 0.49), (0.178, 0.122, 0.145), "torso", ["chest"], k=0.06),
+        E((0, -0.035, 0.29), (0.172, 0.16, 0.15), "torso", ["spine", "chest"], k=0.08),
+        E((0, 0.035, 0.145), (0.178, 0.13, 0.10), "pants", ["hips"], k=0.06),
+        E((0, 0.09, 0.06), (0.15, 0.10, 0.075), "pants", ["hips"], k=0.05),  # seat
+    ]
+    for sfx, s in ((".L", 1), (".R", -1)):
+        j = {k: np.array(v) for k, v in J(s).items()}
+        shin = j["ank"] - j["kne"]
+        P += [
+            K(j["arm"] - np.array([0.03 * s, 0, 0.0]), j["elb"], 0.064, 0.05, "shirt", ["upperarm" + sfx, "shoulder" + sfx], k=0.03),
+            K((0.07 * s, 0.035, 0.56), j["arm"], 0.078, 0.066, "shirt", ["shoulder" + sfx, "chest"], k=0.05),
+            K(j["elb"], j["wri"], 0.05, 0.04, "shirt", ["forearm" + sfx], k=0.02),
+            E(j["wri"] + (j["hnd"] - j["wri"]) * 0.5, (0.037, 0.053, 0.044), "hand", ["hand" + sfx], k=0.015),
+            K(j["hip"] + np.array([0.0, 0.0, -0.01]), j["kne"], 0.108, 0.07, "pants", ["thigh" + sfx, "hips"], k=0.05),
+            E(j["kne"], (0.07, 0.072, 0.072), "pants", ["thigh" + sfx, "shin" + sfx], k=0.02),
+            K(j["kne"] + shin * 0.12, j["ank"] + np.array([0, 0, 0.02]), 0.075, 0.07, "pants", ["shin" + sfx], k=0.02),
+            E(j["ank"] + np.array([0, 0.0, -0.005]), (0.072, 0.076, 0.045), "pants", ["shin" + sfx], k=0.02),  # bunched hem
+            K(j["ank"] + np.array([0, 0.025, -0.03]), j["toe"], 0.05, 0.037, "boot", ["foot" + sfx], k=0.02),
+            E(j["ank"] + np.array([0, 0.03, -0.055]), (0.036, 0.036, 0.02), "heel", ["foot" + sfx], k=0.005),
+            E((0.031 * s, -0.082, 0.843), (0.011, 0.007, 0.0075), "eye", ["head"], k=0.004),
+            E((0.044 * s, -0.071, 0.806), (0.03, 0.026, 0.028), "skin", ["head"], k=0.03),  # cheek
+            E((0.052 * s, -0.045, 0.765), (0.028, 0.031, 0.031), "skin", ["head"], k=0.03),  # jowl
+            E((0.015 * s, -0.099, 0.803), (0.012, 0.01, 0.01), "skin", ["head"], k=0.008),  # nostril wing
+            E((0.086 * s, 0.008, 0.82), (0.016, 0.026, 0.034), "skin", ["head"], k=0.01),  # ear
+        ]
+    return P
+
+
+def _mix(c, m, col):
+    m = np.clip(m, 0, 1)[:, None]
+    return c * (1 - m) + np.array(col) * m
+
+
+def driver_body_color(prims):
+    labs = ["skin", "hair", "torso", "shirt", "hand", "pants", "boot", "heel", "eye"]
+    solid = [p for p in prims if not p.sub]
+
+    def fn(P, N, ex):
+        lw = C.label_weights(prims, P, labs, tau=0.006)
+        n = C.fbm(P, 30.0, 2, seed=7)
+        x, y, z = P[:, 0], P[:, 1], P[:, 2]
+        ax = np.abs(x)
+        cols = {
+            "skin": (0.56, 0.41, 0.33), "hair": (0.56, 0.54, 0.51), "torso": (0.11, 0.11, 0.12),
+            "shirt": (0.70, 0.68, 0.62), "hand": (0.55, 0.40, 0.31), "pants": (0.60, 0.54, 0.42),
+            "boot": (0.13, 0.095, 0.07), "heel": (0.08, 0.06, 0.05), "eye": (0.07, 0.055, 0.05),
+        }
+        c = sum(lw[k][:, None] * np.array(cols[k]) for k in labs)
+        front = y < -0.03
+
+        # vest: dark wool, blue-grey windowpane check with a brown overcheck
+        g = 0.026
+        u = np.where(np.abs(N[:, 0]) > 0.75, y, x)
+        fu, fz = np.abs((u / g) % 1.0 - 0.5), np.abs((z / g) % 1.0 - 0.5)
+        fu2, fz2 = np.abs(((u / g) + 0.5) % 1.0 - 0.5), np.abs(((z / g) + 0.5) % 1.0 - 0.5)
+        vc = np.tile(np.array(cols["torso"]), (len(P), 1))
+        seen = np.clip((0.07 - y) / 0.05, 0, 1)  # the back is under the coat: plain
+        l2 = np.clip((np.maximum(fu2, fz2) - 0.44) / 0.03, 0, 1)
+        l1 = np.clip((np.maximum(fu, fz) - 0.39) / 0.04, 0, 1)
+        vc = _mix(vc, l2 * 0.8 * seen, (0.24, 0.16, 0.10))
+        vc = _mix(vc, l1 * 0.85 * seen, (0.30, 0.33, 0.38))
+        bottom = 0.205 - 0.035 * np.clip(1 - ax / 0.07, 0, 1) * front
+        vest = (lw["torso"] + lw["shirt"] * (ax < 0.2) * (z > 0.40)) * (z > bottom) * (z < 0.63)
+        opening = front & (ax < 0.012 + 0.075 * np.clip((z - 0.46) / 0.13, 0, 1)) & (z > 0.45)
+        vest = vest * ~opening
+        c = _mix(c, vest, (0, 0, 0)) + vc * np.clip(vest, 0, 1)[:, None]
+        # shirt front in the V, trousers under the vest's points
+        c = _mix(c, lw["torso"] * opening, cols["shirt"])
+        c = _mix(c, lw["torso"] * (z <= bottom), cols["pants"])
+        # vest buttons, pocket welts, a nickel badge on his left breast
+        k = np.round((z - 0.235) / 0.045)
+        btn = front & (k >= 0) & (k <= 5) & (np.hypot(x, z - (0.235 + k * 0.045)) < 0.0065)
+        c = _mix(c, btn * 1.0, (0.52, 0.47, 0.40))
+        welt = front & (np.abs(z - 0.29) < 0.003) & (np.abs(ax - 0.095) < 0.034)
+        c = _mix(c, welt * 0.8, (0.30, 0.30, 0.33))
+        th = np.arctan2(z - 0.47, x - 0.088)
+        star = np.hypot(x - 0.088, z - 0.47) < 0.011 * (0.62 + 0.38 * np.cos(5 * th))
+        c = _mix(c, (front & star) * 1.0, (0.66, 0.65, 0.62))
+
+        # shirt collar band showing at the base of the neck
+        collar = lw["skin"] * (z > 0.595) * (z < 0.635)
+        c = _mix(c, collar, cols["shirt"])
+
+        # face: ruddy nose and cheeks, heavy grey brows, lined forehead, eye shadow
+        face = lw["skin"] * (y < -0.035) * (z > 0.70)
+        red = np.exp(-((ax / 0.022) ** 2 + ((y + 0.11) / 0.02) ** 2 + ((z - 0.807) / 0.02) ** 2))
+        red += 0.7 * np.exp(-(((ax - 0.045) / 0.024) ** 2 + ((z - 0.805) / 0.022) ** 2)) * np.clip((-0.04 - y) / 0.03, 0, 1)
+        c = _mix(c, face * np.clip(red, 0, 1) * 0.6, (0.66, 0.33, 0.26))
+        brow_z = 0.869 + 0.003 * np.clip((ax - 0.03) / 0.03, -1, 1)
+        brow = face * (np.abs(z - brow_z) < 0.0085 * (1 - 0.3 * np.clip((ax - 0.045) / 0.02, 0, 1))) * (ax > 0.008) * (ax < 0.064)
+        c = _mix(c, brow * (0.75 + 0.25 * C.fbm(P, 400.0, 2, seed=9)), (0.58, 0.56, 0.52))
+        # eyes: dark slits under the lids with a glint of white
+        slit = face * np.exp(-(((ax - 0.031) / 0.011) ** 2 + ((z - 0.8435) / 0.0035) ** 2))
+        c = _mix(c, slit, (0.09, 0.07, 0.06))
+        c = _mix(c, face * np.exp(-(((ax - 0.022) / 0.004) ** 2 + ((z - 0.8435) / 0.0025) ** 2)) * 0.6, (0.62, 0.58, 0.52))
+        sock = face * np.exp(-(((ax - 0.031) / 0.015) ** 2 + ((z - 0.846) / 0.008) ** 2))
+        c *= (1 - 0.2 * sock)[:, None]
+        wrinkle = face * (z > 0.88) * (z < 0.925) * (np.sin(z * 2 * np.pi / 0.009 + 3 * x) > 0.75)
+        c *= (1 - 0.12 * wrinkle)[:, None]
+        crow = face * (ax > 0.052) * (np.abs(z - 0.842) < 0.014) * (np.sin((z - 0.842) * 900 + ax * 300) > 0.6)
+        c *= (1 - 0.10 * crow)[:, None]
+        # jowl line under the cheeks and a crease under the lower lip
+        jowl = face * np.exp(-(((ax - 0.05) / 0.012) ** 2 + ((z - 0.782 + 0.4 * (ax - 0.05)) / 0.02) ** 2)) * (y < -0.06)
+        c *= (1 - 0.18 * jowl)[:, None]
+        c *= (1 - 0.2 * face * np.exp(-((ax / 0.018) ** 2 + ((z - 0.755) / 0.003) ** 2)))[:, None]
+        lip = face * np.exp(-((ax / 0.022) ** 2 + ((z - 0.772) / 0.006) ** 2))
+        c = _mix(c, lip * 0.6, (0.50, 0.29, 0.25))
+        # grey hair: temples, short sideburns, the back of the head above the nape
+        side = lw["skin"] * np.clip((ax - 0.062) / 0.008, 0, 1) * np.clip((y + 0.035) / 0.01, 0, 1) \
+            * np.clip((0.012 - y) / 0.01, 0, 1) * np.clip((z - 0.80) / 0.01, 0, 1) * (z < 0.87)
+        nape = lw["skin"] * np.clip((y - 0.03) / 0.015, 0, 1) * np.clip((z - 0.775) / 0.01, 0, 1) * (z < 0.87)
+        hair = np.clip(lw["hair"] + side + nape, 0, 1)
+        hc = np.array(cols["hair"]) * (0.8 + 0.35 * C.fbm(P * np.array([1, 1, 0.25]), 300.0, 2, seed=10))[:, None]
+        c = c * (1 - hair[:, None]) + hc * hair[:, None]
+
+        # worn pale canvas: vertical wear, grime at the knees, seat and hems
+        pants = lw["pants"] + lw["torso"] * (z <= bottom)
+        wear = C.fbm(P * np.array([1.0, 1.0, 0.2]), 60.0, 3, seed=11)
+        grime = np.clip((-0.35 - z) / 0.25, 0, 1) + 0.5 * np.exp(-((z + 0.18) / 0.06) ** 2)
+        pc = c * (0.88 + 0.2 * wear)[:, None]
+        pc = _mix(pc, grime * 0.45, (0.36, 0.31, 0.24))
+        c = c * (1 - pants[:, None]) + pc * pants[:, None]
+
+        c *= (0.94 + 0.12 * n)[:, None]
+        ao = C.sdf_ao(solid, P, N, steps=4, dist=0.02)
+        aw = 0.55 - 0.3 * face  # the face's hollows read from the geometry; keep AO light there
+        c *= (1 - aw + aw * ao)[:, None]
+        return c
+
+    return fn
+
+
+def moustache_prims():
+    """Thick grey walrus moustache: covers the upper lip, droops past the mouth."""
+    E, K = C.ell, C.cone
+    P = [E((0, -0.104, 0.785), (0.030, 0.017, 0.015), "m", ["head"], k=0.012)]
+    for s in (1, -1):
+        P += [
+            E((0.027 * s, -0.099, 0.781), (0.025, 0.016, 0.017), "m", ["head"], k=0.012),
+            K((0.037 * s, -0.094, 0.778), (0.052 * s, -0.08, 0.743), 0.016, 0.007, "m", ["head"], k=0.012),
+        ]
+    return P
+
+
+def moustache_color(prims):
+    solid = [p for p in prims if not p.sub]
+
+    def fn(P, N, ex):
+        strands = C.fbm(P * np.array([1.0, 1.0, 0.18]), 520.0, 2, seed=12)
+        c = np.tile(np.array((0.66, 0.64, 0.60)), (len(P), 1)) * (0.62 + 0.55 * strands)[:, None]
+        # tobacco-stained fringe over the mouth, darker roots against the face
+        stain = np.exp(-((P[:, 0] / 0.02) ** 2 + ((P[:, 2] - 0.772) / 0.008) ** 2))
+        c = _mix(c, stain * 0.45, (0.55, 0.48, 0.36))
+        c *= (0.55 + 0.45 * np.clip((-0.088 - P[:, 1]) / 0.02, 0, 1))[:, None]
+        ao = C.sdf_ao(solid, P, N, steps=3, dist=0.006)
+        return c * (0.6 + 0.4 * ao)[:, None]
+
+    return fn
+
+
+def neckerchief_prims(dbp):
+    """Pale neckerchief tied loosely at the throat, ends hanging over the vest."""
+    E, K = C.ell, C.cone
+    neck = [p for p in dbp if p.kind == "cone" and p.bones == ["neck", "head"]]
+    P = inflate(neck, 0.017, None, "kerchief")
+    P += [
+        C.box((0, 0, 1.0), (1, 1, 0.295), 0.0, "cut", [], sub=True, k=0.01),  # above z 0.705
+        C.box((0, 0, 0.0), (1, 1, 0.61), 0.0, "cut", [], sub=True, k=0.01),  # below z 0.61
+        E((0, -0.079, 0.636), (0.026, 0.02, 0.021), "kerchief", ["neck", "chest"], k=0.012),  # knot
+        K((0.004, -0.083, 0.628), (0.026, -0.098, 0.566), 0.018, 0.007, "kerchief", ["chest"], k=0.01, scale=(1.25, 0.5, 1)),
+        K((-0.004, -0.083, 0.628), (-0.02, -0.104, 0.574), 0.016, 0.006, "kerchief", ["chest"], k=0.01, scale=(1.25, 0.5, 1)),
+    ]
+    return P
+
+
+def kerchief_pattern(P, N, c):
+    folds = np.sin(np.arctan2(P[:, 1], P[:, 0]) * 9 + P[:, 2] * 60)
+    return c * (0.9 + 0.1 * folds)[:, None]
+
+
+def driver_coat_prims(dbp):
+    """Long dark coat worn open.  A solid offset of the body with the front
+    carved away (only near the body, so the sleeves added after it survive)."""
+    E, K = C.ell, C.cone
+    core = [p for p in dbp if p.label == "torso" or (p.label == "pants" and p.bones == ["hips"])]
+    shoulders = [p for p in dbp if p.label == "shirt" and p.bones[0].startswith("shoulder")]
+    P = inflate(core + shoulders, 0.024, None, "coat")
+    P += [
+        E((0, 0.04, 0.15), (0.205, 0.158, 0.11), "coat", ["hips"], k=0.06),
+        E((0, 0.035, 0.625), (0.098, 0.088, 0.045), "collar", ["chest", "neck"], k=0.02),
+        # tail spread on the seat behind him
+        C.box((0, 0.21, -0.03), (0.2, 0.016, 0.17), 0.012, "coat", ["hips", "coat.B"], k=0.05, rot=_rotx(-38)),
+    ]
+    thighs = []
+    for sfx, s in ((".L", 1), (".R", -1)):
+        j = {k: np.array(v) for k, v in J(s).items()}
+        td = (j["kne"] - j["hip"]) / np.linalg.norm(j["kne"] - j["hip"])
+        P += [
+            K(j["hip"] + np.array([0.02 * s, 0.02, 0.03]), j["kne"] + td * 0.04 + np.array([0.0, 0.04, 0.02]), 0.13, 0.1, "coat",
+              ["thigh" + sfx], k=0.05),
+        ]
+        thighs += [p for p in dbp if p.kind == "cone" and p.bones == ["thigh" + sfx, "hips"]]
+    inner = core + thighs
+
+    def opening(p):
+        x, y, z = p[:, 0], p[:, 1], p[:, 2]
+        # open from the collar to the belly; the skirt over the thighs stays whole
+        w = np.interp(z, [0.10, 0.17, 0.24, 0.40, 0.52, 0.60, 0.68], [0.0, 0.11, 0.16, 0.15, 0.10, 0.05, 0.035])
+        strip = np.maximum(np.abs(x) - w, y + 0.01)
+        d = C.eval_sdf(inner, p)
+        return np.maximum(strip, np.maximum(-(d + 0.02), d - 0.07))
+
+    P.append(C.fnprim(opening, (-0.24, -0.42, -0.4), (0.24, 0.06, 0.74), "cut", [], sub=True, k=0.008))
+
+    def lap(p):
+        # the skirt falls open over the thighs: carve the top-inner quarter of
+        # each (the front-inner side when he stands) so the trousers show
+        out = np.full(len(p), 1.0)
+        for s in (1, -1):
+            j = {k: np.array(v) for k, v in J(s).items()}
+            a, b = j["hip"], j["kne"]
+            t = np.clip((p - a) @ (b - a) / ((b - a) @ (b - a)), 0, 1.1)
+            c = a + t[:, None] * (b - a)
+            quarter = np.maximum(c[:, 2] - p[:, 2] - 0.005, (p[:, 0] - c[:, 0]) * s - 0.035)
+            out = np.minimum(out, np.maximum(quarter, (p[:, 0] * s < -0.02) * 1.0))
+        d = C.eval_sdf(inner, p)
+        return np.maximum(np.maximum(out, p[:, 2] - 0.14), np.maximum(-(d + 0.02), d - 0.07))
+
+    P.append(C.fnprim(lap, (-0.45, -0.5, -0.35), (0.45, 0.12, 0.2), "cut", [], sub=True, k=0.008))
+    for sfx, s in ((".L", 1), (".R", -1)):
+        j = {k: np.array(v) for k, v in J(s).items()}
+        P += [
+            K((0.07 * s, 0.035, 0.55), j["arm"] - np.array([0, 0, 0.01]), 0.09, 0.08, "coat", ["shoulder" + sfx, "chest"], k=0.05),
+            K(j["arm"] - np.array([0.03 * s, 0, 0.0]), j["elb"], 0.082, 0.07, "coat", ["upperarm" + sfx, "shoulder" + sfx], k=0.03),
+            K(j["elb"], j["wri"], 0.072, 0.064, "coat", ["forearm" + sfx], k=0.02),
+        ]
+    P += [C.box((0, 0, -1.0), (1, 1, 0.58), 0.0, "cut", [], sub=True, k=0.02)]
+    for s in (1, -1):
+        P.append(C.ell(J(s)["hnd"], (0.07, 0.10, 0.07), "cut", [], sub=True, k=0.01))
+    return P, inner
+
+
+def driver_coat_color(prims, inner):
+    solid = [p for p in prims if not p.sub]
+
+    def fn(P, N, ex):
+        x, y, z = P[:, 0], P[:, 1], P[:, 2]
+        nap = C.fbm(P, 45.0, 3, seed=13)
+        c = np.tile(np.array((0.20, 0.18, 0.16)), (len(P), 1)) * (0.82 + 0.36 * nap)[:, None]
+        lw = C.label_weights(prims, P, ["coat", "collar"], tau=0.006)
+        c = _mix(c, lw["collar"] * 0.6, (0.15, 0.135, 0.12))
+        # lining where the carved front edge meets the body
+        d = C.eval_sdf(inner, P)
+        c = _mix(c, (d < 0.014) * (y < 0) * (z > 0.15) * 1.0, (0.27, 0.21, 0.15))
+        # hip pocket flaps, worn elbows, dust toward the hem
+        flap = (np.abs(z - 0.17) < 0.004) & (np.abs(np.abs(x) - 0.15) < 0.045) & (y < 0)
+        c = _mix(c, flap * 0.7, (0.10, 0.09, 0.08))
+        dust = np.clip((0.08 - z) / 0.4, 0, 1) * (0.6 + 0.4 * C.fbm(P, 12.0, 2, seed=14))
+        c = _mix(c, dust * 0.3, (0.46, 0.40, 0.31))
+        ao = C.sdf_ao(solid, P, N, steps=4, dist=0.03)
+        return c * (0.5 + 0.5 * ao)[:, None]
+
+    return fn
+
+
+def make_hat_driver():
+    """Pale wide-brim hat: tall rounded crown with a light crease, dark band."""
+    prof = [(0.001, -0.004), (0.10, -0.004), (0.16, -0.003), (0.205, 0.0), (0.216, 0.007), (0.212, 0.013), (0.16, 0.011),
+            (0.108, 0.015), (0.108, 0.05), (0.105, 0.10), (0.097, 0.135), (0.078, 0.160), (0.05, 0.172), (0.02, 0.175)]
+
+    def sq(th, r, z):
+        brim = max(0.0, (r - 0.11) / 0.105)
+        curl = 0.026 * (math.cos(th) ** 2) * brim ** 2          # sides roll up
+        droop = -0.02 * max(0.0, -math.sin(th)) * brim           # snap-brim dips at the front (-Y)
+        crease = 0.0
+        if z > 0.1:
+            crease = -0.024 * math.exp(-((r * math.cos(th)) / 0.028) ** 2) * min(1.0, (z - 0.1) / 0.06)
+        pinch = -0.006 * max(0.0, -math.sin(th)) ** 3 * (z / 0.17) if z > 0.03 else 0.0
+        return pinch * math.cos(th), 0.0, curl + droop + crease
+
+    ob = C.lathe("Hat_Driver", prof, segments=22, scale_xy=(0.96, 1.08), squash=sq)
+    ob.location = HAT_C + Vector((0, 0.008, 0.004))
+    return ob
+
+
+def driver_hat_color(P, N, ex):
+    r = np.hypot(P[:, 0], P[:, 1] - 0.013)
+    z = P[:, 2]
+    c = np.tile(np.array((0.70, 0.66, 0.56)), (len(P), 1)) * (0.86 + 0.26 * C.fbm(P, 40, 3, seed=15))[:, None]
+    crown = r < 0.118
+    sweat = crown * np.exp(-((z - 0.925) / 0.012) ** 2)
+    c = _mix(c, sweat * 0.5, (0.52, 0.47, 0.38))
+    band = crown * np.clip((z - 0.895) / 0.004, 0, 1) * np.clip((0.921 - z) / 0.004, 0, 1)
+    c = _mix(c, band, (0.10, 0.08, 0.07))
+    under = (N[:, 2] < -0.5) & ~crown
+    c[under] *= 0.8
+    edge = np.clip((r - 0.19) / 0.03, 0, 1)
+    c = _mix(c, edge * 0.35, (0.45, 0.40, 0.33))
+    return c
+
+
+def surface_front(prims, x, z, y0=-0.35, y1=0.02):
+    """y of the body's front surface at (x, z), by bisection along +Y."""
+    lo = np.full(len(x), y0)
+    hi = np.full(len(x), y1)
+    for _ in range(30):
+        mid = (lo + hi) * 0.5
+        d = C.eval_sdf(prims, np.stack([x, mid, z], axis=1))
+        out = d > 0
+        lo = np.where(out, mid, lo)
+        hi = np.where(out, hi, mid)
+    return (lo + hi) * 0.5
+
+
+def make_watch_driver(dbp):
+    """Brass watch chain looped across the belly: watch in his right vest pocket,
+    a bar through the middle buttonhole, the second loop to the left pocket,
+    and a fob hanging from the bar."""
+    solid = [p for p in dbp if not p.sub]
+
+    def loop(a, b, sag, n=16):
+        t = np.linspace(0, 1, n)
+        x = a[0] + (b[0] - a[0]) * t
+        z = a[1] + (b[1] - a[1]) * t - sag * 4 * t * (1 - t)
+        y = surface_front(solid, x, z) - 0.004
+        return [Vector(v) for v in np.stack([x, y, z], axis=1)]
+
+    bar = (0.012, 0.281)
+    parts = [
+        C.tube_along("chain_a", loop((-0.098, 0.300), bar, 0.05, 12), 0.0022, sides=3),
+        C.tube_along("chain_b", loop(bar, (0.098, 0.298), 0.04, 12), 0.0022, sides=3),
+        C.tube_along("chain_c", loop(bar, (0.016, 0.228), 0.0, n=5), 0.0018, sides=3),
+    ]
+
+    def disc(name, c, radius, thick):
+        prof = [(0.001, 0.0), (radius, 0.0), (radius * 1.08, thick * 0.5), (radius, thick), (0.001, thick * 1.1)]
+        ob = C.lathe(name, prof, segments=12)
+        x, z = c
+        y = float(surface_front(solid, np.array([x]), np.array([z]))[0])
+        e = 0.003
+        nx = float(C.eval_sdf(solid, np.array([[x + e, y, z]]))[0] - C.eval_sdf(solid, np.array([[x - e, y, z]]))[0])
+        ny = float(C.eval_sdf(solid, np.array([[x, y + e, z]]))[0] - C.eval_sdf(solid, np.array([[x, y - e, z]]))[0])
+        nz = float(C.eval_sdf(solid, np.array([[x, y, z + e]]))[0] - C.eval_sdf(solid, np.array([[x, y, z - e]]))[0])
+        nrm = Vector((nx, ny, nz)).normalized()
+        ob.rotation_mode = "QUATERNION"
+        ob.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(nrm)
+        ob.location = Vector((x, y, z)) - nrm * 0.002
+        return ob
+
+    parts += [disc("watch", (-0.104, 0.312), 0.021, 0.009), disc("fob", (0.016, 0.218), 0.011, 0.004)]
+    for ob in parts:
+        C.set_active(ob)
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    ob = C.join(parts, "Watch_Driver")
+    finish_lathe(ob)
+    return ob
+
+
+def driver_face_uv(ob, k=2.3):
+    """Smart-UV with the head scaled up so the face gets ~k^2 the texel density."""
+    co = C.verts_np(ob)
+    head = co[:, 2] > 0.715
+    big = co.copy()
+    ctr = np.array([0.0, 0.0, 0.83])
+    big[head] = ctr + (co[head] - ctr) * k
+    ob.data.vertices.foreach_set("co", big.astype(np.float32).ravel())
+    ob.data.update()
+    C.smart_uv(ob, angle=80)
+    ob.data.vertices.foreach_set("co", co.astype(np.float32).ravel())
+    ob.data.update()
+
+
+def sdf_mesh_detail(name, prims, h, target_tris, keep, first, hidden=None, pad=0.06):
+    """C.build_sdf_mesh, but the verts where keep(P) is true stop decimating at
+    `first` tris' density, so the face keeps its shape inside the budget.
+    Faces whose verts are all hidden(P) (always under the coat) are dropped."""
+    los, his = zip(*[p.bbox(0) for p in prims if not p.sub])
+    lo, hi = np.min(los, axis=0) - pad, np.max(his, axis=0) + pad
+    F, lo, n = C.sdf_grid(prims, lo, hi, h)
+    verts, quads = C.surface_nets(F, lo, h)
+    ob = C.mesh_from_arrays(name, verts, quads)
+    C.set_active(ob)
+    m = ob.modifiers.new("sm", "SMOOTH")
+    m.factor = 0.5
+    m.iterations = 2
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    if hidden is not None:
+        import bmesh
+        hid = hidden(C.verts_np(ob))
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        bm.verts.ensure_lookup_table()
+        dead = [f for f in bm.faces if all(hid[v.index] for v in f.verts)]
+        bmesh.ops.delete(bm, geom=dead, context="FACES_ONLY")
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        bm.to_mesh(ob.data)
+        bm.free()
+        nq = len(ob.data.polygons)
+        print(f"[sdf] {name}: dropped {len(dead)} of {len(quads)} faces under the coat")
+        quads = quads[:nq]
+    # pass 1: even decimation to `first` tris; pass 2: the rest down to the
+    # target with the kept region locked (decimate's group weight is all-or-nothing)
+    for ratio, locked in ((first / (len(quads) * 2), False), (None, True)):
+        if locked:
+            keepv = np.nonzero(keep(C.verts_np(ob)))[0]
+            vg = ob.vertex_groups.new(name="detail")
+            vg.add([int(i) for i in keepv], 1.0, "REPLACE")
+            ratio = target_tris / C.tri_count(ob)
+        m = ob.modifiers.new("dec", "DECIMATE")
+        m.decimate_type = "COLLAPSE"
+        m.ratio = min(1.0, ratio)
+        m.use_collapse_triangulate = True
+        if locked:
+            m.vertex_group = "detail"
+            m.invert_vertex_group = True
+        bpy.ops.object.modifier_apply(modifier=m.name)
+    ob.vertex_groups.clear()
+    C.triangulate(ob)
+    C.shade_smooth(ob)
+    P = C.verts_np(ob)
+    print(f"[sdf] {name}: {len(quads)} quads -> {C.tri_count(ob)} tris, {int((P[:, 2] > 0.70).sum())} verts in the head")
+    return ob
+
+
+def skirt_follow(body, coat, Wc, names, k=4):
+    """Below the waist the coat takes the weights of the nearest Body_Driver
+    verts, so the skirt moves exactly with the thighs under it (no poke-through
+    when the legs swing forward onto the footboard)."""
+    Pb, Pc = C.verts_np(body), C.verts_np(coat)
+    idx = {g.index: names.index(g.name) for g in body.vertex_groups}
+    Wb = np.zeros((len(Pb), len(names)))
+    for v in body.data.vertices:
+        for g in v.groups:
+            Wb[v.index, idx[g.group]] = g.weight
+    f = np.clip((0.24 - Pc[:, 2]) / 0.12, 0, 1)
+    W = Wc.copy()
+    for s0 in np.nonzero(f > 0)[0]:
+        d = np.linalg.norm(Pb - Pc[s0], axis=1)
+        nn = np.argsort(d)[:k]
+        w = 1 / (d[nn] + 1e-3) ** 2
+        W[s0] = (1 - f[s0]) * Wc[s0] + f[s0] * (w[:, None] * Wb[nn]).sum(0) / w.sum()
+    C.apply_weights(coat, W, names)
+
+
+def build_driver():
+    dbp = driver_body_prims()
+    cp, inner = driver_coat_prims(dbp)
+    coat_solid = [p for p in cp if p.label != "cut" or p.sub]
+    body = sdf_mesh_detail("Body_Driver", dbp, 0.0045, 3100, lambda P: (P[:, 2] > 0.715) & (P[:, 1] < 0.02), 13000,
+                           hidden=lambda P: C.eval_sdf(coat_solid, P) < -0.012)
+    driver_face_uv(body)
+    img = C.bake_texture(body, 512, driver_body_color(dbp), "Body_Driver_tex")
+    C.assign_material(body, C.image_material("Body_Driver_mat", img, roughness=0.85))
+    coat = build_mesh("Coat_Driver", cp, 0.0075, 1450, driver_coat_color(cp, inner), 256, rough=0.92, uv_angle=89)
+    mp = moustache_prims()
+    mous = build_mesh("Moustache_Walrus", mp, 0.0025, 340, moustache_color(mp), 64, rough=0.95)
+    kp = neckerchief_prims(dbp)
+    kerchief = build_mesh("Neckerchief_Driver", kp, 0.004, 300, cloth_color(kp, (0.76, 0.72, 0.63), kerchief_pattern, 0.012), 64)
+    hat = make_hat_driver()
+    finish_lathe(hat)
+    C.smart_uv(hat)
+    img = C.bake_texture(hat, 128, driver_hat_color, "Hat_Driver_tex")
+    C.assign_material(hat, C.image_material("Hat_Driver_mat", img, roughness=0.9))
+    watch = make_watch_driver(dbp)
+    C.smart_uv(watch)
+    img = C.bake_texture(watch, 32, lambda P, N, ex: np.tile(np.array((0.78, 0.60, 0.30)), (len(P), 1)), "Watch_Driver_tex")
+    C.assign_material(watch, C.image_material("Watch_Driver_mat", img, roughness=0.35, metallic=0.9))
+    return dict(body=(body, dbp), coat=(coat, cp), mous=mous, kerchief=(kerchief, kp), hat=hat, watch=watch)
+
+
+# ----------------------------------------------------------------------------
 # animation
 # ----------------------------------------------------------------------------
 def frame_mat(d, s):
@@ -617,10 +1112,66 @@ def die_clip(A, n=108):
     return A.frames(n, pose)
 
 
+def _ik(A, T, L1, L2, pole):
+    """Middle joint of a two-bone chain from A reaching T, bending toward pole."""
+    d = T - A
+    dist = min(max(d.length, abs(L1 - L2) + 1e-4), L1 + L2 - 1e-4)
+    u = d.normalized()
+    a = (L1 * L1 - L2 * L2 + dist * dist) / (2 * dist)
+    h = math.sqrt(max(L1 * L1 - a * a, 0.0))
+    p = Vector(pole)
+    p = (p - u * p.dot(u)).normalized()
+    return A + u * a + p * h
+
+
+DRIVE_WRIST = (0.11, -0.37, 0.30)   # wrists ahead of the belly, lines gathered in front
+DRIVE_ANKLE = (0.15, -0.42, -0.43)  # heels on the coach's footboard (0.54 m below the seat)
+
+
+def drive_clip(A, n=60):
+    """On the coach box: sat upright, feet braced on the footboard, both hands
+    forward on the lines, rolling with the coach (1 s loop).  The coach hangs
+    the six lines on hand.R, so the hands stay put while the body sways."""
+    rig = A.rig
+    tau = 2 * math.pi
+    L = lambda b: (rig.tail[b] - rig.head[b]).length  # noqa: E731
+
+    def pose(t, u):
+        sw = math.sin(tau * u)
+        bob = math.sin(tau * u * 2)
+        loc = {
+            "root": E(0, 1.5 * sw, 0),
+            "hips": E(-4 + 0.6 * bob),
+            "spine": E(3 + 0.8 * math.sin(tau * (2 * u - 0.1))),
+            "chest": E(2),
+            "neck": E(-7),
+            "head": E(-2 + 1.2 * math.sin(tau * (2 * u - 0.2)), 0, 4 * math.sin(tau * u)),
+        }
+        rt = (0, 0, 0.005 * bob)
+        D, H = rig.solve(local=loc, root_t=rt)
+        w = {"coat.B": aim_q(rig, "coat.B", Vector((0, 1, -0.2)))}
+        for sfx, s in ((".L", 1), (".R", -1)):
+            m = Vector((s, 1, 1))
+            Tw = Vector(DRIVE_WRIST) * m + Vector((0, 0, 0.01 * bob))
+            Aw = H["upperarm" + sfx]
+            el = _ik(Aw, Tw, L("upperarm" + sfx), L("forearm" + sfx), Vector((0.9 * s, 0.4, -1)))
+            w["upperarm" + sfx] = aim_q(rig, "upperarm" + sfx, el - Aw)
+            w["forearm" + sfx] = aim_q(rig, "forearm" + sfx, Tw - el)
+            w["hand" + sfx] = hand_q(s, Vector((-0.3 * s, -1, -0.15)), up=(0.5 * s, 0.2, 1))
+            Ta = Vector(DRIVE_ANKLE) * m
+            Ah = H["thigh" + sfx]
+            kn = _ik(Ah, Ta, L("thigh" + sfx), L("shin" + sfx), Vector((0.25 * s, -1, 0.5)))
+            w["thigh" + sfx] = aim_q(rig, "thigh" + sfx, kn - Ah)
+            w["shin" + sfx] = aim_q(rig, "shin" + sfx, Ta - kn)
+            w["foot" + sfx] = aim_q(rig, "foot" + sfx, Vector((0.08 * s, -1, -0.30)))
+        return loc, w, rt
+    return A.frames(n, pose)
+
+
 # ----------------------------------------------------------------------------
-def build_mesh(name, prims, h, tris, color_fn, tex, rough=0.85):
+def build_mesh(name, prims, h, tris, color_fn, tex, rough=0.85, uv_angle=66):
     ob = C.build_sdf_mesh(name, prims, h, tris)
-    C.smart_uv(ob)
+    C.smart_uv(ob, angle=uv_angle)
     img = C.bake_texture(ob, tex, color_fn, name + "_tex")
     C.assign_material(ob, C.image_material(name + "_mat", img, roughness=rough))
     return ob
@@ -648,6 +1199,7 @@ def main():
         img = C.bake_texture(ob, 256, hat_fn, ob.name + "_tex")
         C.assign_material(ob, C.image_material(ob.name + "_mat", img, roughness=0.9))
         hats.append(ob)
+    drv = build_driver()
 
     arm = C.build_armature("RiderRig", bone_list())
     rig = C.Rig(arm)
@@ -658,7 +1210,16 @@ def main():
     C.compute_weights(bandana, bdp, segs, tau=0.01, smooth_iters=2)
     for h in hats:
         C.rigid_weights(h, "head")
-    meshes = [body, duster, poncho, bandana] + hats
+    dbody, dbp = drv["body"]
+    C.compute_weights(dbody, dbp, segs, tau=0.012, smooth_iters=3)
+    Wc, names = C.compute_weights(drv["coat"][0], drv["coat"][1], segs, tau=0.02, smooth_iters=4)
+    skirt_follow(dbody, drv["coat"][0], Wc, names)
+    C.compute_weights(drv["kerchief"][0], drv["kerchief"][1], segs, tau=0.01, smooth_iters=2)
+    for h in (drv["hat"], drv["mous"]):
+        C.rigid_weights(h, "head")
+    C.rigid_weights(drv["watch"], "spine")  # (nearest-vert transfer would grab the hands resting on the belly)
+    driver = [dbody, drv["coat"][0], drv["hat"], drv["mous"], drv["kerchief"][0], drv["watch"]]
+    meshes = [body, duster, poncho, bandana] + hats + driver
     for ob in meshes:
         C.bind(ob, arm)
 
@@ -685,6 +1246,7 @@ def main():
     C.write_action(arm, "StandIdle", standidle_clip(A), loop=True)
     C.write_action(arm, "StandShoot", standshoot_clip(A))
     C.write_action(arm, "DieStanding", die_clip(A))
+    C.write_action(arm, "Drive", drive_clip(A), loop=True)
     arm.animation_data.action = bpy.data.actions["Ride"]
 
     tot = 0

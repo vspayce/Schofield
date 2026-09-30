@@ -1,11 +1,21 @@
 // The stagecoach: follows the route, sways on its thoroughbraces, spins its
-// wheels and drags a four-horse team. Driver NPC up front, player on the roof.
+// wheels and drags a six-horse team. Driver NPC up front, player on the roof.
 import * as THREE from 'three';
 import { assets, findNode } from '../core/assets.js';
 import { createHorse, createRider } from './characters.js';
+import { Hitch } from './hitch.js';
 import { damp, clamp } from '../core/noise.js';
 
-const COATS = [new THREE.Color(1, 1, 1), new THREE.Color(0.55, 0.42, 0.35), new THREE.Color(1.25, 1.15, 1.05), new THREE.Color(0.8, 0.6, 0.45)];
+// Six-horse hitch, coach to leaders, heavy to light: Clydesdale wheelers on the
+// pole, a Cleveland Bay swing pair, Thoroughbred leaders. [breed, x, z past the
+// pole tip]; pairs ~3.5 m apart. The breed textures carry the colour; `shade`
+// is only a few percent so a pair doesn't look cloned. Pitch 3.65 m puts the
+// leaders' noses ~11 m ahead of the splinter bar.
+const TEAM = [
+  ['clydesdale', 0.58, 0.30, 1], ['clydesdale', -0.58, 0.30, 0.95],
+  ['clevelandbay', 0.55, 3.95, 0.97], ['clevelandbay', -0.55, 3.95, 1],
+  ['thoroughbred', 0.52, 7.60, 1], ['thoroughbred', -0.52, 7.60, 0.96],
+];
 
 function fallbackCoach() {
   const root = new THREE.Group();
@@ -43,7 +53,7 @@ export class Coach {
   constructor(route, scene, model = 'stagecoach_treasure') {
     this.route = route; this.scene = scene;
     this.root = new THREE.Group();
-    const g = assets.models[model] || assets.models.stagecoach;
+    const g = assets.models[model] || assets.models.stagecoach_treasure || assets.models.stagecoach;
     this.model = g ? g.scene.clone(true) : fallbackCoach();
     this.model.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.root.add(this.model);
@@ -61,32 +71,26 @@ export class Coach {
     this._bodyBase = this.body.position.clone();
     this._bodyQ = this.body.quaternion.clone();
 
-    // team
+    // team: wheelers, swing, leaders (near horse first in each pair)
     const hitchZ = this.hitch ? this.hitch.position.z : 4.2;
-    this.team = [];
-    const slots = [[0.62, hitchZ - 1.0], [-0.62, hitchZ - 1.0], [0.62, hitchZ + 1.75], [-0.62, hitchZ + 1.75]];
-    slots.forEach(([x, z], i) => {
-      const h = createHorse({ coat: COATS[i], saddle: false, harness: true });
-      h.offX = x; h.offZ = z; h.phase = i * 0.13;
+    this.team = TEAM.map(([breed, x, z, shade], i) => {
+      const h = createHorse({ breed, coat: new THREE.Color().setScalar(shade), saddle: false, harness: true });
+      h.offX = x; h.offZ = hitchZ + z; h.phase = i * 0.13;
       scene.add(h.root);
-      this.team.push(h);
+      return h;
     });
+    // nose of the leaders, ahead of the coach's origin
+    this.teamFront = Math.max(...this.team.map((h) => h.offZ)) + 1.4;
 
     // driver
     this.driver = createRider({ variant: 'driver' });
     (this.seatDriver || this.body).add(this.driver.root);
     if (this.driver.has('Drive')) this.driver.play('Drive'); else this.driver.play('Ride');
 
-    // Reins: a line from the driver's hands to each horse's collar. Rebuilt every
-    // frame in world space, because the team is parented to the scene (it follows
-    // the road ahead of the coach) while the driver rides on the body.
-    this.reinSegs = 3;                       // segments per rein, so it can sag
-    this.reinPts = this.team.length * this.reinSegs * 2;
-    const rg = new THREE.BufferGeometry();
-    rg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.reinPts * 3), 3));
-    this.reins = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x2a1a0e, transparent: true, opacity: 0.9 }));
-    this.reins.frustumCulled = false;
-    scene.add(this.reins);
+    // Pole head, bars, traces and the six lines. Rebuilt every frame in world
+    // space, because the team is parented to the scene (it follows the road
+    // ahead of the coach) while the driver rides on the body.
+    this.hitchGear = new Hitch(this, scene);
 
     this.livery = 'concord';
     this.extras = new THREE.Group();     // strongbox, shutters, cage
@@ -216,38 +220,19 @@ export class Coach {
       const ahead = R.worldAt(hs + 1.2, -h.offX, this._p2);
       h.root.rotation.set(-Math.atan2(ahead.y - p.y, 1.2), Math.atan2(f2.tx, f2.tz), 0, 'YXZ');
       const gait = v < 3 ? 'Idle' : v < 11 ? 'Canter' : 'Gallop';
-      if (h.has(gait)) h.play(gait);
+      if (h.has(gait) && h.actions?.[gait] !== h.current) {
+        // each horse keeps its own place in the stride, so the team isn't in lockstep
+        const a = h.play(gait);
+        if (a?.getClip) a.time = (h.phase * 2.7 % 1) * a.getClip().duration;
+      } else if (h.has(gait)) h.play(gait);
       // clips match ground speed at ~6.7 m/s (gallop); beyond ~1.3x it looks frantic
       h.setSpeed(gait === 'Gallop' ? Math.min(1.32, 0.75 + v / 30) : gait === 'Canter' ? Math.min(1.3, v / 7) : 1);
       h.update(dt);
     }
     this.driver.update(dt);
-    this._reins();
-  }
-
-  // run the lines from the driver's hands forward to each horse's collar
-  _reins() {
     const hand = this.driver.hand || this.driver.root;
     hand.updateWorldMatrix(true, false);
-    const from = hand.getWorldPosition(this._p);
-    const a = this.reins.geometry.attributes.position;
-    const N = this.reinSegs;
-    let k = 0;
-    this.team.forEach((h) => {
-      // the collar sits at the base of the neck, a little above the withers
-      const to = h.root.localToWorld(this._p2.set(0, 1.35, 0.75));
-      // leather hangs: drop a little in the middle, less the harder they pull
-      const sag = 0.14 * Math.max(0.35, 1 - this.speed / 26) * from.distanceTo(to) / 4;
-      for (let j = 0; j < N; j++) {
-        for (const t of [j / N, (j + 1) / N]) {
-          a.setXYZ(k++,
-            from.x + (to.x - from.x) * t,
-            from.y + (to.y - from.y) * t - Math.sin(t * Math.PI) * sag,
-            from.z + (to.z - from.z) * t);
-        }
-      }
-    });
-    a.needsUpdate = true;
+    this.hitchGear.update(hand.getWorldPosition(this._p), this.speed);
   }
 
   // world-space aim point for enemies (random spot on the coach)
@@ -259,6 +244,6 @@ export class Coach {
   dispose() {
     this.scene.remove(this.root);
     this.team.forEach((h) => this.scene.remove(h.root));
-    this.scene.remove(this.reins); this.reins.geometry.dispose(); this.reins.material.dispose();
+    this.hitchGear.dispose();
   }
 }

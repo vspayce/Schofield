@@ -83,7 +83,7 @@ class Rider extends Enemy {
       // don't ride through the coach/team
       const ds = this.s - coach.s;
       const clear = R.biome === 'mountain' ? 2.6 : 3.2;
-      if (ds > -4 && ds < 9.5 && Math.abs(this.d) < clear) this.d = Math.sign(this.d || this.side) * clear;
+      if (ds > -4 && ds < coach.teamFront + 1.5 && Math.abs(this.d) < clear) this.d = Math.sign(this.d || this.side) * clear;
       // swing wide before overtaking
       if (ds > -14 && ds < -4 && Math.abs(this.d) < clear && Math.abs(this.targetD) >= clear) this.d += Math.sign(this.targetD) * 2 * dt;
       this.s += this.speed * dt;
@@ -181,8 +181,8 @@ class Rider extends Enemy {
       const muzzle = this.gun.muzzle.getWorldPosition(new THREE.Vector3());
       g.combat.enemyShot(this, muzzle, { dist, acc: g.diff.riderAcc, dmgPlayer: 7 + Math.random() * 4, dmgCoach: 4 + Math.random() * 3 });
     }
-    // reaching the team
-    if (ds > 4 && ds < 12 && Math.abs(this.d) < 5) {
+    // reaching the team (alongside any of the three pairs)
+    if (ds > 4 && ds < coach.teamFront + 1 && Math.abs(this.d) < 5) {
       this.atTeam += dt;
       if (this.atTeam > 1 && !this._warned) { this._warned = true; g.hud.banner("They're going for the team!", '', 1.5); }
       if (this.atTeam > 5) { this.atTeam = 0; this._warned = false; g.damageCoach(12); g.onCoachDamage(); this.targetDs = -6; }

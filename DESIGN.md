@@ -97,15 +97,30 @@ good silhouettes do the heavy lifting, not polygon counts.
 - Coat colours handled in code by tinting; bake a neutral light-brown coat with dark
   mane/tail/lower legs in the texture or vertex colours.
 
+### models/horse_clydesdale.glb, horse_clevelandbay.glb, horse_thoroughbred.glb (coach team)
+- The six-horse hitch: Clydesdale wheelers (1870s type, feathered, breeching), Cleveland
+  Bay swing pair, Thoroughbred leaders (a matched chestnut pair). `build_horse.py -- --breed <b>`.
+- Same bones, clips and `Horse`/`Saddle`/`Harness`/`Mount` nodes as horse.glb, so
+  `createHorse({ breed })` drives them; colour is baked per breed (no code tint).
+- `Harness` is the draught harness. Empties on the bones: `Trace_L/R` (where the traces
+  leave the body), `Terret_L/R` (pad), `HameTerret_L/R`, `Bit_L/R`, `HeadRing_L/R`
+  (rein drops the lines to the pairs ahead pass through), `PoleStrap` (collar bottom).
+  `src/game/hitch.js` hangs the pole head, bars, lead chain, traces and six lines on them.
+
 ### models/rider.glb (skinned human, ~1.8 m, seated riding pose basis)
 - Animations: `Ride` (seated bounce loop matching Gallop), `RideAim` (upper body aiming
   a pistol forward-right, loop), `Shoot` (short recoil, additive-friendly), `FallOff`
-  (one-shot, thrown backwards), `StandIdle`, `StandShoot`, `DieStanding` (one-shot).
+  (one-shot, thrown backwards), `StandIdle`, `StandShoot`, `DieStanding` (one-shot),
+  `Drive` (seated on the box, both hands forward on the lines, loop).
 - Bones must include `spine`, `chest`, `neck`, `head`, `upperarm.R`, `forearm.R`, `hand.R`
   (code aims these procedurally). Empty/bone for `hand.R` holds weapons.
 - Variants via separate meshes toggled in code: `Hat_Wide`, `Hat_Bowler`, `Bandana`,
   `Duster` (long coat), `Poncho`. Body mesh `Body`.
-- Also used for the driver and the player (different mesh toggles/tints).
+- Also used for the player and townsfolk (different mesh toggles/tints).
+- The coach driver is his own man, drawn from a period photo: `Body_Driver`, `Coat_Driver`,
+  `Hat_Driver`, `Moustache_Walrus`, `Neckerchief_Driver`, `Watch_Driver` (heavy build, grey
+  walrus moustache, pale dented hat, checked vest and watch chain). Only `driver` shows them;
+  townsfolk, rail hands and the engineer use `townsman` (`Body`, `Hat_Bowler`, `Duster`).
 
 ### models/weapons.glb
 - `Schofield` (nickel/blued S&W revolver, ~0.32 m, grip origin), `CoachGun` (double

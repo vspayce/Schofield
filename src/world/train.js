@@ -883,7 +883,7 @@ export class Train {
 
     // -- crew
     this.crew = [];
-    for (const [variant, x, z, ry] of [['driver', -0.78, -2.15, -0.5], ['bandit3', 0.62, -2.7, 0.9]]) {
+    for (const [variant, x, z, ry] of [['townsman', -0.78, -2.15, -0.5], ['bandit3', 0.62, -2.7, 0.9]]) {
       const c = createRider({ variant });
       c.root.position.set(x, 1.61, z);
       c.root.rotation.y = ry;

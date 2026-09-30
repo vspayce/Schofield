@@ -166,20 +166,30 @@ export class HUD {
       const px = Math.max(30, Math.min(140, (1.9 / dist) * perM));
       list.push({ x: _p.x, y: _p.y, px, glint: e.glintT > 0, dist });
     }
-    const animals = game.wildlife.list
-      .filter((animal) => animal.alive)
-      .map((animal) => ({ animal, dist: animal.pos.distanceTo(game.player.camPos) }))
-      .filter(({ dist }) => dist <= 260)
-      .sort((a, b) => a.dist - b.dist)
-      .slice(0, 5);
-    for (const { animal, dist } of animals) {
-      _p.copy(animal.pos);
-      _p.y += animal.cfg.tall * animal.scale + 0.3;
+    // wildlife: on screen first, then ground game ahead of birds; the vultures
+    // round a carcass share one marker, and birds high overhead get none
+    const wild = [], sites = new Set();
+    for (const animal of game.wildlife.list) {
+      if (!animal.alive || (animal.airborne && animal.alt > 15)) continue;
+      let at = animal.pos, tall = animal.cfg.tall * animal.scale, kind = animal.kind;
+      const site = animal.site;
+      if (site) {
+        if (sites.has(site)) continue;
+        sites.add(site);
+        const n = site.birds.filter((b) => b.alive && !(b.airborne && b.alt > 15)).length;
+        at = site.pos; kind = `vultures ×${n}`;
+      }
+      const dist = at.distanceTo(game.player.camPos);
+      if (dist > 260) continue;
+      _p.copy(at);
+      _p.y += tall + 0.3;
       _p.project(game.camera);
       if (_p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
-      const px = Math.max(22, Math.min(100, (animal.cfg.tall / Math.max(1, dist)) * perM));
-      list.push({ x: _p.x, y: _p.y, px, dist, kind: animal.kind });
+      const px = Math.max(22, Math.min(100, (tall / Math.max(1, dist)) * perM));
+      wild.push({ x: _p.x, y: _p.y, px, dist, kind, bird: !animal.cfg.mass });
     }
+    wild.sort((a, b) => a.bird - b.bird || a.dist - b.dist);
+    list.push(...wild.slice(0, 5));
     while (this.shooterEls.length < list.length) {
       const d = document.createElement('div');
       d.className = 'shooter';

@@ -81,10 +81,13 @@ class Animated {
 }
 
 // ------------------------------------------------------------------- horse
-export function createHorse({ coat = new THREE.Color(1, 1, 1), saddle = true, harness = false } = {}) {
-  const g = assets.models.horse;
+// `breed` picks horse_<breed>.glb (the coach team: clydesdale, clevelandbay,
+// thoroughbred), falling back to the plain horse the riders use.
+export function createHorse({ coat = new THREE.Color(1, 1, 1), saddle = true, harness = false, breed = null } = {}) {
+  const g = (breed && assets.models['horse_' + breed]) || assets.models.horse;
   if (g) {
     const h = new Animated(g, coat);
+    h.breed = g === assets.models.horse ? null : breed;
     const sd = h.node('Saddle'); if (sd) sd.visible = saddle;
     const hn = h.node('Harness'); if (hn) hn.visible = harness;
     h.mount = h.node('Mount') || (() => { const o = new THREE.Object3D(); o.position.set(0, 1.45, 0); h.root.add(o); return o; })();
@@ -161,11 +164,13 @@ export function createRider({ variant = 'bandit', tint = null } = {}) {
       bandit: ['Body', 'Hat_Wide', 'Bandana', 'Duster'],
       bandit2: ['Body', 'Hat_Bowler', 'Bandana', 'Poncho'],
       bandit3: ['Body', 'Hat_Wide', 'Poncho'],
-      driver: ['Body', 'Hat_Bowler', 'Duster'],
+      townsman: ['Body', 'Hat_Bowler', 'Duster'],
+      driver: ['Body_Driver', 'Coat_Driver', 'Hat_Driver', 'Moustache_Walrus', 'Neckerchief_Driver', 'Watch_Driver'],
       player: ['Body', 'Hat_Wide', 'Duster'],
       gunman: ['Body', 'Hat_Wide', 'Duster', 'Bandana'],
     }[variant] || ['Body'];
-    for (const n of ['Hat_Wide', 'Hat_Bowler', 'Bandana', 'Duster', 'Poncho']) {
+    for (const n of ['Body', 'Hat_Wide', 'Hat_Bowler', 'Bandana', 'Duster', 'Poncho', 'Body_Driver', 'Coat_Driver',
+      'Hat_Driver', 'Moustache_Walrus', 'Neckerchief_Driver', 'Watch_Driver']) {
       const o = r.node(n); if (o) o.visible = show.includes(n);
     }
     r.bones = {};
@@ -181,7 +186,7 @@ export function createRider({ variant = 'bandit', tint = null } = {}) {
 
 function fallbackRider(variant, tint) {
   const root = new THREE.Group();
-  const cloth = new THREE.MeshStandardMaterial({ color: variant === 'player' ? 0x5a4632 : variant === 'driver' ? 0x3a3a44 : 0x4a3a2c, roughness: 0.9 });
+  const cloth = new THREE.MeshStandardMaterial({ color: variant === 'player' ? 0x5a4632 : variant === 'driver' ? 0x33302b : 0x4a3a2c, roughness: 0.9 });
   if (tint) cloth.color.multiply(tint);
   const skin = new THREE.MeshStandardMaterial({ color: 0xc08a64, roughness: 0.7 });
   const hatM = new THREE.MeshStandardMaterial({ color: variant === 'bandit' ? 0x1e1712 : 0x6b5238, roughness: 0.85 });

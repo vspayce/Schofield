@@ -44,7 +44,8 @@ function loadAudio(name) {
   }).catch(() => null);
 }
 
-export const MODEL_LIST = ['stagecoach', 'stagecoach_treasure', 'horse', 'rider', 'weapons', 'props', 'town', 'animals'];
+// stagecoach.glb (the Concord) stays on disk but every job now rides the Abbott-Downing
+export const MODEL_LIST = ['stagecoach_treasure', 'horse', 'horse_clydesdale', 'horse_clevelandbay', 'horse_thoroughbred', 'rider', 'weapons', 'props', 'town', 'animals'];
 export const TEX_LIST = [
   ['dirt_road'], ['dry_grass'], ['green_grass'], ['sand'], ['rock'], ['red_rock'], ['snow'], ['gravel'],
   ...['dirt_road', 'dry_grass', 'green_grass', 'sand', 'rock', 'red_rock', 'snow', 'gravel'].map((n) => [n + '_n', { srgb: false }]),

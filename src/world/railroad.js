@@ -274,7 +274,7 @@ export class Railroad {
     // the gang: a few men at the railhead swinging, a couple standing by
     const n = def.workers ?? 6;
     for (let i = 0; i < n; i++) {
-      const w = createRider({ variant: i % 3 === 0 ? 'driver' : 'gunman' });
+      const w = createRider({ variant: i % 3 === 0 ? 'townsman' : 'gunman' });
       const u = T ? this.campU - 3 + rnd() * 14 : this.built - 1 - rnd() * 12;
       const p = this._at(u, new THREE.Vector3()).addScaledVector(side, (i % 2 ? 1 : -1) * (T ? 3.6 + rnd() * 2.4 : 1.4 + rnd() * 2.6));
       p.y = this.route.height(p.x, p.z);

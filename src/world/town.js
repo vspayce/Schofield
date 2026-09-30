@@ -7,7 +7,7 @@ import { createRider } from '../game/characters.js';
 import { mulberry32, damp } from '../core/noise.js';
 
 // hats and coats for people who aren't outlaws
-const FOLK = ['driver', 'player', 'bandit2', 'driver', 'player'];
+const FOLK = ['townsman', 'player', 'bandit2', 'townsman', 'player'];
 const FOLK_TINT = [
   new THREE.Color(1, 1, 1), new THREE.Color(0.72, 0.74, 0.8), new THREE.Color(0.95, 0.88, 0.72),
   new THREE.Color(0.6, 0.62, 0.58), new THREE.Color(1.05, 0.95, 0.85), new THREE.Color(0.8, 0.7, 0.66),
