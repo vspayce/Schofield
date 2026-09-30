@@ -151,7 +151,14 @@ export class Player {
     }
 
     // ---------------------------------------------------------- targeting
-    this.hover = g.enemies.pick(this.camPos, this.aimDir, (g.input.touch ? 0.05 : 0.02) / this.zoom);
+    const targetTolerance = (g.input.touch ? 0.075 : 0.04) / this.zoom;
+    const targetHit = g.enemies.raycast(this.camPos, this.aimDir, this.weapon.range, targetTolerance, g.input.touch ? 1.4 : 1.2);
+    this.hover = targetHit ? {
+      enemy: targetHit.enemy,
+      part: targetHit.part,
+      aimPoint: targetHit.point,
+      dist: targetHit.t,
+    } : null;
     this.wildlifeHover = this.hover ? null : g.wildlife.pick(this.camPos, this.aimDir, (g.input.touch ? 0.05 : 0.02) / this.zoom);
     g.hud.crosshairEnemy(!!this.hover);
     g.hud.crosshairWildlife(!!this.wildlifeHover);
@@ -229,9 +236,10 @@ export class Player {
   _reload() {
     const W = this.weapon;
     if (this.reloading > 0) return;
-    this.reloading = W.reload;
+    this.ammo[W.id] = W.mag;
+    this.reloading = 0;
     audio.play(W.reloadSnd, { volume: 0.9 });
-    this.g.hud.setAmmo(W, this.ammo[W.id], true);
+    this.g.hud.setAmmo(W, this.ammo[W.id], false);
   }
 
   muzzleWorld(out) {
@@ -248,10 +256,11 @@ export class Player {
     // gun fires from the muzzle; direction toward what's under the crosshair
     let aimPoint;
     if (forced) aimPoint = forced;
+    else if (this.hover && this.hover.dist < W.range) aimPoint = this.hover.aimPoint;
     else {
       // assist only nudges near-misses onto the body/horse surface; headshots must be earned
-      const tolerance = (g.input.touch ? 0.035 : 0.01) / this.zoom;
-      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, tolerance, g.input.touch ? 1.1 : 0.4);
+      const tolerance = (g.input.touch ? 0.05 : 0.025) / this.zoom;
+      const hit = g.enemies.raycast(this.camPos, this.aimDir, W.range, tolerance, g.input.touch ? 1.1 : 0.8);
       const animal = !hit ? g.wildlife.pick(this.camPos, this.aimDir, tolerance) : null;
       aimPoint = hit ? hit.point : animal && animal.dist < W.range ? animal.aimPoint : _v2.copy(this.camPos).addScaledVector(this.aimDir, 120).clone();
     }
@@ -262,7 +271,7 @@ export class Player {
     for (let p = 0; p < W.pellets; p++) {
       const dir = baseDir.clone();
       if (!forced) {
-        const s = W.spread * steady;
+        const s = W.spread * steady * (this.hover ? 0.35 : 1);
         dir.x += (Math.random() - 0.5) * 2 * s; dir.y += (Math.random() - 0.5) * 2 * s; dir.z += (Math.random() - 0.5) * 2 * s;
         dir.normalize();
       }
@@ -288,8 +297,7 @@ export class Player {
     g.shake += W.kind === 'shotgun' ? 0.05 : W.kind === 'rifle' ? 0.035 : 0.02;
     this.model.kick?.();
     g.hud.setAmmo(W, this.ammo[W.id], false);
-    // auto-reload an empty gun, unless you've swapped away from it meanwhile
-    if (this.ammo[W.id] <= 0) this.timers.push({ t: 0.35, fn: () => { if (this.weapon === W && this.ammo[W.id] <= 0 && this.reloading <= 0 && !this.g.over) this._reload(); } });
+    if (this.ammo[W.id] <= 0) this._reload();
   }
 
   _startDeadeye() {
