@@ -151,14 +151,9 @@ export class Player {
     }
 
     // ---------------------------------------------------------- targeting
-    const targetTolerance = (g.input.touch ? 0.075 : 0.04) / this.zoom;
-    const targetHit = g.enemies.raycast(this.camPos, this.aimDir, this.weapon.range, targetTolerance, g.input.touch ? 1.4 : 1.2);
-    this.hover = targetHit ? {
-      enemy: targetHit.enemy,
-      part: targetHit.part,
-      aimPoint: targetHit.point,
-      dist: targetHit.t,
-    } : null;
+    const targetTolerance = (g.input.touch ? 0.1 : 0.05) / this.zoom;
+    this.hover = g.enemies.pick(this.camPos, this.aimDir, targetTolerance);
+    if (this.hover && this.hover.dist > this.weapon.range) this.hover = null;
     this.wildlifeHover = this.hover ? null : g.wildlife.pick(this.camPos, this.aimDir, (g.input.touch ? 0.05 : 0.02) / this.zoom);
     g.hud.crosshairEnemy(!!this.hover);
     g.hud.crosshairWildlife(!!this.wildlifeHover);
@@ -271,7 +266,7 @@ export class Player {
     for (let p = 0; p < W.pellets; p++) {
       const dir = baseDir.clone();
       if (!forced) {
-        const s = W.spread * steady * (this.hover ? 0.35 : 1);
+        const s = W.spread * steady * (this.hover ? 0 : 1);
         dir.x += (Math.random() - 0.5) * 2 * s; dir.y += (Math.random() - 0.5) * 2 * s; dir.z += (Math.random() - 0.5) * 2 * s;
         dir.normalize();
       }
