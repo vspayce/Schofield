@@ -108,19 +108,48 @@ good silhouettes do the heavy lifting, not polygon counts.
   `src/game/hitch.js` hangs the pole head, bars, lead chain, traces and six lines on them.
 
 ### models/rider.glb (skinned human, ~1.8 m, seated riding pose basis)
-- Animations: `Ride` (seated bounce loop matching Gallop), `RideAim` (upper body aiming
-  a pistol forward-right, loop), `Shoot` (short recoil, additive-friendly), `FallOff`
-  (one-shot, thrown backwards), `StandIdle`, `StandShoot`, `DieStanding` (one-shot),
-  `Drive` (seated on the box, both hands forward on the lines, loop).
-- Bones must include `spine`, `chest`, `neck`, `head`, `upperarm.R`, `forearm.R`, `hand.R`
-  (code aims these procedurally). Empty/bone for `hand.R` holds weapons.
-- Variants via separate meshes toggled in code: `Hat_Wide`, `Hat_Bowler`, `Bandana`,
-  `Duster` (long coat), `Poncho`. Body mesh `Body`.
-- Also used for the player and townsfolk (different mesh toggles/tints).
-- The coach driver is his own man, drawn from a period photo: `Body_Driver`, `Coat_Driver`,
-  `Hat_Driver`, `Moustache_Walrus`, `Neckerchief_Driver`, `Watch_Driver` (heavy build, grey
-  walrus moustache, pale dented hat, checked vest and watch chain). Only `driver` shows them;
-  townsfolk, rail hands and the engineer use `townsman` (`Body`, `Hat_Bowler`, `Duster`).
+- Built by `tools/blender/build_rider.py`; previews by `preview_outlaws.py` / `preview_driver.py`
+  (run them on the UNPACKED build, then `gltfpack` rider.glb as in `tools/pack_models.sh`).
+- Origins: the seated clips have the SEAT CONTACT at the origin (parent to the horse's `Mount`,
+  the coach's `Seat_Driver`/`Seat_Guard`). The standing clips lift the root so the FEET are at
+  the origin. `Sit` is the exception: root at the bench SEAT SURFACE, feet on the ground 0.46 m
+  below (SIT_DROP).
+- Animations:
+  - Riding: `Ride` (seated bounce loop matching Gallop), `RideAim` (pistol forward-right, loop),
+    `Shoot` (additive recoil against RideAim), `FallOff` (one-shot, thrown backwards),
+    `RideAimL` (left hand forward-left) + `ShootL` (its additive recoil), `RideAimDual` (both
+    arms forward), `RideHolstered` (reins in the left hand, right hand by the sash).
+  - Coach: `Drive` (driver: feet on the footboard, hands on the lines), `SeatAim` (the guard on the
+    roof: knees up, torso still, gun shouldered along RideAim's AIM_DIR so player.js's +0.67 yaw
+    holds) + `SeatShoot` (its additive recoil; `kick()` picks it while SeatAim plays).
+  - Standing: `StandIdle`, `StandShoot`, `DieStanding` (one-shot), `Talk`, `LeanRail` (forearms on
+    a rail 1.07 m high, 0.45 m ahead of the root).
+  - Moving in place: `Walk` 1.4 m/s (cycle 64 frames = 1.067 s, stride 1.493 m per cycle,
+    0.747 m per step), `Run` 3.6 m/s (42 frames = 0.70 s, stride 2.52 m). Planted feet slide back
+    at exactly that speed, so a root moved at it doesn't skate.
+- Bones include `spine`, `chest`, `neck`, `head`, `upperarm.R/L`, `forearm.R/L`, `hand.R/L` (code aims
+  these; GLTFLoader names them `upperarmR`, `handL`, ...). Weapons go on the hand bones with an
+  identity transform (+Z barrel, +Y up); `Grip_R` / `Grip_L` are equivalent empties.
+- Looks are mesh toggles plus per-look colour multipliers in `createRider`'s LOOKS table
+  (`src/game/characters.js`, exported as `VARIANTS` / `RIDER_VARIANTS`). Caller `tint` multiplies
+  materials named *body*/*coat* (the dress material is `Dress_coat_mat`).
+  - Old pieces, kept byte-identical: `Body`, `Duster`, `Hat_Wide`, `Hat_Bowler` (`townsman`,
+    `drifter` = the guard's old look).
+  - `Body_Man` (shared male body: real face, vest over shirt, cartridge belt, tucked boots) with
+    `Coat_Guard` (linen duster, tinted dark for other men), `Hat_Guard`, `Moustache_Guard`,
+    `Jacket` (canvas coat / shell jacket), `Serape`, `Bandana_Man`, `Gauntlets`, `Coat_Buffalo`,
+    `Beard_Long`, `Moustache_Vaquero`, `Mask_Sack`, `Hat_Sugarloaf`, `Hat_Sombrero`, `Hat_Slouch`,
+    `Hat_Lawman` (hat + moustache + star in one mesh).
+  - `Body_Female` (Pearl Hart), `Body_Woman` + `Dress` (bodice and bustle skirt in one mesh; the
+    skirt is modelled standing and inverse-skinned into the bind pose) + `Bonnet` / `Hat_Lady`.
+  - The driver's own set: `Body_Driver`, `Coat_Driver`, `Hat_Driver`, `Moustache_Walrus`,
+    `Neckerchief_Driver`, `Watch_Driver`. Hickok's: `Body_Hickok`, `Hat_Hickok`, `Colts_Hickok`
+    (the Navies in his sash; hide it while the guns are in his hands) + `Coat_Guard` in black.
+- Looks: `player` (Wells Fargo messenger), `driver`; the gang `outlaw`, `sugarloaf`, `vaquero`,
+  `reb`, `mountain`, `pearl`, `bart` (Black Bart, on foot, rare); townsfolk `woman` (one of
+  `woman_slate` / `woman_plum` / `woman_calico`), `lawman`, `townsman`, `drifter`; the old
+  `bandit`, `bandit2`, `bandit3`, `gunman` names now on Body_Man; `hickok`. 5 meshes or fewer
+  per look, 3 for the townsfolk.
 
 ### models/weapons.glb
 - `Schofield` (nickel/blued S&W revolver, ~0.32 m, grip origin), `CoachGun` (double
@@ -145,10 +174,16 @@ good silhouettes do the heavy lifting, not polygon counts.
 
 ### models/town.glb (ghost-town kit, each root object origin at front-centre ground)
 `Saloon` (2-storey, balcony), `GeneralStore`, `Sheriff`, `Bank`, `Church` (with steeple),
-`Hotel`, `Livery` (barn), `WaterTower`, `Gallows`, `Boardwalk` (6 m section), `Shack`.
+`Hotel`, `Livery` (barn), `WaterTower`, `Gallows`, `Boardwalk` (6 m section), `Shack`,
+`CourtHouse` (two-storey brick county court house on a fenced lot, clock tower with four
+dials, louvred belfry and weathervane; origin on the lot fence), and the street props
+`Bench`, `HitchRail`, `Buckboard` (parked wagon, tongue toward -Y).
 Street-facing side = -Y in Blender (+Z in three.js). Weathered, sun-bleached, broken
 boards, faded painted signs. Add empties named `Spawn_*` at windows/roof edges where a
 gunman can appear (e.g. `Spawn_Window_1`, `Spawn_Roof_1`), facing the street.
+The clock hands are child nodes `Clock_Hour_<i>` / `Clock_Minute_<i>` (i = 0..3: front,
++X, back, -X), origin on the arbor, modelled at XII; code turns each about its dial's
+normal (`setClock` in town.js, time from the route's `clock: 'h:mm'`) and merges them.
 
 ### textures/ (tiling, 1024², JPG; `_n` normal maps optional)
 `dirt_road`, `dry_grass`, `green_grass`, `sand`, `rock`, `red_rock`, `snow`, `gravel`
@@ -183,10 +218,23 @@ Fonts: load from Google Fonts (e.g. "Rye", "Smokum", "IM Fell English") in index
   buffalo/bears/goats and circling hawks. Shootable for a hide price; butchering
   gives meat that restores health. Deliberately not Enemies, so chevrons and Dead
   Eye ignore them. Per-route in `routes.js` as `wildlife: { kinds, every }`.
-- `src/world/town.js` — the start and end towns are populated: townsfolk stand in
-  twos and threes on the boardwalks and turn to watch the stage come in. The
-  ghost town stays deserted. Rider meshes have frustum culling off, so folk are
-  hidden and unanimated beyond 150 m.
+- `src/world/town.js` — the start and end towns are populated. A court house
+  stands on the start town's street and across the head of the end town's, so the
+  stage pulls up in front of its clock. Folk walk the boardwalks (lawmen patrol by
+  the jail), stand talking in twos and threes (the bank, hotel and saloon
+  busiest), lean on hitching rails, sit on porch benches and cross the street
+  when the road is clear; saddled horses stand at the rails and a buckboard or two
+  is parked. They turn to watch the stage come in, and at gunfire (any `*shot*`
+  sound) those within 90 m of the coach run for the nearest door. None are
+  Enemies, so they can't be shot. Up to 32 people and 7 horses a town on desktop,
+  fewer by quality tier and on touch (~14 and 3). Rider meshes have frustum
+  culling off, so folk are hidden and unanimated more than 45 m behind or 160 m
+  ahead of the coach, animate at a third of the rate beyond 70 m, and cast
+  shadows only within 40 m. Clips used if the rig has them: `Walk` (in place,
+  authored at 1.4 m/s), `Run`, `Sit` (root on the seat), `LeanRail`, `Talk`;
+  without them they idle, and walkers glide. Variants `woman` and `lawman` are
+  used once characters.js lists them in an exported `VARIANTS`. The ghost town
+  stays deserted.
 - `src/world/railroad.js` — a line crossing the road: the land along it is cut
   and filled to grade (`Route.setRail`, so terrain and scatter respect it),
   ballast, ties, a flat-bottomed rail, planks at the crossing with the road

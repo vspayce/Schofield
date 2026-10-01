@@ -46,10 +46,10 @@ TOWN = {
     'brick':         (768, 384, 256, 256),   # 2 m x 2 m
     'trim':          (0,   640, 128, 384),   # beam/post grain along v
     'signs':         (128, 640, 512, 384),   # 6 signs, 512 x 64 each (top to bottom = TOWN_SIGNS)
-    'win_glass':     (640, 640, 96,  128),
-    'win_broken':    (736, 640, 96,  128),
-    'win_boarded':   (832, 640, 96,  128),
-    'win_open':      (928, 640, 96,  128),
+    'win_glass':     (640, 640, 80,  128),
+    'win_broken':    (720, 640, 80,  128),
+    'win_boarded':   (800, 640, 80,  128),
+    'clock':         (880, 640, 128, 128),   # tower-clock dial, Roman numerals (12 at the top)
     'door_panel':    (640, 768, 96,  256),
     'door_saloon':   (736, 768, 96,  256),
     'door_barn':     (832, 768, 128, 256),

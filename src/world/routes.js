@@ -7,6 +7,7 @@ const C = (hex) => new THREE.Color(hex);
 export const ROUTES = [
   {
     id: 'plains',
+    clock: '5:40',   // the court house clocks (time of day)
     name: 'Dry Creek Plains',
     from: 'Mercy Springs', to: 'Dry Creek',
     blurb: 'Open grassland at golden hour. Riders will try to run you down.',
@@ -52,6 +53,7 @@ export const ROUTES = [
   },
   {
     id: 'pass',
+    clock: '10:20',   // the court house clocks (time of day)
     name: "Widow's Pass",
     from: 'Dry Creek', to: 'Silver Notch',
     blurb: 'A winding mountain road. Riflemen on every ridge; mind the drop.',
@@ -96,6 +98,7 @@ export const ROUTES = [
   },
   {
     id: 'perdition',
+    clock: '7:25',   // the court house clocks (time of day)
     name: 'Perdition',
     from: 'Silver Notch', to: 'Red Mesa',
     blurb: 'Straight through a ghost town at dusk. Gunmen in every window.',
@@ -140,6 +143,7 @@ export const ROUTES = [
   },
   {
     id: 'gulch',
+    clock: '5:55',   // the court house clocks (time of day)
     name: "Devil's Gulch",
     from: 'Red Mesa', to: 'Fort Providence',
     blurb: 'A red canyon at sundown. Every gun in the territory wants your strongbox.',
@@ -189,6 +193,7 @@ export const ROUTES = [
   },
   {
     id: 'gorge',
+    clock: '8:15',   // the court house clocks (time of day)
     name: 'Thunder Gorge',
     from: 'Fort Providence', to: 'Cascade',
     blurb: 'Cross a high timber trestle over the gorge before the road runs beneath the falls.',

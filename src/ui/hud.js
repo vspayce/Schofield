@@ -16,6 +16,7 @@ export class HUD {
     this.scope = $('scope'); this.btnScope = $('btn-scope');
     this.reloadRing = $('reload-ring'); this.reloadFill = this.reloadRing.querySelector('i');
     this.shooterLayer = $('shooters'); this.shooterEls = [];
+    this.escortEls = new Map();
     this.hp = $('hp-meter'); this.coach = $('coach-meter'); this.de = $('de-meter');
     this.routeFill = $('route-fill'); this.routeCoach = $('route-coach');
     this.bounty = $('bounty-val');
@@ -125,6 +126,7 @@ export class HUD {
     if (this._last.hv !== hv) { this._last.hv = hv; this.vHit.style.opacity = hv; game.renderer.final.uniforms.uHit.value = hv * 0.6; }
     this._marks(game);
     this._shooters(game);
+    this._escorts(game);
     // reload progress, right under the crosshair where you are already looking
     const rl = p.reloading > 0;
     if (this._last.rl !== rl) { this._last.rl = rl; this.reloadRing.classList.toggle('on', rl); }
@@ -206,6 +208,35 @@ export class HUD {
       el.style.height = m.px * 1.15 + 'px';
       el.lastChild.textContent = (m.kind ? m.kind.toUpperCase() + ' ' : '') + Math.round(m.dist) + 'm';
     });
+  }
+
+  // name tag and a health pip over each hired gun, in a friendly colour
+  _escorts(game) {
+    const list = game.escorts?.list || [], seen = new Set();
+    for (const e of list) {
+      if (!e.alive) continue;
+      seen.add(e);
+      let el = this.escortEls.get(e);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'escort-tag' + (e.cfg.id === 'bill' ? ' star' : '');
+        el.innerHTML = `<b>${e.tag}</b><span><i></i></span>`;
+        this.shooterLayer.appendChild(el); this.escortEls.set(e, el);
+      }
+      const dist = e.headP.distanceTo(game.player.camPos);
+      _p.copy(e.headP); _p.y += 0.45;
+      _p.project(game.camera);
+      const off = _p.z > 1 || Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1 || dist > 110 || game.player.scopeT > 0.5;
+      el.style.display = off ? 'none' : '';
+      if (off) continue;
+      el.style.left = (_p.x * 0.5 + 0.5) * 100 + '%';
+      el.style.top = (-_p.y * 0.5 + 0.5) * 100 + '%';
+      const hp = Math.max(0, e.hp / e.cfg.hp);
+      const k = Math.round(hp * 50);
+      if (el._k !== k) { el._k = k; el.lastChild.firstChild.style.width = hp * 100 + '%'; el.classList.toggle('low', hp < 0.35); }
+      el.classList.toggle('hit', game.time - (e.hitT ?? -9) < 0.3);
+    }
+    for (const [e, el] of this.escortEls) if (!seen.has(e)) { el.remove(); this.escortEls.delete(e); }
   }
 
   _marks(game) {

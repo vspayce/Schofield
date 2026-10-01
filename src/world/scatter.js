@@ -186,7 +186,7 @@ export class Scatter {
       while (s < r.len - 60) {
         const run = 60 + rnd() * 140, side = rnd() < 0.5 ? -1 : 1, off = 8 + rnd() * 5;
         for (let t = s; t < Math.min(r.len - 60, s + run); t += 3) {
-          if (r.inTown(t)) continue;
+          if (r.inTown(t) || t < 130 || t > r.len - 150) continue;   // not through the living towns
           r.frame(t + 1.5, f);
           push('Fence_Rail', f.x + f.rx * off * side, f.z + f.rz * off * side, Math.atan2(f.tx, f.tz) + Math.PI / 2 + (rnd() - 0.5) * 0.08);
         }

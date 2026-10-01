@@ -30,7 +30,7 @@ ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 OUT_GLB = os.path.join(ROOT, 'public', 'assets', 'models', 'town.glb')
 BUILD = os.path.join(HERE, '_build')
 CONTRACT = ['Saloon', 'GeneralStore', 'Sheriff', 'Bank', 'Church', 'Hotel', 'Livery',
-            'WaterTower', 'Gallows', 'Boardwalk', 'Shack']
+            'WaterTower', 'Gallows', 'Boardwalk', 'Shack', 'CourtHouse', 'Bench', 'HitchRail', 'Buckboard']
 
 T = C.AtlasUV(L.TOWN, L.TOWN_SIZE, inset=2.0)
 TILE = {'siding_grey': (2.0, 3.0), 'siding_red': (2.0, 3.0), 'siding_ochre': (2.0, 3.0), 'clapboard': (2.0, 3.0),
@@ -794,14 +794,330 @@ def shack():
     return finalize(mb, 'Shack', spawns, W, D, 111)
 
 
+# ============================================================================ court house + clock tower
+# Dials face (outward normal, along-wall axis as seen from outside): front, right, back, left.
+# Hands are nodes Clock_Hour_<i> / Clock_Minute_<i> in this order (three.js normals +Z, +X, -Z, -X).
+CLOCK_FACES = [(-Y, X), (X, Y), (Y, -X), (-X, -Y)]
+
+
+def hip_face(mb, o, ux, uy, w, h, run, rect='shingle'):
+    """One face of an equal-pitch hip roof: eave w long from o along ux, slope h up uy; the hips
+    climb from both eave corners and reach the ridge `run` in from each end."""
+    top = lambda x, h=h, run=run, w=w: h * min(1.0, x / run, (w - x) / run)
+    top.kinks = [run, w - run]
+    panel(mb, o, ux, uy, w, h, rect, top_fn=top)
+
+
+def clock_face(mb, c, n, ux, r):
+    """Dial disc (atlas 'clock') in an iron bezel on a square painted surround; c on the wall."""
+    R = frame_R(ux, n)
+    tbox(mb, c + n * 0.035, (2 * r + 0.55, 0.07, 2 * r + 0.55), R, rect='clapboard', tile=(2.0, 3.0), skip=('+y',), seed=3)
+    for sx in (-1, 1):   # surround mouldings
+        tbox(mb, c + ux * sx * (r + 0.3) + n * 0.08, (0.1, 0.06, 2 * r + 0.7), R, skip=('+y',), seed=4)
+        tbox(mb, c + Z * sx * (r + 0.3) + n * 0.08, (2 * r + 0.7, 0.06, 0.1), R, skip=('+y',), seed=5)
+    seg, k = 24, 0.985
+    cen = c + n * 0.08
+    ring = lambda rr, d: [mb.v(cen + n * d + ux * math.cos(2 * math.pi * i / seg) * rr + Z * math.sin(2 * math.pi * i / seg) * rr) for i in range(seg)]
+    rim = ring(r, 0.0)
+    ci = mb.v(cen)
+    uv = lambda i: T('clock', 0.5 + 0.5 * k * math.cos(2 * math.pi * i / seg), 0.5 + 0.5 * k * math.sin(2 * math.pi * i / seg))
+    for i in range(seg):
+        j = (i + 1) % seg
+        mb.face([ci, rim[i], rim[j]], [T('clock', 0.5, 0.5), uv(i), uv(j)], 0)
+    # bezel: inner lip, face, outer side
+    lip, f0, f1, back = ring(r, 0.05), ring(r, 0.05), ring(r + 0.11, 0.05), ring(r + 0.11, -0.05)
+    for i in range(seg):
+        j = (i + 1) % seg
+        for (a, b) in ((rim, lip), (f0, f1), (f1, back)):
+            mb.face([a[j], a[i], b[i], b[j]], [T('dark', 0, 0), T('dark', 1, 0), T('dark', 1, 1), T('dark', 0, 1)], 0)
+
+
+def clock_hands(c, n, ux, idx, parent, hour=10 + 8 / 60):
+    """Hands as separate nodes, origin on the arbor, modelled at XII; the node's rotation about
+    the dial normal shows the time (town.js sets it per route; the GLB says ten past ten)."""
+    out = []
+    t = 0.025
+    R = frame_R(ux, n)
+    R45 = Matrix.Rotation(math.pi / 4, 3, n) @ R
+    hands = {
+        'Hour': (0.11, [((0, 0.18), (0.075, 0.5), R), ((0, 0.5), (0.17, 0.17), R45), ((0, 0.63), (0.045, 0.14), R), ((0, 0), (0.13, 0.13), R45)]),
+        'Minute': (0.15, [((0, 0.3), (0.045, 0.98), R), ((0, -0.2), (0.13, 0.13), R45), ((0, 0.8), (0.09, 0.09), R45), ((0, 0.88), (0.03, 0.14), R)]),
+    }
+    for kind, (dn, parts) in hands.items():
+        mb = C.MeshBuilder()
+        for (a, b), (w, h), Rp in parts:
+            tbox(mb, ux * a + Z * b, (w, t, h), Rp, rect='dark', tile=(1, 2))
+        ob = mb.build('Clock_%s_%d' % (kind, idx), [MAT['town']], sharp_angle=30)
+        C.bake_vertex_colors(ob, rays=4, max_dist=0.2, strength=0.3, ground=False)
+        ob.location = c + n * dn
+        ang = (hour % 12) / 12 if kind == 'Hour' else (hour % 1)
+        ob.rotation_mode = 'AXIS_ANGLE'
+        ob.rotation_axis_angle = (-2 * math.pi * ang, n.x, n.y, n.z)
+        ob.parent = parent
+        ob.matrix_parent_inverse = Matrix.Identity(4)
+        out.append(ob)
+    return out
+
+
+def court_house():
+    """Two-storey brick county court house (1870s) on a fenced lot: projecting entrance pavilion
+    with a pediment, hip roof, and a wooden clock tower over the middle — four dials, a louvred
+    belfry with its bell, a bell-cast cap and an arrow weathervane."""
+    mb = C.MeshBuilder()
+    spawns = []
+    W, D, y0 = 13.0, 14.0, 3.0          # lot fence on y=0, building front at y0
+    f0, f1, wt = 0.7, 4.6, 8.4          # floor levels, wall top
+    pw, pd = 4.6, 0.6                    # entrance pavilion width / projection
+    yp = y0 - pd
+    front = Wall((-W / 2, y0, 0), X, wt, W, 'brick')
+    right = Wall((W / 2, y0, 0), Y, wt, D, 'brick')
+    back = Wall((W / 2, y0 + D, 0), -X, wt, W, 'brick')
+    left = Wall((-W / 2, y0 + D, 0), -Y, wt, D, 'brick')
+    pav = Wall((-pw / 2, yp, 0), X, wt, pw, 'brick')
+    front.ops.append((W / 2 - pw / 2, 0, pw, wt))    # hidden behind the pavilion
+    for i, x in enumerate((-5.3, -3.45, 3.45, 5.3)):
+        opening(mb, front, x + W / 2 - 0.5, f0 + 0.8, 1.0, 2.2, 'glass', seed=i)
+        opening(mb, front, x + W / 2 - 0.5, f1 + 0.6, 1.0, 2.1, 'open' if i in (0, 2) else 'glass', floor_z=f1, spawns=spawns, seed=i + 4)
+    for wall in (right, left):
+        for i, x in enumerate((2.6, 7.0, 11.4)):
+            opening(mb, wall, x, f0 + 0.8, 1.0, 2.2, 'glass', seed=i + 8)
+            opening(mb, wall, x, f1 + 0.6, 1.0, 2.1, 'glass', seed=i + 11)
+    opening(mb, pav, pw / 2 - 0.85, f0, 1.7, 2.8, 'door', seed=15)
+    opening(mb, pav, pw / 2 - 0.8, f0 + 2.95, 1.6, 0.5, 'glass', casing=False, seed=16)   # transom
+    opening(mb, pav, pw / 2 - 0.6, f1 + 0.4, 1.2, 2.5, 'glass', seed=17)
+    for w_ in (front, right, back, left, pav):
+        build_wall(mb, w_)
+    for sx in (-1, 1):   # pavilion side returns, corner pilasters
+        o = V((sx * pw / 2, yp if sx > 0 else y0, 0))
+        panel(mb, o, Y if sx > 0 else -Y, Z, pd, wt, 'brick')
+        tbox(mb, V((sx * (pw / 2 - 0.1), yp - 0.05, (f0 + wt) / 2)), (0.32, 0.14, wt - f0), skip=('+y', '-z', '+z'), seed=17)
+    # pediment over the pavilion + raking cornice
+    ph = 1.7
+    top = lambda x, ph=ph, pw=pw: ph * (1 - abs(x - pw / 2 - 0.2) / (pw / 2 + 0.2))
+    top.kinks = [pw / 2 + 0.2]
+    panel(mb, V((-pw / 2 - 0.2, yp - 0.02, wt)), X, Z, pw + 0.4, ph, 'clapboard', top_fn=top, voff=wt % 3.0)
+    rk = math.atan2(ph, pw / 2 + 0.2)
+    for sx in (-1, 1):
+        L_ = math.hypot(ph, pw / 2 + 0.2) + 0.35
+        tbox(mb, V((sx * (pw / 4 + 0.1), yp - 0.1, wt + ph / 2 + 0.08)), (L_, 0.22, 0.16), Matrix.Rotation(sx * rk, 3, 'Y'), seed=18)
+    tbox(mb, V((0, yp - 0.08, wt + 0.05)), (pw + 0.7, 0.26, 0.18), seed=19)
+    # pavilion roof runs back into the hip
+    e = 0.35
+    for sx in (-1, 1):
+        slab(mb, V((sx * (pw / 2 + e), yp - e, wt - 0.05)), V((sx * (pw / 2 + e), y0 + 3.6, wt - 0.05)),
+             V((0, y0 + 3.6, wt + ph + 0.05)), V((0, yp - e, wt + ph + 0.05)), 'tin')
+    # belt courses, cornice with brackets, plinth
+    for z, h in ((f0, 0.14), (f1 - 0.15, 0.16)):
+        tbox(mb, V((0, y0 - 0.04, z)), (W + 0.12, 0.1, h), seed=20)
+        tbox(mb, V((0, yp - 0.04, z)), (pw + 0.12, 0.1, h), seed=20)
+        for sx in (-1, 1):
+            tbox(mb, V((sx * (W / 2 + 0.04), y0 + D / 2, z)), (0.1, D + 0.12, h), seed=21)
+    tbox(mb, V((0, y0 - 0.14, wt - 0.12)), (W + 0.5, 0.3, 0.26), seed=22)
+    for sx in (-1, 1):
+        tbox(mb, V((sx * (W / 2 + 0.14), y0 + D / 2, wt - 0.12)), (0.3, D + 0.5, 0.26), seed=22)
+    for i in range(10):
+        bx = -W / 2 + 0.3 + i * (W - 0.6) / 9
+        if abs(bx) > pw / 2 + 0.2:
+            tbox(mb, V((bx, y0 - 0.12, wt - 0.42)), (0.12, 0.24, 0.34), seed=23)
+    tbox(mb, V((0, y0 + D / 2, f0 / 2)), (W + 0.16, D + 0.16, f0), rect='brick', tile=(2.0, 2.0), skip=('+z', '-z'), seed=24)
+    tbox(mb, V((0, y0 - pd / 2, f0 / 2)), (pw + 0.16, pd + 0.16, f0), rect='brick', tile=(2.0, 2.0), skip=('+z', '-z'), seed=24)
+    # steps up to the door, with a rail each side
+    for i in range(4):
+        tbox(mb, V((0, yp - 0.2 - (3 - i) * 0.32, (i + 0.5) * f0 / 4)), (2.6, 0.4 + 0.0, f0 / 4), rect='floor', tile=(2, 2), seed=25 + i)
+    for sx in (-1, 1):
+        a, b = V((sx * 1.35, yp - 1.45, 0)), V((sx * 1.35, yp - 0.05, 0))
+        post(mb, a, a + Z * 0.95, s=0.1)
+        post(mb, b, b + Z * (f0 + 0.95), s=0.1)
+        d = (b + Z * (f0 + 0.95)) - (a + Z * 0.95)
+        Rf = C.frame_from_dir(d)
+        tbox(mb, (a + b) / 2 + Z * (0.95 + f0 / 2), (0.08, 0.08, d.length), Matrix((Rf[0], Rf[1], Rf[2])).transposed(), seed=29)
+    # hip roof
+    k, e = 0.52, 0.5
+    s_, c_ = k / math.hypot(1, k), 1 / math.hypot(1, k)
+    ze = wt - e * k
+    run = W / 2 + e
+    h = run / c_
+    hip_face(mb, V((-W / 2 - e, y0 - e, ze)), X, V((0, c_, s_)), W + 2 * e, h, run)
+    hip_face(mb, V((W / 2 + e, y0 + D + e, ze)), -X, V((0, -c_, s_)), W + 2 * e, h, run)
+    hip_face(mb, V((W / 2 + e, y0 - e, ze)), Y, V((-c_, 0, s_)), D + 2 * e, h, run)
+    hip_face(mb, V((-W / 2 - e, y0 + D + e, ze)), -Y, V((c_, 0, s_)), D + 2 * e, h, run)
+    for (cx, cy, sx, sy) in ((0, y0 - e / 2, W + 2 * e, e), (0, y0 + D + e / 2, W + 2 * e, e), (W / 2 + e / 2, y0 + D / 2, e, D), (-W / 2 - e / 2, y0 + D / 2, e, D)):
+        tbox(mb, V((cx, cy, ze - 0.06)), (sx, sy, 0.12), seed=30)   # soffit / fascia
+    # --- clock tower
+    yt = y0 + D / 2
+    tc = V((0, yt, 0))
+    cw, cz0, cz1 = 3.6, 10.4, 14.4      # clock stage (starts just under the hip)
+    for (n, ux) in CLOCK_FACES:
+        o = tc + n * (cw / 2) - ux * (cw / 2) + Z * cz0
+        panel(mb, o, ux, Z, cw, cz1 - cz0, 'clapboard', voff=cz0 % 3.0)
+        for sx in (-1, 1):
+            tbox(mb, tc + n * (cw / 2 + 0.03) + ux * sx * (cw / 2 - 0.06) + Z * ((cz0 + cz1) / 2 + 0.2), (0.18, 0.18, cz1 - cz0 - 0.4), frame_R(ux, n), skip=('+y', '-z', '+z'), seed=31)
+    dial_z, dial_r = 12.55, 1.0
+    hands = []
+    for i, (n, ux) in enumerate(CLOCK_FACES):
+        c = tc + n * (cw / 2) + Z * dial_z
+        clock_face(mb, c, n, ux, dial_r)
+        hands.append((c, n, ux, i))
+    # cornice + deck, balustrade
+    tbox(mb, tc + Z * (cz1 - 0.15), (cw + 0.3, cw + 0.3, 0.3), seed=32)
+    tbox(mb, tc + Z * (cz1 + 0.06), (cw + 0.55, cw + 0.55, 0.12), rect='floor', tile=(2, 2), seed=33)
+    for (n, ux) in CLOCK_FACES:
+        for j in range(5):
+            tbox(mb, tc + n * (cw / 2 + 0.06) + ux * (-cw / 2 + 0.2 + j * (cw - 0.4) / 4) + Z * (cz1 - 0.42), (0.1, 0.2, 0.24), frame_R(ux, n), seed=34)
+        a = tc + n * (cw / 2 + 0.18) - ux * (cw / 2 + 0.18)
+        railing(mb, a, a + ux * (cw + 0.36), cz1 + 0.12, h=0.7, spacing=0.46, seed=35)
+    # belfry: corner posts, louvred openings, dark core, bell
+    bw, bz0, bz1 = 2.6, cz1 + 0.12, 17.1
+    tbox(mb, tc + Z * ((bz0 + bz1) / 2), (bw - 0.5, bw - 0.5, bz1 - bz0), rect='dark', tile=(1, 2), seed=36)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            p = tc + V((sx * (bw / 2 - 0.13), sy * (bw / 2 - 0.13), 0))
+            post(mb, p + Z * bz0, p + Z * bz1, s=0.26)
+    for (n, ux) in CLOCK_FACES:
+        R = frame_R(ux, n)
+        base = tc + n * (bw / 2 - 0.12)
+        tbox(mb, base + Z * (bz0 + 0.12), (bw, 0.2, 0.24), R, seed=37)                 # sill
+        tbox(mb, base + Z * (bz1 - 0.25), (bw, 0.2, 0.5), R, seed=38)                  # head
+        for j in range(6):   # louvres, sloping out and down
+            tbox(mb, base + Z * (bz0 + 0.5 + j * 0.34), (bw - 0.5, 0.03, 0.34), Matrix.Rotation(0.6, 3, ux) @ R, skip=('-x', '+x'), seed=39 + j)
+    C.tube(mb, T, 'iron', [tc + Z * (bz0 + 0.55), tc + Z * (bz0 + 1.15), tc + Z * (bz0 + 1.45)], [0.5, 0.36, 0.14], 10, 1.0, 0, cap_end=True)
+    tbox(mb, tc + Z * (bz0 + 1.6), (bw - 0.4, 0.16, 0.16), seed=47)
+    # bell-cast cap
+    tbox(mb, tc + Z * (bz1 + 0.06), (bw + 0.5, bw + 0.5, 0.14), seed=48)
+    prof = [(bw / 2 + 0.35, bz1 + 0.13), (1.05, bz1 + 0.6), (0.55, bz1 + 1.55), (0.12, bz1 + 2.45)]
+    for (n, ux) in CLOCK_FACES:
+        for j in range(len(prof) - 1):
+            (r0, z0), (r1, z1) = prof[j], prof[j + 1]
+            pts = [tc + n * r0 - ux * r0 + Z * z0, tc + n * r0 + ux * r0 + Z * z0, tc + n * r1 + ux * r1 + Z * z1, tc + n * r1 - ux * r1 + Z * z1]
+            vv = (j / 3, (j + 1) / 3)
+            uvs = [T('tin', 0, vv[0]), T('tin', 1, vv[0]), T('tin', 0.5 + 0.5 * r1 / r0, vv[1]), T('tin', 0.5 - 0.5 * r1 / r0, vv[1])]
+            quad_facing(mb, pts, uvs, n + Z * 0.3)
+    # finial + weathervane (arrow, compass arms, ball)
+    vz = bz1 + 2.45
+    tbox(mb, tc + Z * (vz + 1.0), (0.05, 0.05, 2.1), rect='dark', tile=(1, 2), seed=49)
+    C.tube(mb, T, 'iron', [tc + Z * (vz + 0.25), tc + Z * (vz + 0.35), tc + Z * (vz + 0.6)], [0.05, 0.15, 0.03], 8, 1.0, 0, cap_end=True)
+    for (n, ux) in CLOCK_FACES[:2]:
+        tbox(mb, tc + Z * (vz + 0.95), (0.03, 0.03, 0.03) if False else (1.1 * abs(ux.x) + 0.035, 1.1 * abs(ux.y) + 0.035, 0.035), rect='dark', tile=(1, 2), seed=50)
+    for (n, ux) in CLOCK_FACES:
+        tbox(mb, tc + ux * 0.55 + Z * (vz + 0.95), (0.08, 0.08, 0.08), rect='dark', tile=(1, 1), seed=51)
+    Ra = Matrix.Rotation(math.radians(35), 3, 'Z')     # the arrow points into the wind (cosmetic)
+    ac = tc + Z * (vz + 1.6)
+    tbox(mb, ac, (1.5, 0.03, 0.035), Ra, rect='dark', tile=(1, 2), seed=52)
+    tbox(mb, ac + Ra @ V((0.78, 0, 0)), (0.16, 0.025, 0.16), Ra @ Matrix.Rotation(math.pi / 4, 3, 'Y'), rect='dark', tile=(1, 1), seed=53)
+    tbox(mb, ac + Ra @ V((-0.66, 0, 0.04)), (0.3, 0.02, 0.2), Ra @ Matrix.Rotation(0.25, 3, 'Y'), rect='dark', tile=(1, 1), seed=54)
+    # lot: post-and-rail fence with a gate gap, hitching posts
+    for sx in (-1, 1):
+        xs = [sx * (1.3 + i * 2.6) for i in range(3)]
+        for x in xs:
+            post(mb, V((x, 0.1, 0)), V((x, 0.1, 1.0)), s=0.12)
+        a, b = min(xs), max(xs)
+        for z in (0.45, 0.88):
+            tbox(mb, V(((a + b) / 2, 0.1, z)), (b - a + 0.2, 0.05, 0.1), seed=55)
+        for z in (0.45, 0.88):
+            tbox(mb, V((sx * 6.5, 0.1 + 1.45, z)), (0.05, 2.9, 0.1), seed=56)
+        post(mb, V((sx * 6.5, 2.9, 0)), V((sx * 6.5, 2.9, 1.0)), s=0.12)
+    spawns.append(('Roof', tc - Y * (cw / 2 + 0.05) + X * 0.7 + Z * (cz1 + 0.12)))
+    ob = finalize(mb, 'CourtHouse', spawns, W, D, 121)
+    for (c, n, ux, i) in hands:
+        clock_hands(c, n, ux, i, ob)
+    return ob
+
+
+def bench():
+    """Porch bench, seat 0.45 m high, sitter faces the street (-Y)."""
+    mb = C.MeshBuilder()
+    Lb = 1.8
+    for x in (-0.8, 0.8):
+        for y in (0.05, 0.38):
+            tbox(mb, V((x, y, 0.22)), (0.07, 0.07, 0.44), seed=1)
+        tbox(mb, V((x, 0.42, 0.65)), (0.07, 0.06, 0.5), seed=2)
+        tbox(mb, V((x, 0.2, 0.62)), (0.06, 0.42, 0.05), seed=3)    # arm
+    for y in (0.1, 0.3):
+        tbox(mb, V((0, y, 0.46)), (Lb, 0.18, 0.04), rect='floor', tile=(2, 2), seed=4)
+    for z in (0.62, 0.82):
+        tbox(mb, V((0, 0.44, z)), (Lb, 0.03, 0.12), seed=5)
+    tbox(mb, V((0, 0.22, 0.12)), (Lb - 0.1, 0.04, 0.05), seed=6)
+    return finalize(mb, 'Bench', [], Lb, 0.5, 131)
+
+
+def hitch_rail():
+    """Hitching rail, 2.8 m, at the street edge; horses tie on from the -Y side."""
+    mb = C.MeshBuilder()
+    for x in (-1.3, 1.3):
+        post(mb, V((x, 0, 0)), V((x, 0, 1.12)), s=0.13)
+    tbox(mb, V((0, 0, 1.07)), (2.9, 0.1, 0.1), seed=1)
+    tbox(mb, V((0, 0, 1.13)), (0.06, 0.12, 0.03), rect='iron', tile=(1, 1))     # tie ring plate
+    return finalize(mb, 'HitchRail', [], 2.9, 0.2, 141)
+
+
+def town_wheel(mb, center, radius, spokes=12):
+    """Wagon wheel, axle along X: wooden felloe with an iron tyre, hub, spokes."""
+    seg = 16
+    w = 0.07
+    rings = []
+    for s in range(seg):
+        a = 2 * math.pi * s / seg
+        d = V((0, math.cos(a), math.sin(a)))
+        rings.append([mb.v(center + d * rr + X * xx) for (rr, xx) in ((radius - 0.07, -w / 2), (radius, -w / 2), (radius, w / 2), (radius - 0.07, w / 2))])
+    for s in range(seg):
+        s2 = (s + 1) % seg
+        for q in range(4):
+            q2 = (q + 1) % 4
+            rect = 'iron' if q == 1 else 'trim'
+            mb.face([rings[s][q], rings[s2][q], rings[s2][q2], rings[s][q2]], [T(rect, 0, 0), T(rect, 0, 0.2), T(rect, 0.4, 0.2), T(rect, 0.4, 0)], 0)
+    C.tube(mb, T, 'trim', [center - X * 0.13, center + X * 0.13], [0.08, 0.08], 8, 1.0, 0, cap_end=True, cap_start=True)
+    for k in range(spokes):
+        a = 2 * math.pi * (k + 0.5) / spokes
+        d = V((0, math.cos(a), math.sin(a)))
+        Rr = Matrix.Rotation(a - math.pi / 2, 3, 'X')
+        tbox(mb, center + d * (radius / 2), (0.035, 0.035, radius - 0.12), Rr, skip=('+z', '-z'), seed=k)
+
+
+def buckboard():
+    """Parked buckboard wagon, tongue down on the ground: bed, spring seat, four wheels.
+    Front (tongue) toward -Y, origin centre on the ground."""
+    mb = C.MeshBuilder()
+    Lb, Wb, zb = 2.7, 1.15, 0.92
+    tbox(mb, V((0, 0.2, zb)), (Wb, Lb, 0.06), rect='floor', tile=(2, 2), seed=1)
+    for sx in (-1, 1):
+        tbox(mb, V((sx * Wb / 2, 0.2, zb + 0.15)), (0.04, Lb, 0.26), seed=2)
+    for y in (0.2 - Lb / 2, 0.2 + Lb / 2):
+        tbox(mb, V((0, y, zb + 0.15)), (Wb, 0.04, 0.26), seed=3)
+    for x in (-0.35, 0.35):
+        tbox(mb, V((x, 0.2, zb - 0.08)), (0.08, Lb - 0.1, 0.1), seed=4)   # sills
+    for y in (-0.95, 1.3):
+        tbox(mb, V((0, y, zb - 0.2)), (1.55, 0.09, 0.09), seed=5)        # axles
+        tbox(mb, V((0, y, zb - 0.1)), (0.5, 0.12, 0.08), rect='iron', tile=(1, 1), seed=6)   # elliptic springs
+    town_wheel(mb, V((-0.75, -0.95, 0.42)), 0.42, 10)
+    town_wheel(mb, V((0.75, -0.95, 0.42)), 0.42, 10)
+    town_wheel(mb, V((-0.75, 1.3, 0.55)), 0.55, 12)
+    town_wheel(mb, V((0.75, 1.3, 0.55)), 0.55, 12)
+    # spring seat with a backrest, footboard
+    tbox(mb, V((0, -0.55, zb + 0.42)), (1.1, 0.42, 0.07), rect='floor', tile=(2, 2), seed=7)
+    tbox(mb, V((0, -0.35, zb + 0.66)), (1.1, 0.05, 0.38), seed=8)
+    for sx in (-1, 1):
+        tbox(mb, V((sx * 0.5, -0.55, zb + 0.2)), (0.05, 0.3, 0.36), rect='iron', tile=(1, 1), seed=9)
+    tbox(mb, V((0, -1.05, zb + 0.18)), (Wb, 0.04, 0.42), Matrix.Rotation(0.4, 3, 'X'), seed=10)
+    # tongue resting on the ground, doubletree
+    a, b = V((0, -1.0, zb - 0.22)), V((0, -3.4, 0.08))
+    Rf = C.frame_from_dir(b - a)
+    tbox(mb, (a + b) / 2, (0.08, 0.08, (b - a).length), Matrix((Rf[0], Rf[1], Rf[2])).transposed(), seed=11)
+    tbox(mb, V((0, -1.25, zb - 0.32)), (0.9, 0.07, 0.07), seed=12)
+    # a few sacks / a crate in the bed
+    tbox(mb, V((0.2, 0.9, zb + 0.24)), (0.55, 0.5, 0.42), rect='floor', tile=(2, 2), seed=13)
+    C.tube(mb, T, 'rope', [V((-0.25, 0.25, zb + 0.05)), V((-0.25, 0.25, zb + 0.25)), V((-0.25, 0.25, zb + 0.4))], [0.24, 0.26, 0.14], 8, 1.0, 0, cap_end=True)
+    return finalize(mb, 'Buckboard', [], Wb + 0.4, 4.8, 151)
+
+
 def build():
     C.reset_scene()
     subprocess.run(['python3', os.path.join(HERE, 'town_textures.py')], check=True)
     img = C.load_image(os.path.join(BUILD, 'town_atlas.jpg'))
     MAT['town'] = C.make_material('Town_Atlas', img, roughness=0.9)
-    objs = [saloon(), general_store(), sheriff(), bank(), church(), hotel(), livery(), water_tower(), gallows(), boardwalk(), shack()]
+    objs = [saloon(), general_store(), sheriff(), bank(), church(), hotel(), livery(), water_tower(), gallows(), boardwalk(), shack(),
+            court_house(), bench(), hitch_rail(), buckboard()]
     for o in objs:
-        print('%-14s tris %5d  spawns %s' % (o.name, C.tri_count(o), [c.name for c in o.children]))
+        print('%-14s tris %5d  children %s' % (o.name, C.tri_count(o) + sum(C.tri_count(c) for c in o.children), [c.name for c in o.children]))
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(BUILD, 'town.blend'))
     C.export_glb(OUT_GLB)
     C.verify_glb(OUT_GLB, CONTRACT)

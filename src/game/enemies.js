@@ -9,7 +9,12 @@ import { clamp, damp, lerp } from '../core/noise.js';
 
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _ray = new THREE.Ray();
 const COATS = [new THREE.Color(1, 1, 1), new THREE.Color(0.5, 0.38, 0.3), new THREE.Color(0.3, 0.25, 0.22), new THREE.Color(1.3, 1.2, 1.1), new THREE.Color(0.95, 0.7, 0.5)];
-const VARIANTS = ['bandit', 'bandit2', 'bandit3'];
+// the gang (looks in characters.js): riders, and the men who wait on the ridges
+// and in town. The mountain route draws the buffalo-coat men.
+const RIDER_LOOKS = ['outlaw', 'sugarloaf', 'vaquero', 'reb', 'mountain', 'pearl', 'outlaw', 'reb'];
+const RIDER_LOOKS_MOUNTAIN = ['mountain', 'mountain', 'outlaw', 'reb', 'sugarloaf', 'pearl'];
+const GUNMAN_LOOKS = ['outlaw', 'reb', 'mountain', 'sugarloaf', 'pearl', 'outlaw'];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const CLOTH = [new THREE.Color(1, 1, 1), new THREE.Color(0.8, 0.7, 0.6), new THREE.Color(0.6, 0.65, 0.75), new THREE.Color(1.1, 0.9, 0.7)];
 
 let _id = 0;
@@ -26,7 +31,7 @@ class Rider extends Enemy {
     this.type = 'rider';
     const R = game.route, coach = game.coach;
     this.horse = createHorse({ coat: COATS[Math.floor(Math.random() * COATS.length)], saddle: true });
-    this.man = createRider({ variant: VARIANTS[Math.floor(Math.random() * VARIANTS.length)], tint: CLOTH[Math.floor(Math.random() * CLOTH.length)] });
+    this.man = createRider({ variant: pick(R.biome === 'mountain' ? RIDER_LOOKS_MOUNTAIN : RIDER_LOOKS), tint: pick(CLOTH) });
     this.horse.mount.add(this.man.root);
     this.man.play('Ride');
     this.gun = createWeapon('Schofield');
@@ -258,11 +263,12 @@ class Rider extends Enemy {
 // puts his feet in the world each frame, and its vel is what he's thrown off
 // with when he's hit.
 export class Gunman extends Enemy {
-  constructor(game, pos, face, { rifle = true, popup = false, carrier = null } = {}) {
+  constructor(game, pos, face, { rifle = true, popup = false, carrier = null, variant = null, gun = null } = {}) {
     super(game);
     this.type = rifle ? 'rifleman' : 'gunman';
-    this.man = createRider({ variant: 'gunman', tint: CLOTH[Math.floor(Math.random() * CLOTH.length)] });
-    this.gun = createWeapon(rifle ? 'Winchester' : 'Schofield');
+    this.variant = variant || pick(GUNMAN_LOOKS);
+    this.man = createRider({ variant: this.variant, tint: this.variant === 'bart' ? null : pick(CLOTH) });
+    this.gun = createWeapon(gun || (rifle ? 'Winchester' : 'Schofield'));
     this.man.hand.add(this.gun.root);
     this.root = this.man.root;
     this.base = pos.clone();
@@ -344,6 +350,8 @@ export class Gunman extends Enemy {
     this.hp -= amount;
     if (this.hp <= 0) {
       this.alive = false;
+      // Wells Fargo's standing reward for the PO8
+      if (this.variant === 'bart') this.g.addBounty(150, 'BLACK BART +$150', false);
       if (this.man.has('DieStanding')) this.man.play('DieStanding', { once: true, fade: 0.08 });
       else this.man.play('FallOff', { once: true, fade: 0.08 });
       this.removeAt = this.g.time + 8;
@@ -537,7 +545,11 @@ export class Enemies {
     const best = this._ridgeSpot(i) || this._ridgeSpot(i + 4);
     if (!best) return;
     const face = new THREE.Vector3().subVectors(g.coach.pos, best.p).setY(0).normalize();
-    const e = new Gunman(g, best.p, face, { rifle: true });
+    // now and then, once a run: Black Bart, on foot (he was afraid of horses),
+    // flour sack and derby, with the shotgun he never fired
+    const bart = !this.bartSeen && Math.random() < 0.12;
+    if (bart) { this.bartSeen = true; g.hud.banner('Black Bart!', 'The PO8 wants the box', 2.4); }
+    const e = new Gunman(g, best.p, face, bart ? { rifle: false, variant: 'bart', gun: 'CoachGun' } : { rifle: true });
     e.los = true;
     e.s = best.s;
     this.list.push(e);

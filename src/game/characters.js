@@ -47,17 +47,20 @@ class Animated {
     prepMaterials(this.root, tint);
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = {};
+    this.recoils = {};
     for (const clip of gltf.animations) {
-      if (clip.name === 'Shoot') {
-        // recoil layered on top of whatever pose is playing
+      if (clip.name === 'Shoot' || clip.name === 'SeatShoot' || clip.name === 'ShootL') {
+        // recoil layered on top of whatever pose is playing (SeatShoot is the
+        // seated guard's, made against SeatAim; ShootL the left hand's)
         const add = THREE.AnimationUtils.makeClipAdditive(clip.clone());
-        this.recoil = this.mixer.clipAction(add);
-        this.recoil.blendMode = THREE.AdditiveAnimationBlendMode;
-        this.recoil.setLoop(THREE.LoopOnce, 1);
+        const a = this.recoils[clip.name] = this.mixer.clipAction(add);
+        a.blendMode = THREE.AdditiveAnimationBlendMode;
+        a.setLoop(THREE.LoopOnce, 1);
         continue;
       }
       this.actions[clip.name] = this.mixer.clipAction(clip);
     }
+    this.recoil = this.recoils.Shoot;
     this.current = null;
   }
   has(name) { return !!this.actions[name]; }
@@ -75,7 +78,11 @@ class Animated {
     return a;
   }
   setSpeed(s) { if (this.current) this.current.timeScale = s; }
-  kick() { if (this.recoil) { this.recoil.reset(); this.recoil.weight = 1; this.recoil.play(); } }
+  kick() {
+    const rc = (this.current?.getClip().name === 'SeatAim' && this.recoils.SeatShoot) || this.recoil;
+    if (rc) { rc.reset(); rc.weight = 1; rc.play(); }
+  }
+  kickL() { const rc = this.recoils.ShootL; if (rc) { rc.reset(); rc.weight = 1; rc.play(); } }
   update(dt) { this.mixer.update(dt); }
   node(name) { return findNode(this.root, name); }
 }
@@ -154,30 +161,67 @@ const BONE_ALIASES = {
   head: ['head', 'Head', 'mixamorigHead'],
   handR: ['handR', 'hand.R', 'hand_R', 'Hand.R', 'mixamorigRightHand'],
   upperarmR: ['upperarmR', 'upperarm.R', 'upper_arm.R', 'upperarm_R', 'mixamorigRightArm'],
+  handL: ['handL', 'hand.L', 'hand_L', 'Hand.L', 'mixamorigLeftHand'],
+  forearmL: ['forearmL', 'forearm.L', 'forearm_L', 'mixamorigLeftForeArm'],
+  upperarmL: ['upperarmL', 'upperarm.L', 'upper_arm.L', 'upperarm_L', 'mixamorigLeftArm'],
 };
+
+// Each look: the meshes it shows, and colour multiplied into shared pieces so
+// one mesh can be several garments.  A caller's `tint` still multiplies the
+// body and coat materials on top.  `townsman` and `drifter` keep the old Body;
+// the old bandit names (townsfolk, rail hands, train crew) are rebuilt on
+// Body_Man; the gang that robs the coach uses the outlaw looks.
+const LOOKS = {
+  townsman: { show: ['Body', 'Hat_Bowler', 'Duster'] },
+  drifter: { show: ['Body', 'Hat_Wide', 'Duster'] }, // what the guard used to wear
+  driver: { show: ['Body_Driver', 'Coat_Driver', 'Hat_Driver', 'Moustache_Walrus', 'Neckerchief_Driver', 'Watch_Driver'] },
+  // Wells Fargo shotgun messenger: linen duster, dark creased hat, dark vest
+  player: { show: ['Body_Man', 'Coat_Guard', 'Hat_Guard', 'Moustache_Guard'] },
+  // the old bandit looks, now on the new body (townsfolk, rail hands, train crew)
+  bandit: { show: ['Body_Man', 'Hat_Wide', 'Bandana_Man', 'Coat_Guard'], color: { Coat_Guard: [0.36, 0.31, 0.27] } },
+  bandit2: { show: ['Body_Man', 'Hat_Bowler', 'Bandana_Man', 'Serape'] },
+  bandit3: { show: ['Body_Man', 'Hat_Wide', 'Serape'] },
+  gunman: { show: ['Body_Man', 'Hat_Wide', 'Coat_Guard', 'Bandana_Man'], color: { Coat_Guard: [0.5, 0.44, 0.38] } },
+  // the gang
+  outlaw: { show: ['Body_Man', 'Hat_Wide', 'Bandana_Man', 'Coat_Guard'], color: { Coat_Guard: [0.36, 0.31, 0.27], Hat_Wide: [0.7, 0.66, 0.62] } },
+  sugarloaf: { show: ['Body_Man', 'Hat_Sugarloaf', 'Bandana_Man', 'Jacket'], color: { Bandana_Man: [0.45, 1.6, 3.4], Jacket: [0.92, 0.76, 0.55] } },
+  vaquero: { show: ['Body_Man', 'Hat_Sombrero', 'Serape', 'Moustache_Vaquero'], color: { Body_Man: [0.92, 0.86, 0.8] } },
+  reb: { show: ['Body_Man', 'Hat_Slouch', 'Jacket', 'Gauntlets'], color: { Hat_Slouch: [1.0, 0.85, 0.62], Jacket: [0.8, 0.82, 0.88] } },
+  mountain: { show: ['Body_Man', 'Coat_Buffalo', 'Beard_Long', 'Hat_Wide'], color: { Hat_Wide: [0.55, 0.5, 0.46] } },
+  pearl: { show: ['Body_Female', 'Hat_Slouch'], color: { Hat_Slouch: [1.1, 0.96, 0.8] } },
+  // Black Bart (Charles Boles): flour sack, derby, linen duster over a dark suit
+  bart: { show: ['Body_Man', 'Coat_Guard', 'Hat_Bowler', 'Mask_Sack'], color: { Body_Man: [0.5, 0.5, 0.55], Coat_Guard: [1.04, 1.04, 1.02] } },
+  // townsfolk: 1880s day dresses (one of three at random), the marshal
+  woman: { pick: ['woman_slate', 'woman_plum', 'woman_calico'] },
+  woman_slate: { show: ['Body_Woman', 'Dress', 'Bonnet'], color: { Dress: [0.55, 0.6, 0.72], Bonnet: [0.9, 0.9, 0.95] } },
+  woman_plum: { show: ['Body_Woman', 'Dress', 'Hat_Lady'], color: { Dress: [0.72, 0.4, 0.45], Hat_Lady: [0.55, 0.35, 0.4] } },
+  woman_calico: { show: ['Body_Woman', 'Dress', 'Bonnet'], color: { Dress: [0.95, 0.82, 0.62], Bonnet: [1.0, 0.95, 0.85] } },
+  lawman: { show: ['Body_Man', 'Coat_Guard', 'Hat_Lawman'], color: { Coat_Guard: [0.22, 0.21, 0.21] } },
+  // Wild Bill: own body and face, black frock coat, flat hat, Navies in a red sash
+  hickok: { show: ['Body_Hickok', 'Coat_Guard', 'Hat_Hickok', 'Colts_Hickok'], color: { Coat_Guard: [0.09, 0.087, 0.087] } },
+};
+// every look createRider knows (town.js reads VARIANTS, escort.js RIDER_VARIANTS)
+export const RIDER_VARIANTS = Object.keys(LOOKS);
+export const VARIANTS = RIDER_VARIANTS;
 
 export function createRider({ variant = 'bandit', tint = null } = {}) {
   const g = assets.models.rider;
   if (g) {
+    let look = LOOKS[variant] || { show: ['Body'] };
+    if (look.pick) look = LOOKS[look.pick[Math.floor(Math.random() * look.pick.length)]];
     const r = new Animated(g, tint);
-    const show = {
-      bandit: ['Body', 'Hat_Wide', 'Bandana', 'Duster'],
-      bandit2: ['Body', 'Hat_Bowler', 'Bandana', 'Poncho'],
-      bandit3: ['Body', 'Hat_Wide', 'Poncho'],
-      townsman: ['Body', 'Hat_Bowler', 'Duster'],
-      driver: ['Body_Driver', 'Coat_Driver', 'Hat_Driver', 'Moustache_Walrus', 'Neckerchief_Driver', 'Watch_Driver'],
-      player: ['Body', 'Hat_Wide', 'Duster'],
-      gunman: ['Body', 'Hat_Wide', 'Duster', 'Bandana'],
-    }[variant] || ['Body'];
-    for (const n of ['Body', 'Hat_Wide', 'Hat_Bowler', 'Bandana', 'Duster', 'Poncho', 'Body_Driver', 'Coat_Driver',
-      'Hat_Driver', 'Moustache_Walrus', 'Neckerchief_Driver', 'Watch_Driver']) {
-      const o = r.node(n); if (o) o.visible = show.includes(n);
+    r.root.traverse((o) => { if (o.isMesh) o.visible = look.show.includes(o.name); });
+    for (const [n, c] of Object.entries(look.color || {})) {
+      const o = r.node(n);
+      if (o?.material) { o.material = o.material.clone(); o.material.color.multiply(new THREE.Color(...c)); }
     }
     r.bones = {};
     for (const [k, names] of Object.entries(BONE_ALIASES)) {
       for (const n of names) { const b = r.node(n); if (b) { r.bones[k] = b; break; } }
     }
     r.hand = r.bones.handR || r.root;
+    r.handL = r.bones.handL || null;
+    r.variant = variant;
     r.kind = 'glb';
     return r;
   }

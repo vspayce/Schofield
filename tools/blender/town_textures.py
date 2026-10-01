@@ -2,7 +2,7 @@
 
 Output: tools/blender/_build/town_atlas.jpg (1024², opaque) — sun-bleached board siding,
 peeling paint, clapboard, shingles, rusty tin, deck boards, brick, trim, faded painted
-signs, windows (glass / broken / boarded / open), doors, interior darkness, iron, rope.
+signs, windows (glass / broken / boarded), a tower-clock dial, doors, interior darkness, iron, rope.
 Run: python3 tools/blender/town_textures.py
 """
 import os, sys, math
@@ -372,6 +372,56 @@ def signs(w, h, seed=91):
     return np.clip(out, 0, 1)
 
 
+def clock_dial(w, h, seed=93):
+    """Tower-clock dial: sun-yellowed enamel, black chapter ring with radial Roman
+    numerals (IIII for four, as clockmakers paint it), minute track. No hands (geometry)."""
+    ss = 8
+    S = w * ss
+    c = S / 2
+    img = Image.new('RGB', (S, S), (22, 20, 18))
+    d = ImageDraw.Draw(img)
+    R = S / 2
+    ring = lambda r, **k: d.ellipse([c - r, c - r, c + r, c + r], **k)
+    ring(R * 0.985, fill=(30, 27, 24))                     # black bezel
+    ring(R * 0.93, fill=(226, 214, 186))                   # enamel
+    ink = (24, 21, 19)
+    ring(R * 0.885, outline=ink, width=int(1.2 * ss))       # minute track outer
+    ring(R * 0.815, outline=ink, width=int(0.7 * ss))       # minute track inner
+    for k in range(60):
+        a = math.radians(k * 6)
+        r0, r1 = (R * 0.79, R * 0.885) if k % 5 == 0 else (R * 0.815, R * 0.885)
+        wd = int((1.8 if k % 5 == 0 else 0.6) * ss)
+        d.line([(c + math.sin(a) * r0, c - math.cos(a) * r0), (c + math.sin(a) * r1, c - math.cos(a) * r1)], fill=ink, width=wd)
+    ring(R * 0.53, outline=ink, width=int(0.7 * ss))        # chapter ring inner line
+    f = font(FONTS + 'Times New Roman Bold.ttf', int(S * 0.125))
+    num = ['XII', 'I', 'II', 'III', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI']
+    for k, t in enumerate(num):
+        tile = Image.new('L', (int(S * 0.3), int(S * 0.2)), 0)
+        td = ImageDraw.Draw(tile)
+        bb = td.textbbox((0, 0), t, font=f)
+        tw, th = bb[2] - bb[0], bb[3] - bb[1]
+        sx = min(1.0, S * 0.14 / tw)   # VIII / XII squeezed to fit the ring
+        td.text(((tile.width - tw) / 2 - bb[0], (tile.height - th) / 2 - bb[1]), t, font=f, fill=255)
+        if sx < 1:
+            tile = tile.resize((int(tile.width * sx), tile.height), Image.LANCZOS)
+        # radial: base of each numeral toward the centre
+        rt = tile.rotate(-k * 30, expand=True, resample=Image.BICUBIC)
+        a = math.radians(k * 30)
+        rr = R * 0.66
+        px, py = c + math.sin(a) * rr, c - math.cos(a) * rr
+        img.paste(Image.new('RGB', rt.size, ink), (int(px - rt.width / 2), int(py - rt.height / 2)), rt)
+    ring(R * 0.05, fill=ink)                                # arbor boss
+    img = img.resize((w, h), Image.LANCZOS)
+    a = np.asarray(img).astype(float) / 255
+    # weather: yellowed toward the bottom, soot/rain streaks, chalky fade
+    yy = np.linspace(0, 1, h)[:, None, None]
+    a *= (1.0 - 0.10 * yy) * np.array([1.0, 0.98, 0.93])
+    streak = fbm(h, w, seed, beta=2.2, aniso=(1, 7))
+    a *= (0.88 + 0.16 * streak)[..., None]
+    a = a * 0.9 + 0.1 * a.mean(-1, keepdims=True)
+    return np.clip(a, 0, 1)
+
+
 def dark(w, h):
     yy = np.linspace(0, 1, h)[:, None, None]
     col = np.ones((h, w, 3)) * np.array([0.045, 0.038, 0.032]) * (1 + 0.6 * (1 - yy))
@@ -410,7 +460,7 @@ def build():
         'win_glass': lambda w, h: window(w, h, 'glass', 1),
         'win_broken': lambda w, h: window(w, h, 'broken', 2),
         'win_boarded': lambda w, h: window(w, h, 'boarded', 3),
-        'win_open': lambda w, h: window(w, h, 'open', 4),
+        'clock': lambda w, h: clock_dial(w, h),
         'door_panel': lambda w, h: door(w, h, 'panel', 5),
         'door_saloon': lambda w, h: door(w, h, 'saloon', 6),
         'door_barn': lambda w, h: door(w, h, 'barn', 7),

@@ -21,6 +21,7 @@ import { Player } from './game/player.js';
 import { Enemies } from './game/enemies.js';
 import { Wildlife } from './game/wildlife.js';
 import { Crossing } from './game/crossing.js';
+import { Escorts, parseHires, hireFee } from './game/escort.js';
 import { createRider, createWeapon } from './game/characters.js';
 import { Combat } from './game/combat.js';
 import { Dynamite } from './game/dynamite.js';
@@ -91,7 +92,8 @@ class Game {
     document.getElementById('loading').classList.remove('show');
     const qs = new URLSearchParams(location.search);
     if (qs.has('route')) {
-      this.startRide(+qs.get('route') || 0, qs.get('weapon')).then(() => {
+      // debug: ?hire=bill,gun,gun rides with escorts, free of charge
+      this.startRide(+qs.get('route') || 0, qs.get('weapon'), parseHires(qs.get('hire'))).then(() => {
         // debug: ?train=170 puts the coach that far short of the crossing with the train dispatched
         if (qs.has('train') && this.crossing) this.trainJump(+qs.get('train') || 170);
       });
@@ -112,6 +114,7 @@ class Game {
   disposeWorld() {
     if (!this.route) return;
     this.dynamite?.dispose(); this.dynamite = null;
+    this.escorts?.dispose(); this.escorts = null;
     this.crossing?.dispose(); this.crossing = null; this.bridge?.dispose(); this.bridge = null; this.rockArches?.dispose(); this.rockArches = null; this.enemies?.dispose(); this.wildlife?.dispose(); this.coach?.dispose(); this.fx?.dispose(); this.scatter?.dispose(); this.towns?.dispose(); this.rail?.dispose(); this.water?.dispose(); this.boards?.dispose();
     this.sky?.dispose();
     if (this.terrain) { this.scene.remove(this.terrain.group); this.terrain.tiles.forEach((t) => t.mesh.geometry.dispose()); }
@@ -178,13 +181,14 @@ class Game {
     this.mode = mode;
     this.over = false; this.arrived = false;
     this.bounty = 0; this.hud.setBounty(0);
-    this.coach.s = mode === 'attract' ? 150 : 8;
+    this.coach.s = mode === 'attract' ? 20 : 8;   // the title rolls out of town, past the clock
     this.coach.speed = mode === 'attract' ? 12 : 0;
     this.coach.update(0.016, {});
     if (mode === 'ride') {
       this.player = new Player(this, this.loadout(weapon));
       this.dynamite = new Dynamite(this);
       this.enemies.planFor(this.player);
+      this.escorts = new Escorts(this, this.hires || []);
       this.hud.setRoute(def);
     } else {
       this.attractGuard = this._addAttractGuard();
@@ -201,7 +205,7 @@ class Game {
     guard.root.rotation.y = 0.5;
     const shotgun = createWeapon('CoachGun');
     guard.hand.add(shotgun.root);
-    guard.play(guard.has('RideAim') ? 'RideAim' : 'Ride');
+    guard.play(guard.has('SeatAim') ? 'SeatAim' : guard.has('RideAim') ? 'RideAim' : 'Ride');
     return guard;
   }
 
@@ -231,7 +235,9 @@ class Game {
     audio.loop('music_menu', { bus: 'music', volume: 1 });
   }
 
-  async startRide(i, weapon) {
+  // hires: escort ids for this ride only (already paid for by the menu)
+  async startRide(i, weapon, hires = []) {
+    this.hires = hires; this.hireFee = hireFee(hires);
     this._cancelLater();
     this.paused = false; audio.ctx?.resume();
     audio.stopAll(0.3);
@@ -264,6 +270,7 @@ class Game {
   trainJump(before) {
     this.crossing.debugJump(before);
     this.coach.update(0.016, {});
+    this.escorts?.snap();
     this.terrain.prime(this.coach.pos.x, this.coach.pos.z);
   }
 
@@ -316,7 +323,7 @@ class Game {
     const kept = this.bounty;
     save.earn(kept);
     save.wearCoach(this.coach.hp);      // you limp home with whatever is left
-    this._later(2200, () => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason, kept); });
+    this._later(2200, () => { this.setTimeScale(1); this.hud.show(false); this.menus.failed(reason, kept, this.hireFee || 0); });
   }
 
   arrive() {
@@ -339,7 +346,7 @@ class Game {
     if (coachPct >= 50 && accuracy >= 35) stars = 2;
     if (coachPct >= 75 && accuracy >= 50 && p.hp > 30) stars = 3;
     const reward = Math.round(ROUTES[this.routeIndex].reward * this.mission.pay * (0.5 + coachPct / 200));
-    const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars, mission: this.mission.name };
+    const r = { kills: st.kills, headshots: st.headshots, accuracy, coach: coachPct, bounty: this.bounty, reward, total: this.bounty + reward, stars, mission: this.mission.name, hireFee: this.hireFee || 0, escortKills: this.escorts?.kills || 0, escortBounty: this.escorts?.bounty || 0 };
     save.record(ROUTES[this.routeIndex].id, stars, r.total);
     save.earn(r.total);
     save.wearCoach(this.coach.hp);
@@ -375,6 +382,7 @@ class Game {
       this.dynamite?.update(dt);
       this.crossing?.update(dt);        // before the enemies: some of them ride it
       this.enemies.update(dt);
+      this.escorts?.update(dt);
       this.wildlife.update(dt);
       if (!this.over && coach.s >= this.route.len - 40) this.arrive();
       // ghost town music
@@ -427,7 +435,7 @@ class Game {
   _attractCam(rdt) {
     const c = this.coach, R = this.route, cam = this.camera;
     this._at = (this._at || 0) + rdt;
-    if (c.s > R.len - 200) c.s = 150;
+    if (c.s > R.len - 200) c.s = 20;
     const LEN = 9, SHOTS = 6;
     const k = Math.floor(this._at / LEN), shot = k % SHOTS;
     const t = (this._at % LEN) / LEN;

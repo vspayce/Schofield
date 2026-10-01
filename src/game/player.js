@@ -35,7 +35,8 @@ export class Player {
     this.model = createRider({ variant: 'player' });
     const seat = game.coach.seatGuard || game.coach.body;
     seat.add(this.model.root);
-    this.model.play(this.model.has('RideAim') ? 'RideAim' : 'Ride');
+    // seated on the roof, gun shouldered, no gallop rock (the coach sways him)
+    this.model.play(this.model.has('SeatAim') ? 'SeatAim' : this.model.has('RideAim') ? 'RideAim' : 'Ride');
     this.guns = {};
     for (const W of this.loadout) {
       const w = createWeapon(W.model, { finish: W.finish });
@@ -136,7 +137,7 @@ export class Player {
     const seat = coach.seatGuard || coach.body;
     const root = this.model.root;
     // the model's parent (seat) carries coach yaw; rotate model yaw by relative aim
-    // RideAim points the pistol ~38° to the right of the body; turn the body so the gun sits on the crosshair
+    // SeatAim/RideAim point the gun ~38° to the right of the body; turn the body so the gun sits on the crosshair
     root.rotation.set(0, this.yaw + (this.model.kind === 'glb' ? 0.67 : 0), 0);
     root.visible = this.scopeT < 0.5; // don't look through your own hat
     this.model.update(dt);

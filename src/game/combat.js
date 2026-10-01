@@ -110,9 +110,64 @@ export class Combat {
     p.addDeadeye(head ? 0.16 : 0.1);
   }
 
+  // A hired escort fires at an enemy. The escort has already checked the line
+  // is clear of the coach, team and player; this only resolves the bullet. Kills
+  // go through the enemy's own damage(), so falls, bounty and wave-clearing all
+  // work as for the player's shots, but they don't count as the player's kills.
+  escortShot(esc, muzzle, aim, e, part, hits) {
+    const g = this.g, cfg = esc.cfg;
+    const dir = _v.subVectors(aim, muzzle).normalize().clone();
+    g.fx.muzzle(muzzle, dir, { big: !!cfg.rifle });
+    audio.play(cfg.snd, { position: muzzle, volume: 0.85, pitch: cfg.pitch * (0.97 + Math.random() * 0.06), maxDist: 600 });
+    if (!hits) {
+      // past him into the dirt
+      const miss = aim.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.4));
+      const md = miss.clone().sub(muzzle).normalize();
+      const t = g.terrain.raycast(muzzle, md, 120);
+      const end = muzzle.clone().addScaledVector(md, Math.min(t, 120));
+      g.fx.tracer(muzzle, end);
+      if (t < 120) g.fx.dust(end, { amount: 4, size: 0.3, up: 1 });
+      return false;
+    }
+    const dmg = cfg.dmg * (part === 'head' ? cfg.headMult : 1);
+    const killed = e.damage(dmg, part, dir);
+    g.fx.tracer(muzzle, aim);
+    g.fx.blood(aim, dir);
+    audio.play('hit_flesh_' + (1 + (Math.random() * 2 | 0)), { position: aim, volume: 1 });
+    if (killed) {
+      let bounty = BOUNTY[e.type] || 25;
+      if (part === 'horse') bounty = BOUNTY.horse + 10;
+      if (part === 'head') bounty += BOUNTY.head;
+      g.escorts.credit(esc, bounty, part === 'head');
+    }
+    return killed;
+  }
+
+  // an enemy fires at one of the hired escorts instead of the coach
+  _shotAtEscort(esc, muzzle, { dist, acc, dmgPlayer, rifle }) {
+    const g = this.g;
+    const target = esc.chest.clone();
+    let chance = acc * 0.85 * (1 - smoothstep(10, rifle ? 220 : 48, dist) * 0.7);
+    const dir = _v.subVectors(target, muzzle).normalize();
+    g.fx.muzzle(muzzle, dir, { big: rifle });
+    if (rifle && dist > 60) audio.play('rifle_shot_far', { position: muzzle, volume: 1, delay: dist / 340, maxDist: 900 });
+    else audio.play('schofield_shot2', { position: muzzle, volume: 0.9, pitch: 0.85 + Math.random() * 0.1, maxDist: 600 });
+    if (Math.random() < chance) {
+      g.fx.tracer(muzzle, target);
+      g.fx.blood(target, dir);
+      esc.damage(dmgPlayer * 1.4 * g.diff.dmgMult, muzzle);
+    } else {
+      const miss = target.add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 1.4, (Math.random() - 0.5) * 3));
+      g.fx.tracer(muzzle, miss.addScaledVector(_v.subVectors(miss, muzzle).normalize(), 40));
+    }
+  }
+
   // an enemy fires at the player or the coach
   enemyShot(enemy, muzzle, { dist, acc, dmgPlayer, dmgCoach, rifle = false }) {
     const g = this.g;
+    // now and then at an escort riding nearer to him
+    const esc = g.escorts?.pickTarget(enemy, muzzle, rifle);
+    if (esc) return this._shotAtEscort(esc, muzzle, { dist: muzzle.distanceTo(esc.chest), acc, dmgPlayer, rifle });
     const atPlayer = Math.random() < 0.6;
     const target = atPlayer ? g.player.headPos.clone().add(new THREE.Vector3(0, -0.35, 0)) : g.coach.targetPoint(new THREE.Vector3());
     // accuracy: worse at range, worse when the coach is being whipped, better in Dead Eye? (no)

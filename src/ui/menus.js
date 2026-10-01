@@ -1,7 +1,8 @@
-// Title / route select / loadout / gunsmith / pause / results / settings screens.
+// Title / route select / loadout / gunsmith / guns for hire / pause / results / settings screens.
 import { ROUTES } from '../world/routes.js';
 import { WEAPONS, STARTERS, SIDEARMS, LONG_GUNS } from '../game/weapons.js';
 import { MISSIONS, MISSION_LIST } from '../game/missions.js';
+import { HIRES, HIRE_LIST, ESCORT_CUT, hireFee } from '../game/escort.js';
 import { audio } from '../core/audio.js';
 import { fullscreen } from '../core/fullscreen.js';
 
@@ -25,6 +26,7 @@ export const save = {
 
   get cash() { return this.data.cash || 0; },
   earn(v) { this.data.cash = this.cash + Math.max(0, Math.round(v)); persist(this.data); },
+  spend(v) { this.data.cash = Math.max(0, this.cash - Math.round(v)); persist(this.data); },
   owns(id) { return STARTERS.includes(id) || (this.data.owned || []).includes(id); },
   buy(id) {
     const W = WEAPONS[id];
@@ -83,6 +85,11 @@ function stars(n) { return '★'.repeat(n) + '☆'.repeat(3 - n); }
 // every gun has its own engraving in assets/ui; the year stands in if one is missing
 function gunPic(W) {
   return `<img src="${UI}weapon_${W.id}.png" alt="" onerror="this.outerHTML='<div class=&quot;gun-yr&quot;>${W.year}</div>'"/>`;
+}
+// hired men: a portrait if one's been drawn, else the engraving of what he carries
+function hirePic(H) {
+  const fb = `<img class=&quot;eng&quot; src=&quot;${UI}weapon_${H.pic}.png&quot; alt=&quot;&quot;/>`;
+  return `<img src="${UI}hire_${H.id}.png" alt="" onerror="this.outerHTML='${fb}'"/>`;
 }
 function statBars(W) {
   return Object.entries(W.stats).map(([k, v]) => `<div class="stat"><span>${k}</span><div class="b"><i style="width:${v * 100}%"></i></div></div>`).join('');
@@ -177,7 +184,38 @@ export class Menus {
       <div class="m-row">${slot('side', 'Sidearm', SIDEARMS)}${slot('long', 'Long gun', LONG_GUNS)}</div>
       <div class="coach-cond ${save.coachHp < 55 ? 'bad' : ''}">Coach condition <b>${save.coachHp}%</b>${
         save.coachHp < 100 ? ` · <button class="m-btn ghost sm" data-act="repair">Repair $${save.repairCost()}</button>` : ' · sound'}</div>
-      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="jobs">${MISSIONS[save.mission].name} ▸</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn" data-act="go">All Aboard</button></div>`, true, 'tall');
+      <div class="m-row" style="margin-top:12px"><button class="m-btn ghost" data-act="jobs">${MISSIONS[save.mission].name} ▸</button><button class="m-btn ghost" data-act="shop" data-arg="loadout">Gunsmith · $${save.cash}</button><button class="m-btn ghost ${this._hired().length ? 'hired' : ''}" data-act="hire-screen">${this._hired().length ? `Hired · $${hireFee(this._hired())}` : 'Hire Guns'}</button><button class="m-btn" data-act="go">All Aboard${this._hired().length ? ` · −$${hireFee(this._hired())}` : ''}</button></div>`, true, 'tall');
+  }
+
+  // escorts picked for the next ride; dropped from the end if the purse can't cover them
+  _hired() {
+    const sel = this.hire ||= {};
+    const ids = HIRE_LIST.filter((H) => sel[H.id]).map((H) => H.id);
+    while (ids.length && hireFee(ids) > save.cash) { sel[ids.pop()] = false; }
+    return ids;
+  }
+
+  // Guns for hire: toggles for the next ride only, paid when you climb aboard
+  hireGuns() {
+    const ids = this._hired(), fee = hireFee(ids);
+    const card = (H) => {
+      const on = ids.includes(H.id), afford = on || save.cash >= fee + H.price;
+      const btn = on ? `<button class="m-btn sm" data-act="hire" data-arg="${H.id}">Hired · let go</button>`
+        : `<button class="m-btn sm ${afford ? '' : 'poor'}" data-act="${afford ? 'hire' : ''}" data-arg="${H.id}" ${afford ? '' : 'aria-disabled="true"'}>Hire $${H.price}</button>`;
+      return `<div class="shop-card hire-card ${on ? 'sel' : ''} ${H.id === 'bill' ? 'star' : ''}">
+        <div class="shop-head"><h3>${H.name}</h3><span class="yr">$${H.price} a ride</span></div>
+        <div class="shop-pic hire-pic">${hirePic(H)}</div>
+        <p>${H.blurb}</p>
+        ${statBars(H)}
+        <div class="shop-foot">${btn}</div>
+      </div>`;
+    };
+    this._show(`<h2 class="m-title">Guns for Hire</h2>
+      <div class="purse">Your purse: <b>$${save.cash}</b>${fee ? ` · this ride: <b>−$${fee}</b> · left: <b>$${save.cash - fee}</b>` : ''}</div>
+      <div class="m-tag hire-terms">Paid when you climb aboard, and gone whatever happens. They ride one trip only.
+        Outlaws they drop pay you ${ESCORT_CUT === 0.5 ? 'half' : Math.round(ESCORT_CUT * 100) + '%'} the bounty; they keep the rest.</div>
+      <div class="shop-grid hire-grid">${HIRE_LIST.map(card).join('')}</div>
+      <button class="m-btn" style="margin-top:14px" data-act="hire-done">Done</button>`, true, 'tall');
   }
 
   // buy guns with the purse; back = 'loadout' | 'results'
@@ -225,8 +263,10 @@ export class Menus {
       <div class="line"><span>Coach condition</span><span>${r.coach}%</span></div>
       <div class="line"><span>Bounties</span><span>$${r.bounty}</span></div>
       <div class="line"><span>${r.mission || 'Contract'} payout</span><span>$${r.reward}</span></div>
+      ${r.hireFee ? `<div class="line"><span>of which hired guns' ${r.escortKills} kills, at half</span><span>$${r.escortBounty}</span></div>
+      <div class="line"><span>Guns for hire, paid at departure</span><span>−$${r.hireFee}</span></div>` : ''}
       </div>
-      <div class="total">Total $${r.total}</div>
+      <div class="total">Total $${r.total}${r.hireFee ? `<small class="net"> · net of hire ${r.total < r.hireFee ? '−' : ''}$${Math.abs(r.total - r.hireFee)}</small>` : ''}</div>
       <div class="purse-line">Purse $${save.cash}</div>
       <div class="m-row" style="margin-top:10px">
         <button class="m-btn ghost" data-act="shop" data-arg="results">Gunsmith</button>
@@ -236,10 +276,11 @@ export class Menus {
       </div></div>`);
   }
 
-  failed(reason, kept = 0) {
+  failed(reason, kept = 0, fee = 0) {
     this._show(`<div class="paper"><h2>Dead &amp; Buried</h2>
       <div style="font-style:italic;margin:6px 0 14px">${reason}</div>
       ${kept ? `<div class="purse-line" style="margin:-6px 0 12px">You keep the $${kept} in bounties. Purse $${save.cash}</div>` : ''}
+      ${fee ? `<div class="purse-line" style="margin:-6px 0 12px">The $${fee} you paid your hired guns is gone.</div>` : ''}
       <div class="m-row"><button class="m-btn" data-act="restart">Try Again</button><button class="m-btn ghost" data-act="routes">Routes</button></div></div>`);
   }
 
@@ -267,6 +308,9 @@ export class Menus {
       <h3 class="how-h">Watch for</h3>
       <p><b>Riflemen</b> on the ridges flash a glint before they shoot and hit far harder than riders. Drop them first.</p>
       <p><b>The bracket</b> around a shooter shows his range; it flashes red when he's about to fire.</p>
+      <h3 class="how-h">Guns for hire</h3>
+      <p>From the loadout, <b>Hire Guns</b> buys mounted escorts for one ride, paid when you climb aboard. They pick their own fights
+      but leave a fresh rider to you for a few seconds, and what they drop pays you half the bounty.</p>
       <div style="text-align:center"><button class="m-btn" data-act="title">Got It</button></div></div>`, true, 'tall');
   }
 
@@ -333,7 +377,20 @@ export class Menus {
       case 'buy': if (save.buy(arg)) audio.play('schofield_cock', { volume: 0.8 }); this.gunsmith(); break;
       case 'equip': save.equip(arg); this.gunsmith(); break;
       case 'shop-done': if (this.shopBack === 'results') this.results(); else this.loadout(this.routeIndex); break;
-      case 'go': this.hide(); g.startRide(this.routeIndex); break;
+      case 'go': {
+        const ids = this._hired();
+        save.spend(hireFee(ids));
+        this.hire = {};                       // one ride only
+        this.hide(); g.startRide(this.routeIndex, undefined, ids); break;
+      }
+      case 'hire-screen': this.hireGuns(); break;
+      case 'hire': {
+        const sel = this.hire ||= {};
+        sel[arg] = !sel[arg];
+        if (sel[arg]) audio.play('schofield_cock', { volume: 0.7 });
+        this.hireGuns(); break;
+      }
+      case 'hire-done': this.loadout(this.routeIndex); break;
       case 'resume': this.hide(); g.resume(); break;
       case 'pause': this.pause(); break;
       case 'restart': save.coachHp = 100; this.hide(); g.startRide(g.routeIndex); break;
