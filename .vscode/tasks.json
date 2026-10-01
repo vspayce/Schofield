@@ -1,0 +1,173 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Schofield Dynamite",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Check balance release worktree",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Stage coach balance update",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				"--",
+				"src/main.js",
+				"src/style.css"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Commit coach balance update",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"commit",
+				"-m",
+				"Reduce coach damage and simplify mobile dynamite HUD"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Push balance update",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"push",
+				"origin",
+				"HEAD:main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check balance Pages run",
+			"type": "shell",
+			"command": "gh",
+			"args": [
+				"run",
+				"list",
+				"--workflow",
+				"deploy.yml",
+				"--limit",
+				"1",
+				"--json",
+				"databaseId,status,conclusion,url,headSha"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Wait for balance Pages run",
+			"type": "shell",
+			"command": "gh",
+			"args": [
+				"run",
+				"watch",
+				"36654365717",
+				"--exit-status"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Stage wildlife marker refinement",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				"--",
+				"src/ui/hud.js",
+				"src/style.css"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Commit wildlife pointer markers",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"commit",
+				"-m",
+				"Shrink wildlife markers to head pointers"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Push wildlife marker fix",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"push",
+				"origin",
+				"HEAD:main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check wildlife pointer Pages run",
+			"type": "shell",
+			"command": "gh",
+			"args": [
+				"run",
+				"list",
+				"--workflow",
+				"deploy.yml",
+				"--limit",
+				"1",
+				"--json",
+				"databaseId,status,conclusion,url,headSha"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Wait for wildlife pointer Pages run",
+			"type": "shell",
+			"command": "gh",
+			"args": [
+				"run",
+				"watch",
+				"36724563579",
+				"--exit-status"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Probe Blender runtime",
+			"type": "shell",
+			"command": "/Applications/Blender.app/Contents/MacOS/Blender",
+			"args": [
+				"--version"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+	]
+}
