@@ -210,9 +210,13 @@ export function createRider({ variant = 'bandit', tint = null } = {}) {
     let look = LOOKS[variant] || { show: ['Body'] };
     if (look.pick) look = LOOKS[look.pick[Math.floor(Math.random() * look.pick.length)]];
     const r = new Animated(g, tint);
-    r.root.traverse((o) => { if (o.isMesh) o.visible = look.show.includes(o.name); });
+    // gltfpack moves each mesh onto an unnamed child of its named node, which
+    // GLTFLoader calls mesh_0, mesh_1, ...
+    const meshName = (o) => (!o.name || /^mesh_\d+$/.test(o.name) ? o.parent?.name : o.name);
+    r.root.traverse((o) => { if (o.isMesh) o.visible = look.show.includes(meshName(o)); });
     for (const [n, c] of Object.entries(look.color || {})) {
-      const o = r.node(n);
+      let o = r.node(n);
+      if (o && !o.isMesh) o = o.children.find((ch) => ch.isMesh);
       if (o?.material) { o.material = o.material.clone(); o.material.color.multiply(new THREE.Color(...c)); }
     }
     r.bones = {};
