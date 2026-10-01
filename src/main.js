@@ -39,6 +39,8 @@ const DIFF = [
 ];
 const COACH_DAMAGE_MULT = 0.7;
 
+const _UP = new THREE.Vector3(0, 1, 0);
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('gl');
@@ -84,7 +86,7 @@ class Game {
     msg.textContent = 'Building the territory…';
     fill.style.width = '95%';
     await new Promise((r) => setTimeout(r, 30));
-    this.buildWorld(0, 'attract');
+    this.buildWorld(this._attractRoute(), 'attract');
     fill.style.width = '100%';
     document.getElementById('loading').classList.remove('show');
     const qs = new URLSearchParams(location.search);
@@ -225,7 +227,7 @@ class Game {
     this.hud.show(false);
     audio.stopAll(0.4);
     this.setTimeScale(1); this.timeScale = 1;
-    this.buildWorld(0, 'attract');
+    this.buildWorld(this._attractRoute(), 'attract');
     audio.loop('music_menu', { bus: 'music', volume: 1 });
   }
 
@@ -413,24 +415,64 @@ class Game {
     audio.updateListener(this.camera);
   }
 
+  // a different stretch of the territory each time you come back to the title
+  _attractRoute() {
+    let i = Math.floor(Math.random() * ROUTES.length);
+    if (ROUTES.length > 1 && i === this.routeIndex) i = (i + 1) % ROUTES.length;
+    return i;
+  }
+
+  // Title cinematic: wide landscape shots between the close ones, the coach
+  // kept in the right third, clear of the menu on the left.
   _attractCam(rdt) {
-    const c = this.coach;
+    const c = this.coach, R = this.route, cam = this.camera;
     this._at = (this._at || 0) + rdt;
-    if (c.s > this.route.len - 200) c.s = 150;
-    const shot = Math.floor(this._at / 8) % 3;
-    const t = (this._at % 8) / 8;
-    const right = c.right, fwd = c.fwd;
+    if (c.s > R.len - 200) c.s = 150;
+    const LEN = 9, SHOTS = 6;
+    const k = Math.floor(this._at / LEN), shot = k % SHOTS;
+    const t = (this._at % LEN) / LEN;
+    const right = c.right, fwd = c.fwd, up = _UP;
     const target = new THREE.Vector3();
     const look = new THREE.Vector3().copy(c.pos).add(new THREE.Vector3(0, 1.8, 0));
-    // coach framed in the right third, clear of the menu on the left
-    if (shot === 0) { target.copy(c.pos).addScaledVector(right, 7).addScaledVector(fwd, 6 - t * 12).add(new THREE.Vector3(0, 1.4, 0)); look.addScaledVector(right, 2.6); }
-    else if (shot === 1) { target.copy(c.pos).addScaledVector(fwd, -9 - t * 3).addScaledVector(right, -3).add(new THREE.Vector3(0, 4 + t * 2, 0)); look.addScaledVector(fwd, 6); }
-    else { target.copy(c.pos).addScaledVector(fwd, 14 - t * 2).addScaledVector(right, -4 + t * 3).add(new THREE.Vector3(0, 1.2, 0)); look.addScaledVector(fwd, 3); }
-    const gh = this.route.height(target.x, target.z) + 0.8;
+    const cut = this._shot !== k;
+    let fov = 60, side = this._side || 1;
+    if (cut) this._side = side = Math.random() < 0.5 ? -1 : 1;
+    if (shot === 0) {
+      // aerial establishing: high and wide, drifting with the coach, looking down the road
+      target.copy(c.pos).addScaledVector(right, side * (55 - t * 10)).addScaledVector(fwd, -30 + t * 25).addScaledVector(up, 32 - t * 6);
+      look.addScaledVector(fwd, 40); fov = 50;
+    } else if (shot === 1) {
+      // low tracking alongside
+      target.copy(c.pos).addScaledVector(right, 7).addScaledVector(fwd, 6 - t * 12).addScaledVector(up, 1.4);
+      look.addScaledVector(right, 2.6);
+    } else if (shot === 2) {
+      // long lens from far down the road: the coach comes on through the country
+      if (cut) {
+        this._plant = R.worldAt(Math.min(R.len - 10, c.s + 150), side * 14, new THREE.Vector3());
+        this._plant.y = R.height(this._plant.x, this._plant.z) + 2.5 + Math.random() * 3;
+      }
+      target.copy(this._plant);
+      look.y += 0.4; fov = 26 - t * 6;
+    } else if (shot === 3) {
+      // crane up from behind, revealing the road ahead
+      target.copy(c.pos).addScaledVector(fwd, -10 - t * 8).addScaledVector(right, -3 * side).addScaledVector(up, 3 + t * 16);
+      look.addScaledVector(fwd, 12 + t * 40);
+    } else if (shot === 4) {
+      // slow orbit at a distance, the horizon wheeling behind
+      const a = side * (0.6 + t * 1.3);
+      target.copy(c.pos).addScaledVector(fwd, Math.cos(a) * 26).addScaledVector(right, Math.sin(a) * 26).addScaledVector(up, 9);
+      look.addScaledVector(fwd, 4); fov = 55;
+    } else {
+      // front quarter, the team coming at you
+      target.copy(c.pos).addScaledVector(fwd, 14 + c.teamFront - t * 2).addScaledVector(right, -4 + t * 3).addScaledVector(up, 1.2);
+      look.addScaledVector(fwd, 3);
+    }
+    const gh = R.height(target.x, target.z) + 0.8;
     target.y = Math.max(target.y, gh);
-    if (this._shot !== shot) { this._shot = shot; this.camera.position.copy(target); }
-    else this.camera.position.lerp(target, 1 - Math.exp(-6 * rdt));
-    this.camera.lookAt(look);
+    if (cut) { this._shot = k; cam.position.copy(target); cam.fov = fov; }
+    else { cam.position.lerp(target, 1 - Math.exp(-6 * rdt)); cam.fov = damp(cam.fov, fov, 4, rdt); }
+    cam.updateProjectionMatrix();
+    cam.lookAt(look);
   }
 }
 
